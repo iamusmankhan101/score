@@ -83,6 +83,9 @@ export async function resolveActor(
   return { userId: actor.id, actorId: actor.id, locationId: requestedLocationId, role: actor.role };
 }
 
+/** The salon's own admins: the owner, or a manager (one branch's admin). Gates Salonflow. */
+export const isSalonAdmin = (actor: ResolvedActor) => actor.role === "owner" || actor.role === "manager";
+
 /**
  * For platform-admin-only endpoints that act on an arbitrary target user
  * (e.g. approving another salon's payment, changing their plan) — verifies

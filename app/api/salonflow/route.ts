@@ -2,8 +2,9 @@
  * GET /api/salonflow
  *
  * Today's live data for the Salonflow screen (/dashboard/salonflow), which
- * polls this every few seconds. Owners see every branch; a manager only their
- * own. Staff logins get 403 — the screen shows the day's takings.
+ * polls this every few seconds. Salon admins only: owners see every branch, a
+ * manager (branch admin) only their own. Staff and platform admins get 403 — the
+ * screen shows the day's takings.
  *
  * Sends the menu, staff and hours plus today's appointments and paid bills,
  * and the same weekday last week (up to the same time) for trend arrows. The
@@ -15,7 +16,7 @@
 
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { resolveActor } from "@/lib/api-auth";
+import { isSalonAdmin, resolveActor } from "@/lib/api-auth";
 import type { Appointment, Client, Service, Staff } from "@/lib/types";
 import type { SalonInvoice } from "@/lib/salon-invoices";
 import type { SalonLocation } from "@/lib/locations";
@@ -79,7 +80,7 @@ const paidOn = (inv: SalonInvoice, date: string) => inv.status === "paid" && (in
 export async function GET(req: NextRequest) {
   const actor = await resolveActor(req);
   if (!actor) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  if (actor.role === "staff") return Response.json({ error: "Not allowed" }, { status: 403 });
+  if (!isSalonAdmin(actor)) return Response.json({ error: "Not allowed" }, { status: 403 });
 
   try {
     const settings = (await readRow<Json>(`${actor.userId}_settings`)) ?? {};

@@ -8,7 +8,7 @@ import {
   UserCog, BarChart3, Package, Globe, Sparkles, CreditCard, Scissors,
   CircleUserRound, LogOut, Shield, Wand2, ReceiptText, ShoppingCart,
   X, Gift, Banknote, ChevronRight, ChevronDown, MapPin, Check, Wallet, Star,
-  ClipboardCheck, Store, Landmark, Archive, Smartphone, FileText, Armchair, FileSignature, Megaphone, DoorOpen, HeartPulse, Hourglass,
+  ClipboardCheck, Store, Landmark, Archive, Smartphone, FileText, FileSignature, Megaphone, DoorOpen, HeartPulse, Hourglass,
 } from "lucide-react";
 import { businessTypeOf, term, useIsClinic } from "@/lib/clinic";
 import { AuthUser, getCurrentUser, signOut } from "@/lib/auth";
@@ -25,7 +25,6 @@ export const NAV_GROUPS: {
     items: [
       { href: "/dashboard",              icon: LayoutDashboard, label: "Dashboard"    },
       { href: "/dashboard/calendar",     icon: CalendarDays,    label: "Calendar"     },
-      { href: "/dashboard/floor",        icon: Armchair,        label: "Salon Floor"  },
       { href: "/dashboard/appointments", icon: ClipboardList,   label: "Appointments" },
     ],
   },
