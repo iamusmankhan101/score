@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Eye, EyeOff, KeyRound, LockKeyhole, Mail, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Users } from "lucide-react";
+import CodeInput from "@/components/code-input";
 import { getCurrentUser } from "@/lib/auth";
 import styles from "../auth.module.css";
 
@@ -249,21 +250,15 @@ export default function SignInPage() {
                       : `We emailed a 6-digit code to ${twoFactor.emailHint ?? "your email"}. It expires in 10 minutes.`}
                   </p>
                 </div>
-                <label className={styles.field}>
-                  <span className={styles.label}>Sign-in code</span>
-                  <div className={styles.inputWrap}>
-                    <KeyRound size={16} className={styles.inputIcon} />
-                    <input className={styles.input} inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus
-                      placeholder="123456" value={code} style={{ letterSpacing: "0.3em", fontWeight: 700 }}
-                      onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                      onKeyDown={(e) => e.key === "Enter" && submitCode()} />
-                  </div>
-                </label>
+                <div className={styles.field}>
+                  <span className={styles.label}>Enter verification code</span>
+                  <CodeInput value={code} onChange={setCode} onEnter={() => code.length === 6 && submitCode()} autoFocus label="Verification code" />
+                </div>
                 {notice && <div style={{ fontSize: 13, color: "#059669", fontWeight: 600, marginBottom: 12 }}>{notice}</div>}
                 {error && <div className={styles.error}>{error}</div>}
-                <button type="button" onClick={submitCode} disabled={submitting} className={styles.primaryButton}
-                  style={submitting ? { opacity: 0.5, cursor: "not-allowed" } : undefined}>
-                  {submitting ? "Checking…" : <><span>Verify &amp; sign in</span> <ArrowRight size={14} /></>}
+                <button type="button" onClick={submitCode} disabled={submitting || code.length !== 6} className={styles.primaryButton}
+                  style={submitting || code.length !== 6 ? { opacity: 0.45, cursor: "not-allowed" } : undefined}>
+                  {submitting ? "Checking…" : <><span>Verify &amp; continue</span> <ArrowRight size={14} /></>}
                 </button>
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16, fontSize: 13 }}>
                   <button type="button" onClick={backToPassword} style={{ background: "none", border: "none", color: "#77738a", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, padding: 0 }}>

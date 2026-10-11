@@ -8,13 +8,9 @@
  */
 
 import { useEffect, useState, type CSSProperties } from "react";
+import CodeInput from "@/components/code-input";
 
 type Status = { available: boolean; enabled?: boolean; method?: "email" | "totp" };
-
-const inp: CSSProperties = {
-  width: 140, padding: "9px 12px", borderRadius: 10, border: "1px solid #e3e0eb", fontSize: 14,
-  letterSpacing: "0.3em", fontWeight: 700, outline: "none", color: "#1a1a2e", background: "#fff",
-};
 
 export default function TwoStepSignIn() {
   const [status, setStatus] = useState<Status | null>(null);
@@ -72,9 +68,11 @@ export default function TwoStepSignIn() {
     padding: "9px 16px", borderRadius: 10, border: primary ? "none" : "1px solid #e3e0eb", fontSize: 13, fontWeight: 700,
     background: primary ? "#7c3aed" : "#fff", color: primary ? "#fff" : "#6b6b8a", cursor: busy ? "not-allowed" : "pointer",
   });
+  // Full-width row of boxes; the buttons sit on the next line.
   const codeInput = (
-    <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="123456" value={code} autoFocus
-      aria-label="6-digit code" onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} style={inp} />
+    <div style={{ flexBasis: "100%" }}>
+      <CodeInput value={code} onChange={setCode} autoFocus />
+    </div>
   );
 
   return (
