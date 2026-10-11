@@ -189,6 +189,8 @@ function OnlineBookingInner({ salonIdOverride }: { salonIdOverride?: string }) {
   }
   const totalDuration      = selectedServices.reduce((sum, s) => sum + s.durationMin, 0);
   const totalPrice         = selectedServices.reduce((sum, s) => sum + s.price, 0);
+  // Variable-price services count at their minimum, so the total is a starting price.
+  const totalLabel         = (selectedServices.some((s) => s.variablePrice) ? "from " : "") + fmt(totalPrice);
   const selectedHours      = getHoursForDate(selectedDate);
   const dateIsOpen         = !selectedDate || !selectedHours || selectedHours.open;
   // The salon's clock, not the visitor's — a customer abroad must see the salon's today.
@@ -391,7 +393,7 @@ function OnlineBookingInner({ salonIdOverride }: { salonIdOverride?: string }) {
         <span className="svcRowCheck">{checked && <Check size={12} strokeWidth={3} />}</span>
         <span className="svcRowName">{sv.name}</span>
         <span className="svcRowDur"><Clock size={11} /> {sv.durationMin}m</span>
-        <span className="svcRowPrice">{fmt(sv.price)}</span>
+        <span className="svcRowPrice">{sv.variablePrice && sv.priceRangeMin && sv.priceRangeMax ? `${fmt(sv.priceRangeMin)} - ${fmt(sv.priceRangeMax)}` : fmt(sv.price)}</span>
       </button>
     );
   }
@@ -626,7 +628,7 @@ function OnlineBookingInner({ salonIdOverride }: { salonIdOverride?: string }) {
                 <button className={`btnNext ${selectedServiceIds.length > 0 ? "active" : "disabled"}`} disabled={selectedServiceIds.length === 0} onClick={() => setStep(2)}>
                   {selectedServiceIds.length === 0 ? "Select a service" : (
                     <>
-                      <span className="btnNextMeta">{selectedServiceIds.length} · {fmt(totalPrice)}</span>
+                      <span className="btnNextMeta">{selectedServiceIds.length} · {totalLabel}</span>
                       Continue <ChevronRight size={16} />
                     </>
                   )}
@@ -752,7 +754,7 @@ function OnlineBookingInner({ salonIdOverride }: { salonIdOverride?: string }) {
 
               <div className="totalRow">
                 <span>Total</span>
-                <span className="totalAmount">{fmt(totalPrice)}</span>
+                <span className="totalAmount">{totalLabel}</span>
               </div>
 
               <div className="stepNav">
@@ -782,7 +784,7 @@ function OnlineBookingInner({ salonIdOverride }: { salonIdOverride?: string }) {
                 <div className="successRow"><span className="successLabel">Time</span><span className="successValue">{fmtTime12(selectedTime)}</span></div>
                 <div className="successRow"><span className="successLabel">Duration</span><span className="successValue">{totalDuration} min</span></div>
                 <div className="successRow"><span className="successLabel">Payment</span><span className="successValue">{chosenPay.label}</span></div>
-                <div className="successRow highlight"><span className="successLabel">Total</span><span className="successValue">{fmt(totalPrice)}</span></div>
+                <div className="successRow highlight"><span className="successLabel">Total</span><span className="successValue">{totalLabel}</span></div>
               </div>
 
               {chosenPay.id !== "counter" && (
