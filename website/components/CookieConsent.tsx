@@ -26,8 +26,8 @@ export default function CookieConsent() {
     <div className={styles.wrap} role="dialog" aria-label="Cookie consent" aria-live="polite">
       <div className={styles.banner}>
         <p className={styles.text}>
-          We use cookies to keep you signed in, understand how visitors use this site, and improve your experience.
-          Read our <a href="/privacy">Privacy Policy</a> to learn more.
+          We only use essential cookies and storage, to keep you signed in and remember your choices. No advertising
+          or tracking cookies. Read our <a href="/privacy">Privacy Policy</a> to learn more.
         </p>
         <div className={styles.actions}>
           <button type="button" className={styles.decline} onClick={() => choose("declined")}>

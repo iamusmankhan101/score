@@ -52,3 +52,54 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+.doc h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111111;
+  margin: 24px 0 8px;
+}
+
+/* "The short version" box at the top of a policy. */
+.summary {
+  background: #f5f3ff;
+  border: 1px solid #ede9fe;
+  border-radius: 14px;
+  padding: 18px 22px 6px;
+  margin-bottom: 32px;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  margin: 0 0 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.doc table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  min-width: 560px;
+}
+
+.doc th {
+  text-align: left;
+  font-weight: 600;
+  color: #111111;
+  background: #f9fafb;
+  padding: 10px 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.doc td {
+  color: #374151;
+  line-height: 1.6;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: top;
+}
+
+.doc tr:last-child td {
+  border-bottom: none;
+}
