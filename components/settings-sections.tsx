@@ -162,7 +162,9 @@ export function Appearance() {
   const [form, setForm] = useState({ ...settingsStore.appearance });
   const [saved, setSaved] = useState(false);
   const colors = ["#7C3AED", "#db2777", "#0369a1", "#059669", "#d97706", "#dc2626"];
-  const save = () => { Object.assign(settingsStore.appearance, form); setSaved(true); setTimeout(() => setSaved(false), 3000); };
+  const save = () => {
+    // Only the fields this form edits, so a stale copy can't undo the booking-page price toggle.
+    Object.assign(settingsStore.appearance, { accent: form.accent, dateFormat: form.dateFormat, timeFormat: form.timeFormat }); setSaved(true); setTimeout(() => setSaved(false), 3000); };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {saved && <SavedBanner />}
