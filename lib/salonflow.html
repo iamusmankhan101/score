@@ -681,26 +681,8 @@ class MockAdapter {
   clientName(a) { return this.clients.find(c => c.id === a.clientId).name; }
 
   alerts() {
-    const now = this.now;
-    const out = this.events.filter(e => now - e.at < 90 * MIN);
-    for (const a of this.appts) {
-      const svc = this.svc(a);
-      if (a.status === 'in-progress') {
-        const over = Math.round((now - a.startedAt - (a.end - a.start)) / MIN);
-        if (over >= 10) {
-          const st = this.stations.find(s => s.id === a.stationId), who = this.staff.find(p => p.id === a.staffId);
-          out.push({ id: `over:${a.id}`, branchId: a.branchId, level: over >= 25 ? 'critical' : 'warn', kind: 'overrun', at: now - over * MIN, appointmentId: a.id, text: `${svc.name} on station ${st.label} is ${over} min over (${who.name})` });
-        }
-      } else if (a.status === 'arrived') {
-        const waited = Math.round((now - Math.max(a.arrivedAt, a.start)) / MIN);
-        if (waited >= 15) out.push({ id: `wait:${a.id}`, branchId: a.branchId, level: waited >= 30 ? 'critical' : 'warn', kind: 'waiting', at: now - waited * MIN, appointmentId: a.id, text: `${this.clientName(a)} waiting ${waited} min for ${svc.name}` });
-      }
-      if (a.bridal && a.bridal.advanceStatus !== 'paid' && ACTIVE.includes(a.status)) {
-        out.push({ id: `adv:${a.id}`, branchId: a.branchId, level: a.bridal.advanceStatus === 'pending' ? 'critical' : 'warn', kind: 'bridal-advance', at: a.start, appointmentId: a.id,
-          text: `${svc.name} for ${this.clientName(a)} at ${clock(a.start)} — advance ${a.bridal.advanceStatus} (Rs ${a.bridal.advancePaid.toLocaleString('en-US')} of ${a.bridal.advanceDue.toLocaleString('en-US')})` });
-      }
-    }
-    return out;
+    return [...this.events.filter(e => this.now - e.at < 90 * MIN),
+      ...opsAlerts({ now: this.now, appointments: this.appts, services: this.services, clients: this.clients, stations: this.stations, staff: this.staff })];
   }
 
   snapshot() {
@@ -741,36 +723,114 @@ class MockAdapter {
   }
 }
 
-// Backend stub. Fill in the TODOs; the UI needs no changes as long as the server speaks the schema above.
-class ApiAdapter {
-  constructor({ baseUrl, wsUrl, token }) { Object.assign(this, { baseUrl, wsUrl, token }); }
-  async start(emit) {
-    // TODO(backend): GET /salonflow/snapshot → Snapshot for today (PKT)
-    const res = await fetch(`${this.baseUrl}/salonflow/snapshot`, { headers: { Authorization: `Bearer ${this.token}` } });
-    if (!res.ok) throw new Error(`Snapshot request failed (${res.status})`);
-    this.snap = { ...(await res.json()), live: true, speed: null };
-    emit(this.snap);
-    // TODO(backend): stream messages, either
-    //   { type: 'snapshot', data: Snapshot }
-    //   { type: 'patch', collection: 'appointments'|'payments'|'alerts'|..., upsert: [records], remove: [ids], now }
-    this.ws = new WebSocket(`${this.wsUrl}/salonflow/stream`);
-    this.ws.onopen = () => this.ws.send(JSON.stringify({ type: 'auth', token: this.token }));
-    this.ws.onmessage = e => {
-      const msg = JSON.parse(e.data);
-      if (msg.type === 'snapshot') this.snap = { ...msg.data, live: true, speed: null };
-      if (msg.type === 'patch') {
-        const gone = new Set([...(msg.remove ?? []), ...(msg.upsert ?? []).map(r => r.id)]);
-        this.snap = { ...this.snap, now: msg.now ?? this.snap.now, [msg.collection]: [...this.snap[msg.collection].filter(r => !gone.has(r.id)), ...(msg.upsert ?? [])] };
+// Overruns, long waits and unpaid bridal advances, worked out from the appointments alone,
+// so the simulation and live data raise them the same way.
+function opsAlerts({ now, appointments, services, clients, stations, staff }) {
+  const by = arr => new Map(arr.map(x => [x.id, x]));
+  const svcs = by(services), people = by(clients), seats = by(stations), team = by(staff);
+  const out = [];
+  for (const a of appointments) {
+    const svc = svcs.get(a.serviceId), clientName = people.get(a.clientId).name;
+    if (a.status === 'in-progress') {
+      const over = Math.round((now - a.startedAt - (a.end - a.start)) / MIN);
+      if (over >= 10) {
+        out.push({ id: `over:${a.id}`, branchId: a.branchId, level: over >= 25 ? 'critical' : 'warn', kind: 'overrun', at: now - over * MIN, appointmentId: a.id, text: `${svc.name} on station ${seats.get(a.stationId).label} is ${over} min over (${team.get(a.staffId).name})` });
       }
-      emit(this.snap);
-    };
-    // TODO(backend): reconnect with backoff on close; show a "connection lost" state.
+    } else if (a.status === 'arrived') {
+      const waited = Math.round((now - Math.max(a.arrivedAt, a.start)) / MIN);
+      if (waited >= 15) out.push({ id: `wait:${a.id}`, branchId: a.branchId, level: waited >= 30 ? 'critical' : 'warn', kind: 'waiting', at: now - waited * MIN, appointmentId: a.id, text: `${clientName} waiting ${waited} min for ${svc.name}` });
+    }
+    if (a.bridal && a.bridal.advanceStatus !== 'paid' && ACTIVE.includes(a.status)) {
+      out.push({ id: `adv:${a.id}`, branchId: a.branchId, level: a.bridal.advanceStatus === 'pending' ? 'critical' : 'warn', kind: 'bridal-advance', at: a.start, appointmentId: a.id,
+        text: `${svc.name} for ${clientName} at ${clock(a.start)} — advance ${a.bridal.advanceStatus} (Rs ${a.bridal.advancePaid.toLocaleString('en-US')} of ${a.bridal.advanceDue.toLocaleString('en-US')})` });
+    }
   }
-  stop() { this.ws?.close(); }
-  command(name, args) {
-    // TODO(backend): POST /salonflow/commands/:name
-    return fetch(`${this.baseUrl}/salonflow/commands/${name}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` }, body: JSON.stringify(args) });
+  return out;
+}
+
+// Turns GET /api/salonflow (today's real appointments and paid bills, see app/api/salonflow/route.ts)
+// into a Snapshot. Stations come from the staff list exactly as in the simulation.
+function liveSnapshot(raw) {
+  const now = raw.now, day = pktMidnight(now);
+  // Staff with bookings today get the limited stations first.
+  const booked = new Set(raw.appointments.map(a => a.staffId));
+  const prep = prepareSalon({ ...raw.salon, branches: raw.branches.map(b => ({ ...b, hours: raw.hours })),
+    staff: [...raw.staff].sort((x, y) => booked.has(y.id) - booked.has(x.id)), services: raw.services });
+  const branches = prep.branches.map(({ hours, ...b }) => { const h = hoursOn({ hours }, day); return { ...b, open: h.open, opensAt: h.from, closesAt: h.to }; });
+  const { stations, staff } = prep;
+  // A branch with no working staff on record still needs somewhere to show its bookings.
+  for (const b of branches) {
+    if (stations.some(st => st.branchId === b.id)) continue;
+    stations.push({ id: `${b.id}-s1`, branchId: b.id, index: 0, type: 'styling', label: `1 · ${STATION_TYPES.styling}` });
+    staff.push({ id: `${b.id}-team`, branchId: b.id, name: 'Team', role: 'Staff', stationId: `${b.id}-s1` });
   }
+  const services = prep.services.map(({ w, staffIds, bridal, ...s }) => s);
+  const svcById = new Map(services.map(s => [s.id, s])), staffById = new Map(staff.map(p => [p.id, p]));
+  const clients = new Map(), appointments = [], payments = [];
+  const seen = t => Number.isFinite(t) && t >= day && t <= now ? t : null;
+
+  function add(r) {
+    // ponytail: a booking with several services, or one the staff member has no station for, goes on the
+    // first station of the branch / under one combined menu line. Fine for a glance, not for staff reports.
+    const known = staffById.get(r.staffId);
+    const station = (known?.branchId === r.branchId && known.stationId && stations.find(st => st.id === known.stationId))
+      || stations.find(st => st.branchId === r.branchId);
+    const who = known?.branchId === r.branchId ? known : staff.find(p => p.stationId === station.id);
+    let serviceId = r.serviceIds.length === 1 && svcById.has(r.serviceIds[0]) ? r.serviceIds[0] : null;
+    if (!serviceId) {
+      const first = svcById.get(r.serviceIds[0]);
+      serviceId = `booking:${r.id}`;
+      const svc = { id: serviceId, name: r.serviceNames.join(' + ') || 'Service', category: first?.category ?? 'other', durationMin: Math.round((r.end - r.start) / MIN), price: r.price, priceMax: null };
+      svc.stationTypes = stationTypesFor(svc);
+      services.push(svc); svcById.set(serviceId, svc);
+    }
+    if (!clients.has(r.clientId)) clients.set(r.clientId, { id: r.clientId, name: r.clientName, phone: r.clientPhone });
+    const changed = seen(r.changedAt);
+    const a = { id: r.id, branchId: r.branchId, stationId: station.id, staffId: who.id, clientId: r.clientId, serviceId,
+      start: r.start, end: r.end, status: r.status, source: ['whatsapp', 'walk-in', 'web', 'manual'].includes(r.source) ? r.source : 'manual', price: r.price };
+    if (a.status === 'arrived') a.arrivedAt = changed ?? Math.min(a.start, now);
+    if (a.status === 'in-progress') a.arrivedAt = a.startedAt = changed ?? Math.min(a.start, now);
+    if (a.status === 'completed') { a.arrivedAt = a.startedAt = a.start; a.completedAt = seen(r.completedAt) ?? changed ?? Math.min(a.end, now); }
+    appointments.push(a);
+    return a;
+  }
+
+  raw.appointments.forEach(add);
+  const apptById = new Map(appointments.map(a => [a.id, a]));
+  for (const p of raw.payments) {
+    const subtotal = p.total - p.tax;
+    // A counter sale with no booking today shows as a finished walk-in so its money is counted.
+    const a = apptById.get(p.appointmentId) ?? add({ id: `sale:${p.id}`, branchId: p.branchId, staffId: p.staffId, clientId: p.clientId || `sale:${p.id}`,
+      clientName: p.clientName, clientPhone: p.clientPhone, serviceIds: [], serviceNames: [p.description],
+      start: p.at - 30 * MIN, end: p.at, status: 'completed', source: 'walk-in', price: subtotal, completedAt: p.at });
+    payments.push({ id: p.id, appointmentId: a.id, branchId: p.branchId, at: p.at, subtotal, taxRate: subtotal ? Math.round(p.tax / subtotal * 1000) / 10 : 0,
+      tax: p.tax, tip: 0, total: p.total, method: METHOD_LABEL[p.method] ? p.method : 'cash' });
+  }
+
+  const snap = { now, live: true, speed: null, salon: prep.salon, config: { tax: structuredClone(TAX) },
+    branches, stations, staff, clients: [...clients.values()], services, appointments, payments, lastWeek: raw.lastWeek };
+  const noShows = appointments.filter(a => a.status === 'no-show' && now - a.start < 2 * HOUR).map(a => ({ id: `noshow:${a.id}`, branchId: a.branchId, level: 'warn', kind: 'no-show', at: a.start, appointmentId: a.id,
+    text: `${clients.get(a.clientId).name} did not come for ${svcById.get(a.serviceId).name} (${clock(a.start)})` }));
+  return { ...snap, alerts: [...noShows, ...opsAlerts(snap)] };
+}
+
+// Polls the app's own API; the page is served by the app (/dashboard/salonflow), so the login cookie goes along.
+class LiveAdapter {
+  constructor(url = '/api/salonflow', everyMs = 15_000) { Object.assign(this, { url, everyMs }); }
+  async load() {
+    const res = await fetch(this.url, { credentials: 'same-origin', cache: 'no-store' });
+    if (res.status === 401) throw new Error('please sign in to Salon Central first');
+    if (res.status === 403) throw new Error("your login can't see the salon's takings — ask the owner");
+    if (!res.ok) throw new Error(`the server answered ${res.status}`);
+    return liveSnapshot(await res.json());
+  }
+  async start(emit) {
+    emit(await this.load());
+    // A failed refresh keeps the last good picture on screen and tries again next time.
+    this.timer = setInterval(() => this.load().then(emit, err => console.warn('Salonflow refresh failed:', err)), this.everyMs);
+  }
+  stop() { clearInterval(this.timer); }
+  command(name) { throw new Error(`${name} is only for the simulation`); }
 }
 
 const DataSource = (() => {
@@ -897,7 +957,26 @@ function selfTest() {
   const hr = hourly(s), one = hourly(s, s.branches[0].id);
   assert(one.rows.reduce((t, r) => t + r.collected, 0) === stats(s, s.branches[0].id).collected, 'hourly per branch');
   assert(hr.rows.reduce((t, r) => t + r.collected, 0) === st.collected && hr.rows.reduce((t, r) => t + r.served, 0) === st.done, 'hourly totals match');
-  return `Self-test passed (${s.appointments.length} appointments, ${s.payments.length} payments)`;
+
+  // Live data: a two-service booking, a paid booking, a counter sale with no booking, unknown staff.
+  const t0 = Date.UTC(2026, 9, 11, 9, 0); // 14:00 PKT
+  const live = liveSnapshot({ now: t0 + 30 * MIN, salon: { id: 'u', name: 'Live' }, hours: null, branches: [{ id: 'main', name: 'Main', city: 'Lahore' }],
+    staff: [{ id: 'p1', name: 'Sara', role: 'senior-stylist', branchId: 'main' }, { id: 'p2', name: 'Ali', role: 'receptionist', branchId: 'main' }],
+    services: [{ id: 'cut', name: 'Haircut', category: 'hair', durationMin: 30, price: 1500, priceMax: null }, { id: 'nail', name: 'Gel Nails', category: 'nails', durationMin: 60, price: 6000, priceMax: null }],
+    appointments: [
+      { id: 'a1', branchId: 'main', staffId: 'p1', clientId: 'c1', clientName: 'Hina', clientPhone: '•••• 123', serviceIds: ['cut', 'nail'], serviceNames: ['Haircut', 'Gel Nails'], start: t0, end: t0 + 90 * MIN, status: 'in-progress', source: 'agent', price: 7500 },
+      { id: 'a2', branchId: 'main', staffId: 'gone', clientId: 'c2', clientName: 'Zara', clientPhone: '', serviceIds: ['cut'], serviceNames: ['Haircut'], start: t0 - 60 * MIN, end: t0 - 30 * MIN, status: 'completed', source: 'web', price: 1500 }],
+    payments: [
+      { id: 'i1', branchId: 'main', appointmentId: 'a2', staffId: null, clientId: 'c2', clientName: 'Zara', clientPhone: '', description: 'Haircut', at: t0 - 25 * MIN, total: 1740, tax: 240, method: 'card' },
+      { id: 'i2', branchId: 'main', appointmentId: null, staffId: 'p1', clientId: null, clientName: 'Walk-in', clientPhone: '', description: 'Shampoo', at: t0, total: 900, tax: 0, method: '' }],
+    lastWeek: { date: t0 - 7 * DAY, byBranch: { main: { collected: 2000, served: 1 } } } });
+  const li = idx(live), ls = stats(live);
+  assert(live.appointments.length === 3 && ls.collected === 2640 && ls.done === 2, 'live: counter sale counted as a finished walk-in');
+  assert(li.service.get(li.appt.get('a1').serviceId).name === 'Haircut + Gel Nails' && li.appt.get('a1').source === 'manual', 'live: combined services, unknown source');
+  assert(live.appointments.every(a => li.station.has(a.stationId) && li.staff.has(a.staffId) && li.client.has(a.clientId)), 'live: every booking has a station, staff member and client');
+  assert(live.payments.every(p => li.appt.has(p.appointmentId) && p.total === p.subtotal + p.tax + p.tip) && live.payments[1].method === 'cash', 'live: payments link up');
+  assert(hourly(live).rows.reduce((t, r) => t + r.collected, 0) === ls.collected, 'live: hourly totals match');
+  return `Self-test passed (${s.appointments.length} appointments, ${s.payments.length} payments; live mapping ok)`;
 }
 // ═══════════════════════════════ END DATA LAYER ═══════════════════════════
 // ═══════════════════════════════ UI ═══════════════════════════════
@@ -956,6 +1035,7 @@ function renderTop(s) {
   $('#clock').textContent = `${dateFmt.format(s.now)} · ${clock(s.now)} PKT`;
   const speeds = [[0, 'Pause'], [1, '1×'], [30, '30×'], [120, '120×']];
   $('#speed').hidden = s.speed == null;
+  $('#taxBtn').hidden = s.live; // live bills carry the tax the POS charged; rates are set in the app
   paint($('#speed'), speeds.map(([v, l]) => `<button type="button" data-speed="${v}" data-fk="speed${v}" aria-pressed="${s.speed === v}">${l}</button>`).join(''));
   const b = view.branchId && idx(s).branch.get(view.branchId);
   paint($('#crumbs'), b ? `<button type="button" data-back data-fk="back">← All branches</button><span>${esc(b.name)}, ${esc(b.city)}</span>` : '<span>All branches</span>');
@@ -1219,79 +1299,205 @@ function disposeGroup(g) {
   g.removeFromParent();
 }
 
-// ── Network view: Pakistan board
-// Simplified outline of Pakistan, [lon, lat].
-const OUTLINE = [[61.6, 25.2], [64.6, 25.3], [66.6, 25.4], [67.0, 24.8], [67.5, 23.9], [68.2, 23.7], [68.8, 24.3], [70.0, 24.2], [71.1, 24.4], [70.6, 25.7], [70.1, 26.6], [69.6, 27.2], [70.4, 28.0], [71.9, 27.9], [72.9, 29.0], [73.4, 29.9], [74.5, 30.9], [74.6, 31.8], [75.3, 32.3], [74.6, 32.8], [74.3, 33.5], [74.0, 34.0], [73.7, 34.4], [74.3, 34.8], [75.5, 34.7], [76.8, 35.0], [77.8, 35.5], [76.5, 35.9], [75.9, 36.6], [75.0, 37.0], [73.9, 36.9], [72.5, 36.8], [71.2, 36.1], [71.6, 35.2], [71.1, 34.4], [70.0, 34.0], [69.3, 33.1], [69.5, 31.9], [68.2, 31.6], [66.8, 31.3], [66.3, 29.9], [64.2, 29.5], [62.5, 29.4], [60.9, 29.8], [61.8, 28.5], [62.8, 27.3], [63.2, 26.6], [61.8, 26.2]];
-const CITIES = [['Karachi', 67.0, 24.86], ['Hyderabad', 68.37, 25.4], ['Lahore', 74.35, 31.52], ['Islamabad', 73.05, 33.68], ['Faisalabad', 73.08, 31.42], ['Multan', 71.47, 30.16], ['Peshawar', 71.58, 34.01], ['Quetta', 67.0, 30.18], ['Sialkot', 74.53, 32.49], ['Gwadar', 62.33, 25.13], ['Gilgit', 74.31, 35.92]];
-const K = 1.45, BOARD_TOP = 0.45;
-const proj = (lon, lat) => new THREE.Vector3((lon - 69.3) * K, BOARD_TOP, -(lat - 30.2) * K);
-const NET_HOME = { pos: new THREE.Vector3(3, 27, 21), target: new THREE.Vector3(2.5, 0, 0) };
+// ── Network view: the city
+// A made-up modern city on a block grid. Each branch gets a block near the middle; the rest is towers,
+// low-rise and parks, laid out from a fixed seed so the city looks the same on every visit.
+const PITCH = 3.4, ROAD = 0.9, BLOCK = PITCH - ROAD, HALF = 3; // blocks run -HALF..HALF on both axes
+const EDGE = (HALF + 0.5) * PITCH, SIDEWALK = ROAD / 2 - 0.1;
+const NET_HOME = { pos: new THREE.Vector3(0, 23, 23), target: new THREE.Vector3(0, 0, 0.5) };
+const WALK = 40 * MIN; // how long a client takes to walk in, or home again
+const CLIENT_RING = { coming: '#a78bfa', waiting: '#f97316', leaving: '#22c55e' };
 
-const network = { group: new THREE.Group(), buildings: new Map(), key: '' };
+const network = { group: new THREE.Group(), buildings: new Map(), clients: new Map(), cars: [], people: null, key: '' };
 scene.add(network.group);
+
+// Facade with a grid of windows, some lit; doubles as the glow map so lit windows shine at dusk.
+const WINDOWS = (() => {
+  const c = Object.assign(document.createElement('canvas'), { width: 64, height: 128 }), ctx = c.getContext('2d'), rng = mulberry32(42);
+  ctx.fillStyle = '#2a2445'; ctx.fillRect(0, 0, 64, 128);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 4; x++) {
+    ctx.fillStyle = rng() < 0.45 ? '#ffd08a' : '#3b3462';
+    ctx.fillRect(4 + x * 15, 3 + y * 8, 11, 5);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+})();
+const towerMats = new Map();
+function towerMat(tint, h) {
+  const key = `${tint}${Math.round(h * 2)}`;
+  if (!towerMats.has(key)) {
+    const map = WINDOWS.clone();
+    map.repeat.set(1.5, Math.max(0.25, Math.round(h * 2) / 5));
+    const side = new THREE.MeshStandardMaterial({ color: tint, map, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: 0.55, roughness: 0.35, metalness: 0.3 });
+    const roof = clay('#3a3355');
+    towerMats.set(key, [side, side, roof, roof, side, side]);
+  }
+  return towerMats.get(key);
+}
+
+function car(color) {
+  const g = new THREE.Group();
+  box(0.56, 0.16, 0.28, color, 0, 0.12, 0, g);
+  box(0.3, 0.12, 0.24, '#d9d3f0', -0.03, 0.26, 0, g);
+  for (const z of [-0.08, 0.08]) box(0.02, 0.05, 0.06, glow('#fff3c4', 1.5), 0.29, 0.13, z, g);
+  return g;
+}
 
 function buildNetwork(s) {
   disposeGroup(network.group);
   network.group = new THREE.Group();
-  network.buildings.clear();
+  network.buildings.clear(); network.clients.clear(); network.cars = [];
   scene.add(network.group);
-  const g = network.group;
+  const g = network.group, rng = mulberry32(7);
 
-  const shape = new THREE.Shape(OUTLINE.map(([lon, lat]) => { const p = proj(lon, lat); return new THREE.Vector2(p.x, -p.z); }));
-  const board = mesh(new THREE.ExtrudeGeometry(shape, { depth: BOARD_TOP, bevelEnabled: true, bevelSize: 0.15, bevelThickness: 0.1, bevelSegments: 1 }),
-    [clay('#cdb08f'), clay('#7a5a46')], 0, 0, 0, g);
-  board.rotation.x = -Math.PI / 2;
-  board.position.y = -0.1;
-  mesh(new THREE.CylinderGeometry(26, 26, 0.2, 9), '#241a3f', 0, -0.25, -1, g).receiveShadow = true;
-  // Northern mountains, purely decorative.
-  [[74.8, 35.8, 1.5], [76.2, 35.4, 1.2], [73.6, 36.2, 1.1], [72.3, 35.9, 0.9], [71.8, 35.4, 0.8], [75.6, 36.4, 1.0], [67.2, 30.8, 0.6], [66.4, 28.5, 0.5]].forEach(([lon, lat, h]) => {
-    const p = proj(lon, lat);
-    mesh(new THREE.ConeGeometry(h * 0.6, h, 5), '#8f7f8f', p.x, BOARD_TOP + h / 2, p.z, g);
-    mesh(new THREE.ConeGeometry(h * 0.22, h * 0.35, 5), '#f2ecf5', p.x, BOARD_TOP + h * 0.83, p.z, g);
-  });
-  const branchCities = new Set(s.branches.map(b => b.city));
-  for (const [name, lon, lat] of CITIES) {
-    const p = proj(lon, lat);
-    mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.06, 8), glow('#ffc977', 0.8), p.x, BOARD_TOP + 0.03, p.z, g);
-    if (!branchCities.has(name)) label(div('clabel', name), p.x, BOARD_TOP + 0.1, p.z + 0.35, g);
+  mesh(new THREE.CylinderGeometry(26, 26, 0.2, 9), '#241a3f', 0, -0.35, -1, g).receiveShadow = true;
+  box(EDGE * 2 + 0.6, 0.3, EDGE * 2 + 0.6, '#2b2640', 0, -0.15, 0, g); // asphalt
+  for (let k = -HALF - 1; k <= HALF; k++) { // lane markings
+    const at = (k + 0.5) * PITCH;
+    box(EDGE * 2, 0.01, 0.04, '#6c6488', 0, 0.005, at, g);
+    box(0.04, 0.01, EDGE * 2, '#6c6488', at, 0.005, 0, g);
   }
 
-  // Branches in the same city are fanned out so buildings never overlap.
-  const byCity = s.branches.reduce((m, b) => m.set(b.city, [...(m.get(b.city) ?? []), b]), new Map());
-  for (const list of byCity.values()) list.forEach((b, i) => {
-    const p = proj(b.lon, b.lat);
-    const shift = i - (list.length - 1) / 2;
-    p.x += shift * 2.2;
-    const bg = new THREE.Group();
-    bg.position.copy(p);
-    bg.userData.branchId = b.id;
-    box(1.6, 0.04, 1.6, '#e9dccd', 0, 0.02, 0.15, bg); // plot
-    box(1.2, 0.8, 0.9, '#f1e4d4', 0, 0.42, 0, bg);
-    const roof = mesh(new THREE.ConeGeometry(0.95, 0.5, 4), '#6d28d9', 0, 1.07, 0, bg);
-    roof.rotation.y = Math.PI / 4;
-    roof.scale.z = 0.75;
-    for (const wx of [-0.38, 0.38]) box(0.26, 0.24, 0.03, glow('#ffc977'), wx, 0.55, 0.46, bg); // lit windows
-    box(0.26, 0.4, 0.03, glow('#ffb35c', 0.7), 0, 0.24, 0.46, bg); // door
-    box(1.4, 0.06, 0.4, '#2b2340', 0, 0.06, 0.72, bg); // pip plinth
-    const stations = s.stations.filter(st => st.branchId === b.id);
-    const pips = stations.map((st, k) => {
-      const pip = mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshStandardMaterial({ color: COLORS.free, emissive: COLORS.free, emissiveIntensity: 0.3, roughness: 0.4 }),
-        (k - (stations.length - 1) / 2) * 0.3, 0.17, 0.72, bg);
-      pip.userData.stationId = st.id;
-      return pip;
-    });
-    tree(bg, -0.75, -0.45); tree(bg, 0.78, -0.35, 0, 0.85); tree(bg, -0.8, 0.6, 0, 0.7);
-    // Same-city labels are pushed apart sideways so they never cover each other.
-    const el = div('blabel');
-    el.type = 'button';
-    el.style.transform = `translateX(${shift * 60}%)`;
-    el.addEventListener('click', () => openBranch(b.id));
-    const wrap = document.createElement('div');
-    wrap.append(el);
-    label(wrap, 0, 1.7, 0, bg);
-    g.add(bg);
-    network.buildings.set(b.id, { group: bg, pips, el });
+  // Branches take the blocks nearest the middle; their neighbours stay low so the salons can be seen.
+  const blocks = [];
+  for (let i = -HALF; i <= HALF; i++) for (let j = -HALF; j <= HALF; j++) blocks.push([i, j]);
+  blocks.sort((a, b) => Math.hypot(a[0], a[1] - 0.4) - Math.hypot(b[0], b[1] - 0.4));
+  const salonBlocks = new Map(s.branches.slice(0, blocks.length).map((b, n) => [blocks[n].join(), b]));
+  const nearSalon = (i, j) => [...salonBlocks.keys()].some(k => { const [a, b] = k.split(',').map(Number); return Math.max(Math.abs(a - i), Math.abs(b - j)) <= 1; });
+
+  for (const [i, j] of blocks) {
+    const cx = i * PITCH, cz = j * PITCH;
+    box(BLOCK, 0.1, BLOCK, '#57506f', cx, 0.05, cz, g); // pavement
+    const branch = salonBlocks.get(`${i},${j}`);
+    if (branch) { buildSalon(s, branch, cx, cz, g); continue; }
+    const low = nearSalon(i, j);
+    for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const x = cx + lx * BLOCK / 4, z = cz + lz * BLOCK / 4, r = rng();
+      if (r < 0.15) { // pocket park
+        box(BLOCK / 2 - 0.15, 0.04, BLOCK / 2 - 0.15, '#3e6b4c', x, 0.12, z, g);
+        tree(g, x - 0.2, z - 0.15, 0.1, 0.8); tree(g, x + 0.25, z + 0.2, 0.1, 0.65);
+        continue;
+      }
+      const tall = !low && r > 0.45;
+      const h = tall ? 1.4 + rng() * 2 : 0.4 + rng() * 0.7, w = BLOCK / 2 - 0.2 - rng() * 0.2;
+      const tint = ['#ffffff', '#d8ccff', '#ffd9cc', '#c9e2ff'][Math.floor(rng() * 4)];
+      mesh(new THREE.BoxGeometry(w, h, w), towerMat(tint, h), x, 0.1 + h / 2, z, g);
+      if (tall && rng() < 0.5) box(w * 0.4, 0.25, w * 0.4, '#4a4268', x, 0.1 + h + 0.12, z, g); // rooftop plant room
+    }
+  }
+
+  // Traffic: a few cars looping along the roads in both directions.
+  for (let n = 0; n < 14; n++) {
+    const axis = n % 2 ? 'x' : 'z', dir = rng() < 0.5 ? 1 : -1, line = (Math.floor(rng() * (2 * HALF + 2)) - HALF - 0.5) * PITCH;
+    const obj = car(['#ef4444', '#f2ecf5', '#3b82f6', '#eab308', '#1f1b2e', '#a78bfa'][n % 6]);
+    obj.rotation.y = (axis === 'x' ? 0 : -Math.PI / 2) + (dir < 0 ? Math.PI : 0);
+    g.add(obj);
+    network.cars.push({ obj, axis, dir, line: line + dir * 0.18, speed: 1.2 + rng() * 1.2, at: rng() * EDGE * 2 });
+  }
+
+  network.people = new THREE.Group();
+  g.add(network.people);
+}
+
+function buildSalon(s, b, cx, cz, g) {
+  const bg = new THREE.Group();
+  bg.position.set(cx, 0.1, cz);
+  bg.scale.setScalar(1.25);
+  bg.userData.branchId = b.id;
+  box(1.6, 0.04, 1.6, '#e9dccd', 0, 0.02, 0.15, bg); // plot
+  box(1.2, 0.8, 0.9, '#f1e4d4', 0, 0.42, 0, bg);
+  const roof = mesh(new THREE.ConeGeometry(0.95, 0.5, 4), '#6d28d9', 0, 1.07, 0, bg);
+  roof.rotation.y = Math.PI / 4;
+  roof.scale.z = 0.75;
+  for (const wx of [-0.38, 0.38]) box(0.26, 0.24, 0.03, glow('#ffc977'), wx, 0.55, 0.46, bg); // lit windows
+  box(0.26, 0.4, 0.03, glow('#ffb35c', 0.7), 0, 0.24, 0.46, bg); // door
+  box(1.4, 0.06, 0.4, '#2b2340', 0, 0.06, 0.72, bg); // pip plinth
+  const stations = s.stations.filter(st => st.branchId === b.id);
+  const pips = stations.map((st, k) => {
+    const pip = mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshStandardMaterial({ color: COLORS.free, emissive: COLORS.free, emissiveIntensity: 0.3, roughness: 0.4 }),
+      (k - (stations.length - 1) / 2) * 0.3, 0.17, 0.72, bg);
+    pip.userData.stationId = st.id;
+    return pip;
   });
+  tree(bg, -0.75, -0.45); tree(bg, 0.78, -0.35, 0, 0.85); tree(bg, -0.8, 0.6, 0, 0.7);
+  const el = div('blabel');
+  el.type = 'button';
+  el.addEventListener('click', () => openBranch(b.id));
+  const wrap = document.createElement('div');
+  wrap.append(el);
+  label(wrap, 0, 1.7, 0, bg);
+  g.add(bg);
+  // Clients walk the pavement: along their own street, up the road beside the salon, then to its door.
+  const door = new THREE.Vector3(cx, 0.1, cz + PITCH / 2 - SIDEWALK);
+  network.buildings.set(b.id, { group: bg, pips, el, door, sideRoad: cx + PITCH / 2 - SIDEWALK });
+}
+
+function strHash(str) { let h = 2166136261; for (const ch of str) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; }
+
+// Where a client lives (a spot on a city pavement) and the route from there to the salon's door.
+function clientRoute(a, bld) {
+  const rng = mulberry32(strHash(a.clientId));
+  const z = (Math.floor(rng() * (2 * HALF + 2)) - HALF - 0.5) * PITCH + (rng() < 0.5 ? -SIDEWALK : SIDEWALK);
+  const home = new THREE.Vector3((rng() * 2 - 1) * (EDGE - 0.5), 0.1, z);
+  const { door, sideRoad } = bld;
+  return [home, new THREE.Vector3(sideRoad, 0.1, z), new THREE.Vector3(sideRoad, 0.1, door.z), door];
+}
+function along(path, f) {
+  const lens = path.slice(1).map((p, i) => p.distanceTo(path[i])), total = lens.reduce((t, l) => t + l, 0);
+  let d = f * total;
+  for (let i = 0; i < lens.length; i++) { if (d <= lens[i]) return path[i].clone().lerp(path[i + 1], lens[i] ? d / lens[i] : 0); d -= lens[i]; }
+  return path.at(-1).clone();
+}
+
+// Today's clients out in the city: at home until about 40 min before their slot, then walking in;
+// queued outside the door while waiting; out of sight while in the chair; walking home after.
+function updateClients(s) {
+  const seen = new Set(), queue = new Map();
+  for (const a of s.appointments.slice().sort((x, y) => (x.arrivedAt ?? 0) - (y.arrivedAt ?? 0))) {
+    const bld = network.buildings.get(a.branchId);
+    if (!bld) continue;
+    let f = null, mood = null;
+    if (a.status === 'booked' || a.status === 'confirmed') { f = Math.min(1, Math.max(0, (s.now - a.start + WALK) / WALK)); mood = f > 0 ? 'coming' : null; }
+    else if (a.status === 'arrived') { f = 1; mood = 'waiting'; }
+    else if (a.status === 'completed' && s.now - a.completedAt < WALK) { f = 1 - (s.now - a.completedAt) / WALK; mood = 'leaving'; }
+    if (f == null) continue;
+    seen.add(a.id);
+    let c = network.clients.get(a.id);
+    if (!c) {
+      const h = strHash(a.clientId), obj = person(OUTFITS[h % OUTFITS.length], SKIN[h % SKIN.length]);
+      obj.scale.setScalar(0.55);
+      const ring = mesh(new THREE.TorusGeometry(0.32, 0.06, 4, 16), glow('#a78bfa'), 0, 0.05, 0, obj);
+      ring.rotation.x = Math.PI / 2;
+      obj.userData.apptId = a.id;
+      const route = clientRoute(a, bld);
+      obj.position.copy(along(route, f));
+      network.people.add(obj);
+      c = { obj, ring, route, pos: obj.position.clone() };
+      network.clients.set(a.id, c);
+    }
+    c.pos = along(c.route, f);
+    if (mood === 'waiting') { const n = queue.get(a.branchId) ?? 0; queue.set(a.branchId, n + 1); c.pos.x += (n % 2 ? 1 : -1) * (0.35 + 0.3 * Math.floor(n / 2)); }
+    c.ring.visible = !!mood;
+    if (mood) c.ring.material = glow(CLIENT_RING[mood]);
+  }
+  for (const [id, c] of network.clients) if (!seen.has(id)) { disposeGroup(c.obj); network.clients.delete(id); }
+}
+
+function animateCity(dt) {
+  for (const c of network.cars) {
+    c.at = (c.at + c.dir * c.speed * dt + EDGE * 4) % (EDGE * 2);
+    const run = c.at - EDGE;
+    if (c.axis === 'x') c.obj.position.set(run, 0.02, c.line); else c.obj.position.set(c.line, 0.02, run);
+  }
+  for (const { obj, pos } of network.clients.values()) {
+    const dx = pos.x - obj.position.x, dz = pos.z - obj.position.z, d = Math.hypot(dx, dz);
+    if (d < 0.02) continue;
+    const k = reduceMotion ? 1 : Math.min(1, 2.5 * dt / d);
+    obj.rotation.y = Math.atan2(dx, dz);
+    obj.position.x += dx * k; obj.position.z += dz * k;
+  }
 }
 
 function updateNetwork(s) {
@@ -1311,6 +1517,7 @@ function updateNetwork(s) {
       <div class="rev num">${rs(st.collected)}</div><div class="occ">${st.busy}/${st.stations} in use · ${st.waiting} waiting</div>${warn ? `<div class="warnline">${warn}</div>` : ''}`;
     bld.el.setAttribute('aria-label', `${b.name}, ${b.city}: ${rs(st.collected)} collected, ${st.busy} of ${st.stations} stations in use. Open floor view.`);
   }
+  updateClients(s);
 }
 
 // ── Floor view: one branch interior
@@ -1594,16 +1801,17 @@ async function showNetwork() {
   switching = false;
 }
 
-// Clicking in 3D (ignoring drags): a building opens its branch, a station selects its client.
+// Clicking in 3D (ignoring drags): a building opens its branch, a station or a client out in the city selects the booking.
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 let downAt = null;
 function hit(e) {
   const r = renderer.domElement.getBoundingClientRect();
   ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
   ray.setFromCamera(ndc, camera);
-  const targets = view.branchId ? (floor.group ? floor.group.children : []) : [...network.buildings.values()].map(b => b.group);
+  const targets = view.branchId ? (floor.group ? floor.group.children : []) : [...network.buildings.values()].map(b => b.group).concat(network.people ?? []);
   for (const h of ray.intersectObjects(targets, true)) {
     for (let o = h.object; o; o = o.parent) {
+      if (o.userData.apptId) return { apptId: o.userData.apptId };
       if (o.userData.branchId) return { branchId: o.userData.branchId };
       if (o.userData.stationId) return { stationId: o.userData.stationId };
     }
@@ -1615,6 +1823,7 @@ renderer.domElement.addEventListener('pointerup', e => {
   if (downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) < 5) {
     const h = hit(e);
     if (h?.branchId) openBranch(h.branchId);
+    if (h?.apptId) select(h.apptId);
     if (h?.stationId) { const ss = stationState(S, idx(S).station.get(h.stationId)); const a = ss.current ?? ss.next; if (a) select(a.id); }
   }
   downAt = null;
@@ -1646,6 +1855,7 @@ renderer.setAnimationLoop(now => {
     const pulse = 0.6 + 0.4 * Math.sin(now / 220);
     for (const b of network.buildings.values()) for (const pip of b.pips) pip.material.emissiveIntensity = pip.userData.state === 'late' ? 0.5 + pulse : pip.userData.state === 'busy' ? 0.9 : 0.35;
   }
+  if (network.group.visible) animateCity(dt);
   if (floor.group) animatePeople(dt);
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
@@ -1701,11 +1911,10 @@ controls.minDistance = 8; controls.maxDistance = 60;
 DataSource.subscribe(s => { const first = !S; S = s; render(s); if (first && idx(s).branch.has(params.get('branch'))) openBranch(params.get('branch')); });
 
 const showError = err => { $('#error').style.display = 'grid'; $('#error').textContent = `Could not load data: ${err.message}`; };
-if (params.get('source') === 'api') {
-  // e.g. ?source=api&api=https://api.example.com&ws=wss://api.example.com — token comes from your login flow.
-  DataSource.use(new ApiAdapter({ baseUrl: params.get('api'), wsUrl: params.get('ws'), token: sessionStorage.getItem('salonflowToken') }), showError);
-} else {
+if (params.has('demo')) {
   DataSource.use(new MockAdapter(SALONS.find(x => x.id === params.get('salon')) ?? SALONS[0]), showError);
+} else {
+  DataSource.use(new LiveAdapter(), showError);
 }
 if (params.has('selftest')) {
   try { console.log(selfTest()); } catch (err) { console.error(err); showError(err); }
