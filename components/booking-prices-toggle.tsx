@@ -1,23 +1,32 @@
 "use client";
 
-import { useState } from "react";
-import { saveSettings, settingsStore } from "@/lib/settings-store";
+import { useEffect, useState } from "react";
+import { SETTINGS_CHANGED_EVENT, saveSettings, settingsStore } from "@/lib/settings-store";
+
+// Read fresh each time: reloadSettings() (sidebar on navigation, dashboard after a sync) swaps in a
+// new appearance object, so a reference kept from render would save the old value.
+const appearance = () => settingsStore.appearance as { hideBookingPrices?: boolean };
 
 /** Hide prices on the online booking page (and the WordPress plugin, which embeds it). Saves on toggle. */
 export default function BookingPricesToggle() {
-  const appearance = settingsStore.appearance as { hideBookingPrices?: boolean };
-  const [hidden, setHidden] = useState(appearance.hideBookingPrices === true);
+  const [hidden, setHidden] = useState(appearance().hideBookingPrices === true);
   const [status, setStatus] = useState<"" | "saved" | "error">("");
+
+  useEffect(() => {
+    const sync = () => setHidden(appearance().hideBookingPrices === true);
+    window.addEventListener(SETTINGS_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(SETTINGS_CHANGED_EVENT, sync);
+  }, []);
 
   async function toggle() {
     const next = !hidden;
     setHidden(next);
     setStatus("");
-    appearance.hideBookingPrices = next;
+    appearance().hideBookingPrices = next;
     const ok = await saveSettings();
     if (!ok) {
       // Didn't reach the database, so customers would still see the old setting — undo and say so.
-      appearance.hideBookingPrices = !next;
+      appearance().hideBookingPrices = !next;
       setHidden(!next);
       void saveSettings();
     }

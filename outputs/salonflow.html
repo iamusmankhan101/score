@@ -4,111 +4,195 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Salonflow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+/* Salon Central brand: purple gradient #5B21B6 → #9333EA, Montserrat, dark #13131a chrome. */
 :root {
-  --bg: #f3ede6; --panel: #fffcf8; --ink: #2a2320; --muted: #7b6f66; --line: #e5dbd0;
-  --accent: #8a3b5c; --free: #2a9384; --busy: #d98a1c; --late: #cf3f35; --wait: #6a5fc4;
-  --scene: #efe6dc;
-  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #171311; --panel: #211b18; --ink: #f2ebe5; --muted: #a8998e; --line: #3a312c; --scene: #1d1815; color-scheme: dark; }
+  --glass: rgba(19, 19, 26, 0.80); --glass-hi: rgba(255, 255, 255, 0.05); --edge: rgba(255, 255, 255, 0.09);
+  --ink: #f5f3fb; --muted: #a8a3c0; --faint: #6c6788;
+  --accent: #7C3AED; --accent-light: #A78BFA; --accent-dim: rgba(124, 58, 237, 0.18);
+  --grad: linear-gradient(135deg, #5B21B6 0%, #9333EA 100%);
+  --pink: #ec4899; --green: #22c55e; --orange: #f97316; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308;
+  font: 13px/1.45 Montserrat, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); height: 100vh; display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
-button { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: pointer; }
-button:hover { border-color: var(--accent); }
-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+body { margin: 0; background: #120d1f; color: var(--ink); height: 100vh; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+:focus-visible { outline: 2px solid var(--accent-light); outline-offset: 2px; border-radius: 6px; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); } .small { font-size: 12px; } .faint { color: var(--faint); }
+.green { color: var(--green); } .red { color: var(--red); } .orange { color: var(--orange); }
+svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
-header { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
-.brand b { font-size: 16px; color: var(--accent); letter-spacing: .2px; }
-.brand span { color: var(--muted); margin-left: 8px; }
-#crumbs { display: flex; gap: 6px; align-items: center; }
-#crumbs .sep { color: var(--muted); }
-.spacer { flex: 1; }
-.clock { font-variant-numeric: tabular-nums; font-weight: 600; }
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.seg button { border: 0; border-radius: 0; padding: 4px 9px; }
-.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
-.badge { font-size: 11px; padding: 3px 8px; border-radius: 99px; background: #f6e3c4; color: #7a4a06; }
-.badge.live { background: #d5efe9; color: #0f5b50; }
-
-main { display: grid; grid-template-columns: 270px 1fr 360px; min-height: 0; }
-aside { overflow-y: auto; padding: 12px; background: var(--panel); }
-#kpis { border-right: 1px solid var(--line); }
-#side { border-left: 1px solid var(--line); }
-#stage { position: relative; min-height: 0; overflow: hidden; background: var(--scene); }
+#stage { position: fixed; inset: 0; }
 #stage canvas { display: block; transition: opacity .18s; }
 #stage.fade canvas { opacity: 0; }
 .labels { position: absolute; inset: 0; pointer-events: none; }
-#hint { position: absolute; left: 12px; bottom: 10px; color: var(--muted); font-size: 12px; pointer-events: none; }
+#error { position: fixed; inset: 0; display: none; place-items: center; text-align: center; padding: 20px; color: var(--red); z-index: 20; }
 
-h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 16px 0 6px; font-weight: 600; }
-h2:first-child { margin-top: 0; }
-.kpi { padding: 10px 0; border-bottom: 1px solid var(--line); }
-.kpi .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.kpi .l { color: var(--muted); font-size: 12px; }
-.kpi .sub { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.meter { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 6px; }
-.meter i { display: block; height: 100%; background: var(--busy); }
-.mix { display: grid; grid-template-columns: 90px 1fr auto; gap: 3px 8px; align-items: center; font-size: 12px; font-variant-numeric: tabular-nums; }
-.mix .meter { margin: 0; }
-.mix .meter i { background: var(--accent); }
+.glass { background: var(--glass); backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); border: 1px solid var(--edge); border-radius: 14px; box-shadow: 0 12px 32px rgba(0, 0, 0, .38); }
+.panel-title { font-size: 17px; font-weight: 700; letter-spacing: -.2px; }
 
-.list { list-style: none; margin: 0; padding: 0; }
-.list li { padding: 7px 0; border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: flex-start; }
-.list li:last-child { border-bottom: 0; }
-.list .grow { flex: 1; min-width: 0; }
-.list .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.muted { color: var(--muted); }
-.small { font-size: 12px; }
-.empty { color: var(--muted); font-style: italic; padding: 6px 0; }
-.dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; }
-.dot.critical { background: var(--late); } .dot.warn { background: var(--busy); } .dot.info { background: var(--wait); }
-.x { border: 0; padding: 0 4px; color: var(--muted); background: none; }
-.pill { font-size: 11px; padding: 1px 6px; border-radius: 99px; border: 1px solid var(--line); }
-.pill.paid { color: var(--free); border-color: var(--free); }
-.pill.partial { color: var(--busy); border-color: var(--busy); }
-.pill.pending { color: var(--late); border-color: var(--late); }
-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-th, td { padding: 6px 4px; text-align: left; border-bottom: 1px solid var(--line); }
-th { font-size: 11px; color: var(--muted); font-weight: 600; }
-td.r, th.r { text-align: right; }
+/* Top bar */
+.topbar { position: fixed; top: 12px; left: 12px; right: 12px; height: 54px; display: flex; align-items: center; gap: 14px; padding: 0 12px 0 14px; z-index: 6; }
+.logo { height: 30px; display: block; }
+.prod { border-left: 1px solid var(--edge); padding-left: 14px; line-height: 1.2; }
+.prod b { font-size: 14px; } .prod div { font-size: 11px; color: var(--muted); }
+.crumbs { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.crumbs button { padding: 6px 10px; border-radius: 8px; background: var(--glass-hi); border: 1px solid var(--edge); font-weight: 500; }
+.crumbs button:hover { border-color: var(--accent-light); }
+.spacer { flex: 1; }
+.alertpill { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 99px; background: rgba(239, 68, 68, .14); color: #fca5a5; font-weight: 600; font-size: 12px; }
+.alertpill.calm { background: rgba(34, 197, 94, .12); color: #86efac; }
+.alertpill svg.i { width: 15px; height: 15px; }
+.clock { font-weight: 600; white-space: nowrap; }
+.seg { display: inline-flex; padding: 3px; border-radius: 9px; background: var(--glass-hi); border: 1px solid var(--edge); }
+.seg button { padding: 4px 9px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--grad); color: #fff; }
+.ghost { padding: 7px 11px; border-radius: 9px; border: 1px solid var(--edge); background: var(--glass-hi); font-size: 12px; font-weight: 600; }
+.ghost:hover { border-color: var(--accent-light); }
+
+/* KPI cards */
+.kpis { position: fixed; top: 78px; left: 12px; display: flex; gap: 10px; max-width: calc(100vw - 380px); z-index: 5; }
+.kpi { flex: 1 1 0; min-width: 150px; max-width: 230px; padding: 12px 14px; display: flex; gap: 12px; }
+.kpi .ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-dim); color: var(--accent-light); flex: none; }
+.kpi .body { flex: 1; min-width: 0; }
+.kpi .l { font-size: 12px; color: var(--muted); font-weight: 500; }
+.kpi .v { font-size: 21px; font-weight: 700; letter-spacing: -.3px; white-space: nowrap; }
+.kpi .t { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.kpi .t span { color: var(--faint); font-weight: 500; }
+.kpi .row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.bars { display: flex; align-items: flex-end; gap: 2px; height: 30px; flex: none; }
+.bars i { width: 4px; border-radius: 2px 2px 0 0; background: var(--grad); min-height: 2px; }
+.bars i.future { background: var(--edge); }
+.bars i.now { background: var(--pink); }
+.pips { display: flex; flex-wrap: wrap; gap: 3px; max-width: 74px; }
+.pips i { width: 8px; height: 8px; border-radius: 2px; }
+
+/* Detail card (top right) */
+.detail { position: fixed; top: 78px; right: 12px; width: 344px; z-index: 5; overflow: hidden; }
+.detail .head { display: flex; gap: 10px; align-items: flex-start; padding: 14px 14px 12px; border-left: 3px solid var(--accent); }
+.detail .who { flex: 1; min-width: 0; }
+.detail .name { font-size: 19px; font-weight: 700; letter-spacing: -.2px; }
+.detail .x { color: var(--muted); font-size: 20px; line-height: 1; padding: 0 2px; }
+.route { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: center; padding: 12px 14px; border-top: 1px solid var(--edge); }
+.route .big { font-size: 20px; font-weight: 700; }
+.route .r { text-align: right; }
+.route .mid { display: flex; align-items: center; gap: 4px; color: var(--accent-light); }
+.route .mid::before, .route .mid::after { content: ''; width: 18px; height: 1px; background: var(--faint); }
+.kv { display: grid; grid-template-columns: 96px 1fr; gap: 5px 10px; padding: 12px 14px; border-top: 1px solid var(--edge); font-size: 12.5px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; font-weight: 600; }
+
+/* Chips */
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 99px; white-space: nowrap; }
+.chip::before { content: ''; width: 6px; height: 6px; border-radius: 2px; background: currentColor; }
+.chip.green { color: #4ade80; background: rgba(34, 197, 94, .14); }
+.chip.orange { color: #fb923c; background: rgba(249, 115, 22, .15); }
+.chip.red { color: #f87171; background: rgba(239, 68, 68, .15); }
+.chip.blue { color: #60a5fa; background: rgba(59, 130, 246, .15); }
+.chip.purple { color: var(--accent-light); background: var(--accent-dim); }
+.chip.muted { color: var(--muted); background: var(--glass-hi); }
+
+/* Service tracker (bottom left) */
+.tracker { position: fixed; left: 12px; bottom: 12px; width: calc(42vw - 18px); padding: 14px 16px 16px; z-index: 5; }
+.tracker .top { display: flex; justify-content: space-between; gap: 12px; }
+.tracker .sub { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; color: var(--muted); }
+.tag { background: var(--grad); color: #fff; font-weight: 700; padding: 4px 11px; border-radius: 99px; font-size: 12px; }
+.count { text-align: right; border-left: 2px solid var(--green); padding-left: 12px; }
+.count.late { border-color: var(--red); } .count.wait { border-color: var(--orange); } .count.idle { border-color: var(--faint); }
+.count .n { font-size: 24px; font-weight: 700; letter-spacing: -.4px; white-space: nowrap; }
+.count .s { font-size: 12px; font-weight: 600; }
+.steps { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; margin-top: 16px; }
+.step { position: relative; padding-top: 32px; min-width: 0; }
+.step::before { content: ''; position: absolute; top: 11px; left: 0; right: 0; height: 2px; background: var(--edge); }
+.step.done::before { background: var(--accent); }
+.step .c { position: absolute; top: 0; left: 0; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--faint); background: #1b1726; display: grid; place-items: center; z-index: 1; }
+.step .c svg { width: 13px; height: 13px; stroke-width: 3; }
+.step.done .c { background: var(--grad); border-color: transparent; }
+.step.now .c { border-color: var(--accent-light); box-shadow: 0 0 0 4px rgba(124, 58, 237, .3); }
+.step.bad .c { border-color: var(--red); color: var(--red); }
+.step .t { font-weight: 700; font-size: 13px; }
+.step .l { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.step.est .t { color: var(--muted); font-style: italic; }
+
+/* Operations table (bottom right) */
+.ops { position: fixed; right: 12px; bottom: 12px; width: calc(58vw - 18px); max-height: 36vh; display: flex; flex-direction: column; z-index: 5; }
+.ops.collapsed .tablewrap { display: none; }
+.ops .bar { display: flex; align-items: center; gap: 4px; padding: 8px; border-bottom: 1px solid var(--edge); }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.tabs button { padding: 7px 12px; border-radius: 9px; font-weight: 600; font-size: 12.5px; color: var(--muted); }
+.tabs button:hover { color: var(--ink); background: var(--glass-hi); }
+.tabs button[aria-selected="true"] { background: var(--grad); color: #fff; }
+.live { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-left: auto; padding: 0 6px; white-space: nowrap; }
+.live i { width: 8px; height: 8px; border-radius: 50%; background: var(--yellow); }
+.live.on i { background: var(--green); box-shadow: 0 0 0 0 rgba(34, 197, 94, .6); animation: ping 1.6s infinite; }
+@keyframes ping { 70% { box-shadow: 0 0 0 7px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
+.caret { padding: 4px 8px; color: var(--muted); }
+.tablewrap { overflow: auto; flex: 1; min-height: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th { position: sticky; top: 0; background: #1a1724; text-align: left; font-weight: 600; color: var(--muted); font-size: 11.5px; padding: 8px 10px; white-space: nowrap; z-index: 1; }
+td { padding: 7px 10px; border-top: 1px solid var(--edge); white-space: nowrap; }
+td.wrap { white-space: normal; min-width: 220px; }
+th.r, td.r { text-align: right; }
 tbody tr { cursor: pointer; }
-tbody tr:hover td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+tbody tr:hover td { background: var(--glass-hi); }
+tbody tr.sel td { background: linear-gradient(90deg, rgba(91, 33, 182, .75), rgba(147, 51, 234, .55)); color: #fff; }
+tbody tr.sel td .muted { color: #e9d5ff; }
+.empty { color: var(--muted); font-style: italic; padding: 16px 10px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.dot.critical { background: var(--red); } .dot.warn { background: var(--orange); } .dot.info { background: var(--accent-light); }
+.x2 { color: var(--muted); padding: 0 6px; font-size: 16px; }
+.mixline { display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 10px; font-size: 12px; color: var(--muted); }
+.mixline b { color: var(--ink); }
 
 /* 3D labels */
-.blabel { pointer-events: auto; text-align: left; padding: 6px 9px; border-radius: 10px; background: var(--panel); box-shadow: 0 2px 8px #0002; line-height: 1.3; }
+.blabel { pointer-events: auto; text-align: left; padding: 7px 10px; border-radius: 11px; background: var(--glass); border: 1px solid var(--edge); backdrop-filter: blur(8px); box-shadow: 0 6px 16px rgba(0, 0, 0, .35); line-height: 1.3; min-width: 120px; }
+.blabel:hover { border-color: var(--accent-light); }
 .blabel b { display: block; font-size: 13px; }
-.blabel .rev { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.blabel .rev { font-size: 15px; font-weight: 700; }
 .blabel .occ { font-size: 11px; color: var(--muted); }
-.blabel .warnline { font-size: 11px; color: var(--late); font-weight: 600; }
-.clabel { font-size: 11px; color: var(--muted); text-shadow: 0 0 3px var(--scene); }
-.slabel { width: 168px; padding: 6px 8px; border-radius: 9px; background: var(--panel); box-shadow: 0 2px 8px #0002; border-top: 4px solid var(--free); font-size: 11.5px; line-height: 1.3; }
-.slabel.busy { border-top-color: var(--busy); } .slabel.late { border-top-color: var(--late); }
+.blabel .warnline { font-size: 11px; color: #f87171; font-weight: 600; }
+.clabel { font-size: 11px; font-weight: 500; color: #d9cfe8; text-shadow: 0 1px 3px #000; }
+.slabel { pointer-events: auto; cursor: pointer; width: 172px; padding: 7px 9px; border-radius: 10px; background: var(--glass); border: 1px solid var(--edge); border-top: 3px solid var(--green); box-shadow: 0 6px 16px rgba(0, 0, 0, .35); font-size: 11.5px; line-height: 1.3; }
+.slabel.busy { border-top-color: var(--orange); } .slabel.late { border-top-color: var(--red); }
+.slabel.sel { outline: 2px solid var(--accent-light); }
 .slabel .t { font-weight: 700; display: flex; justify-content: space-between; gap: 6px; }
 .slabel .t span { font-weight: 500; color: var(--muted); }
-.slabel .bar { height: 4px; border-radius: 2px; background: var(--line); margin: 4px 0 2px; overflow: hidden; }
-.slabel .bar i { display: block; height: 100%; background: var(--busy); }
-.slabel.late .bar i { background: var(--late); }
-.slabel .late-t { color: var(--late); font-weight: 600; }
-.rlabel { padding: 4px 8px; border-radius: 8px; background: var(--panel); box-shadow: 0 2px 6px #0002; font-size: 11.5px; }
+.slabel .pb { height: 4px; border-radius: 2px; background: var(--edge); margin: 5px 0 3px; overflow: hidden; }
+.slabel .pb i { display: block; height: 100%; background: var(--grad); }
+.slabel.late .pb i { background: var(--red); }
+.rlabel { padding: 5px 9px; border-radius: 9px; background: var(--glass); border: 1px solid var(--edge); font-size: 11.5px; }
 
-dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 18px; width: min(420px, 92vw); }
-dialog::backdrop { background: #0005; }
-dialog label { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
-dialog input { width: 80px; font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); text-align: right; }
-dialog menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; margin: 14px 0 0; }
-#error { position: absolute; inset: 0; display: none; place-items: center; text-align: center; padding: 20px; color: var(--late); }
+dialog { border: 1px solid var(--edge); border-radius: 14px; background: #1a1724; color: var(--ink); padding: 20px; width: min(430px, 92vw); }
+dialog::backdrop { background: rgba(0, 0, 0, .55); }
+dialog label { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--edge); }
+dialog input { width: 80px; font: inherit; padding: 5px 7px; border: 1px solid var(--edge); border-radius: 7px; background: #120d1f; color: var(--ink); text-align: right; }
+dialog menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; margin: 16px 0 0; }
+dialog .primary { background: var(--grad); color: #fff; padding: 7px 14px; border-radius: 9px; font-weight: 600; }
+dialog p { font-size: 12px; color: var(--muted); }
 
-@media (max-width: 1100px) {
+[hidden] { display: none !important; }
+
+/* Below desktop width the panels stack under the scene instead of floating over it. */
+@media (max-width: 1150px) {
   body { height: auto; overflow: auto; }
-  main { grid-template-columns: 1fr; }
-  #stage { height: 58vh; order: -1; }
-  #kpis, #side { border: 0; border-top: 1px solid var(--line); }
+  #stage { position: relative; height: 58vh; }
+  .topbar, .kpis, .detail, .tracker, .ops { position: static; width: auto; max-width: none; margin: 10px; }
+  .topbar { height: auto; flex-wrap: wrap; padding: 10px; }
+  .kpis { flex-wrap: wrap; }
+  .kpi { max-width: none; min-width: 200px; }
+  .ops { max-height: 70vh; }
+  .tracker .top { flex-wrap: wrap; }
+  .steps { grid-auto-columns: minmax(84px, 1fr); overflow-x: auto; padding-bottom: 4px; }
 }
-@media (prefers-reduced-motion: reduce) { #stage canvas { transition: none; } }
+@media (max-width: 600px) {
+  .kpi { flex-basis: 100%; min-width: 0; }
+  .count { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) { #stage canvas { transition: none; } .live.on i { animation: none; } }
 </style>
 <script type="importmap">
 { "imports": {
@@ -118,26 +202,28 @@ dialog menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; ma
 </script>
 </head>
 <body>
-<header>
-  <div class="brand"><b>Salonflow</b><span id="salonName"></span></div>
-  <nav id="crumbs" aria-label="Location"></nav>
+<header class="topbar glass">
+  <img class="logo" alt="Salon Central" src="data:image/png;base64,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">
+  <div class="prod"><b>Salonflow</b><div id="salonName"></div></div>
+  <nav class="crumbs" id="crumbs" aria-label="Location"></nav>
   <div class="spacer"></div>
-  <div class="clock" id="clock" aria-live="off"></div>
+  <button class="alertpill" id="alertPill" type="button"></button>
+  <div class="clock num" id="clock"></div>
   <div class="seg" id="speed" role="group" aria-label="Simulation speed"></div>
-  <span class="badge" id="sourceBadge"></span>
-  <button id="taxBtn" type="button">Tax rates</button>
+  <button class="ghost" id="taxBtn" type="button">Tax rates</button>
 </header>
-<main>
-  <aside id="kpis" aria-label="Today's figures"></aside>
-  <section id="stage" aria-label="3D view"><div id="hint"></div><div id="error"></div></section>
-  <aside id="side" aria-label="Details"></aside>
-</main>
+<section id="stage" aria-label="3D view"></section>
+<section class="kpis" id="kpis" aria-label="Today's figures"></section>
+<aside class="detail glass" id="detail" aria-label="Selected appointment" hidden></aside>
+<section class="tracker glass" id="tracker" aria-label="Service tracker" hidden></section>
+<section class="ops glass" id="ops" aria-label="Operations"></section>
+<div id="error"></div>
 <dialog id="taxDlg">
   <form method="dialog">
-    <h2>Sales tax on services</h2>
+    <div class="panel-title">Sales tax on services</div>
     <div id="taxFields"></div>
-    <p class="small muted">Added on top of the bill. Applies to bills from now on; bills already paid keep the rate they were charged at. Confirm current rates with your tax adviser.</p>
-    <menu><button value="cancel">Cancel</button><button value="save" id="taxSave">Save</button></menu>
+    <p>Added on top of the bill. Applies to bills from now on; bills already paid keep the rate they were charged at. Confirm current rates with your tax adviser.</p>
+    <menu><button class="ghost" value="cancel">Cancel</button><button class="primary" value="save">Save</button></menu>
   </form>
 </dialog>
 
@@ -155,8 +241,9 @@ dialog menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; ma
  *   live:     boolean                true = real backend, false = simulated
  *   speed:    number | null          simulation multiplier (0 = paused); null when live
  *   salon:    { id, name }
+ *   salons:   [{ id, name }] | undefined   other salons this login may switch to (platform admin); omit for a single salon
  *   config:   { tax: { [provinceKey]: { label: string, rate: number } } }   rate in %, added on top of the bill
- *   branches: Branch[]      { id, name, city, province (tax key), lat, lon, opensAt 'HH:MM', closesAt 'HH:MM' }
+ *   branches: Branch[]      { id, name, city, province (tax key), lat, lon (null = city not set), open (today), opensAt 'HH:MM', closesAt 'HH:MM' }
  *   stations: Station[]     { id, branchId, index, type: 'styling'|'wash'|'facial'|'nail'|'bridal', label }
  *   staff:    Staff[]       { id, branchId, name, role, stationId | null }      stationId null = front desk
  *   clients:  Client[]      { id, name, phone '+92 3XX XXXXXXX' }               UI must mask phone
@@ -174,6 +261,8 @@ dialog menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; ma
  *                             method: 'cash'|'jazzcash'|'easypaisa'|'raast'|'card'|'bank' }
  *                           subtotal = price minus any bridal advance taken earlier; total = subtotal + tax + tip
  *   alerts:   Alert[]       { id, branchId, level: 'info'|'warn'|'critical', kind, text, at, appointmentId? }
+ *   lastWeek: { date, byBranch: { [branchId]: { collected, served } } } | null
+ *                           same weekday last week, counted up to the same time of day (for trend arrows)
  * }
  *
  * Adapter interface: { start(emit: (Snapshot) => void), stop(), command(name, args) }
@@ -190,58 +279,271 @@ function mulberry32(a) {
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 
-// Per-client setup. Swap this block for each salon client; in production the
-// backend supplies the same data and ApiAdapter is used instead.
-const CLIENT = {
-  salon: { id: 'zeenat', name: 'Zeenat Beauty Lounge' },
-  tax: {
-    punjab: { label: 'Punjab (PRA)', rate: 16 },
-    sindh: { label: 'Sindh (SRB)', rate: 15 },
-    ict: { label: 'Islamabad (ICT)', rate: 16 },
-    kp: { label: 'Khyber Pakhtunkhwa (KPRA)', rate: 15 },
-    balochistan: { label: 'Balochistan (BRA)', rate: 15 },
-  },
-  // staff: [name, role, station index or null for the front desk]
-  branches: [
-    { id: 'gulberg', name: 'Gulberg III', city: 'Lahore', province: 'punjab', lat: 31.51, lon: 74.35, opensAt: '11:00', closesAt: '21:00',
-      stations: ['styling', 'styling', 'wash', 'bridal'],
-      staff: [['Saba Rauf', 'Senior stylist', 0], ['Hina Javed', 'Stylist', 1], ['Nazia Parveen', 'Hair technician', 2], ['Mehwish Akhtar', 'Bridal artist', 3], ['Rabia Noor', 'Receptionist', null]] },
-    { id: 'dha', name: 'DHA Phase 6', city: 'Lahore', province: 'punjab', lat: 31.47, lon: 74.45, opensAt: '11:00', closesAt: '21:00',
-      stations: ['styling', 'facial', 'nail', 'bridal'],
-      staff: [['Sumbal Tariq', 'Senior stylist', 0], ['Aqsa Mehmood', 'Skin specialist', 1], ['Shazia Bibi', 'Nail technician', 2], ['Farzana Yousaf', 'Bridal artist', 3], ['Iram Saleem', 'Receptionist', null]] },
-    { id: 'clifton', name: 'Clifton Block 5', city: 'Karachi', province: 'sindh', lat: 24.82, lon: 67.03, opensAt: '11:00', closesAt: '21:00',
-      stations: ['styling', 'styling', 'facial', 'wash'],
-      staff: [['Sobia Memon', 'Senior stylist', 0], ['Naheed Abbasi', 'Stylist', 1], ['Rukhsana Baloch', 'Skin specialist', 2], ['Tahira Siddiqui', 'Hair technician', 3], ['Anila Qureshi', 'Receptionist', null]] },
-    { id: 'f7', name: 'F-7 Markaz', city: 'Islamabad', province: 'ict', lat: 33.72, lon: 73.06, opensAt: '11:00', closesAt: '21:00',
-      stations: ['styling', 'wash', 'facial', 'nail'],
-      staff: [['Shumaila Awan', 'Senior stylist', 0], ['Nasreen Akhtar', 'Hair technician', 1], ['Fozia Raja', 'Skin specialist', 2], ['Gulnaz Khattak', 'Nail technician', 3], ['Sadaf Abbasi', 'Receptionist', null]] },
-  ],
+// ── Salons ──────────────────────────────────────────────────────────────────
+// Real Salon Central accounts. Everything between the SALONS markers is written by
+// scripts/salonflow-export.mjs from the live database: branches, staff first names and
+// service menus, never customer records. Shape of one salon:
+//   { id, name,
+//     branches: [{ id, name, city, hours? }],      hours as Settings → Hours: [{ day: 'Monday', open, from, to }]; missing = 11:00–21:00 daily
+//     staff:    [{ id, name, role, branchId }],
+//     services: [{ id, name, category, durationMin, price, priceMax, staffIds? }] }   staffIds missing = anyone can do it
+// SALONS:BEGIN
+const SALONS = [
+  {
+    "id":"misbah","name":"Misbah's Serenity Spa & Salon",
+    "branches":[{"id":"main","name":"Main Branch","city":null}],
+    "staff":[{"id":"misbah-p1","name":"Esha","role":"","branchId":"main"},{"id":"misbah-p2","name":"Saba","role":"","branchId":"main"},{"id":"misbah-p3","name":"Faiza","role":"","branchId":"main"},{"id":"misbah-p4","name":"Maryam","role":"","branchId":"main"},{"id":"misbah-p5","name":"Nimra","role":"","branchId":"main"}],
+    "services":[
+      {"id":"sv1788851177243000","name":"Face Relaxing Massage","category":"massage","durationMin":30,"price":1000,"priceMax":null},
+      {"id":"sv1788851177243001","name":"Face Lifting Massage","category":"massage","durationMin":30,"price":2000,"priceMax":null},
+      {"id":"sv1788851177243002","name":"Face Janssen Massage","category":"massage","durationMin":30,"price":2000,"priceMax":null},
+      {"id":"sv1788851177243003","name":"Thalgo Face Massage","category":"massage","durationMin":30,"price":2000,"priceMax":null},
+      {"id":"sv1788851177243004","name":"Feet Massage","category":"massage","durationMin":30,"price":1000,"priceMax":null},
+      {"id":"sv1788851177243005","name":"Legs Massage","category":"massage","durationMin":30,"price":1500,"priceMax":null},
+      {"id":"sv1788851177243006","name":"Shoulder Massage","category":"massage","durationMin":30,"price":1000,"priceMax":null},
+      {"id":"sv1788851177243007","name":"Head Massage","category":"massage","durationMin":30,"price":1000,"priceMax":null},
+      {"id":"sv1788851177243008","name":"Neck Massage","category":"massage","durationMin":30,"price":1000,"priceMax":null},
+      {"id":"sv1788851177243009","name":"Arms Massage","category":"massage","durationMin":30,"price":1500,"priceMax":null},
+      {"id":"sv1788851177243010","name":"Back Neck Deep Massage","category":"massage","durationMin":30,"price":1500,"priceMax":null},
+      {"id":"sv1788851177243011","name":"Full Body Massage","category":"massage","durationMin":90,"price":7000,"priceMax":null},
+      {"id":"sv1788851177243012","name":"Head Oil Massage","category":"massage","durationMin":45,"price":2000,"priceMax":null},
+      {"id":"sv1788851177243013","name":"Lash Extension - Natural","category":"lashes","durationMin":120,"price":8000,"priceMax":15000},
+      {"id":"sv1788851177243014","name":"Lash Extension - Volumize","category":"lashes","durationMin":150,"price":15000,"priceMax":25000},
+      {"id":"sv1788851177243015","name":"Lash Extension - Classic","category":"lashes","durationMin":120,"price":8000,"priceMax":15000},
+      {"id":"sv1788851177243016","name":"Lash Extension - Mega Volume","category":"lashes","durationMin":150,"price":10000,"priceMax":15000},
+      {"id":"sv1788851177243017","name":"Lash Extension - Hybrid","category":"lashes","durationMin":150,"price":12000,"priceMax":20000},
+      {"id":"sv1788851177243018","name":"Lash Extension - Lifted","category":"lashes","durationMin":90,"price":9000,"priceMax":15000},
+      {"id":"sv1788851177243019","name":"Acrylics Nails","category":"nails","durationMin":90,"price":7000,"priceMax":null},
+      {"id":"sv1788851177243020","name":"Gel Nails","category":"nails","durationMin":60,"price":6000,"priceMax":null},
+      {"id":"sv1788851177243021","name":"Poly Gel Nails","category":"nails","durationMin":75,"price":4000,"priceMax":null},
+      {"id":"sv1788851177243022","name":"Nails Tips","category":"nails","durationMin":60,"price":4500,"priceMax":null},
+      {"id":"sv1788851177243023","name":"Nails Design - French Tip Nails","category":"nails","durationMin":30,"price":1000,"priceMax":null},
+      {"id":"sv1788851177243024","name":"Nails Design - Chrome Tip Nails","category":"nails","durationMin":30,"price":2000,"priceMax":null},
+      {"id":"sv1788851177243025","name":"Nails Design - Cat Eye Nails","category":"nails","durationMin":30,"price":1500,"priceMax":null},
+      {"id":"sv1788851177243026","name":"Nails Design - Glitter Nails","category":"nails","durationMin":30,"price":1000,"priceMax":null},
+      {"id":"sv1788851177243027","name":"Nails Design - 3D Art Nails","category":"nails","durationMin":45,"price":2500,"priceMax":null},
+      {"id":"sv1788851177243028","name":"Nails Design - Ombre Nails","category":"nails","durationMin":30,"price":1500,"priceMax":null},
+      {"id":"sv1788851177243029","name":"Nails Design - Mate Nails","category":"nails","durationMin":30,"price":1000,"priceMax":null},
+      {"id":"sv1788851177243030","name":"Acrylic Removing","category":"nails","durationMin":30,"price":3000,"priceMax":null},
+      {"id":"sv1788851177243031","name":"Nails Refill","category":"nails","durationMin":60,"price":3500,"priceMax":null},
+      {"id":"sv1788851177243032","name":"Mani Pedi - Basic","category":"nails","durationMin":60,"price":3000,"priceMax":null},
+      {"id":"sv1788851177243033","name":"Mani Pedi - Whitening","category":"nails","durationMin":60,"price":4000,"priceMax":null},
+      {"id":"sv1788851177243034","name":"Mani Pedi - Classic Spa","category":"nails","durationMin":75,"price":5000,"priceMax":null},
+      {"id":"sv1788851177243035","name":"Mani Pedi - Detox","category":"nails","durationMin":75,"price":5000,"priceMax":null},
+      {"id":"sv1788851177243036","name":"Mani Pedi - Paraffin Serum","category":"nails","durationMin":90,"price":6000,"priceMax":null},
+      {"id":"sv1788851177243037","name":"Mani Pedi - Jelly Aroma","category":"nails","durationMin":75,"price":5500,"priceMax":null},
+      {"id":"sv1788851177243038","name":"Mani Pedi - Whitening Coffin","category":"nails","durationMin":75,"price":5500,"priceMax":null},
+      {"id":"sv1788851177243039","name":"Nanoplastia - Shoulder Length","category":"hair","durationMin":120,"price":17500,"priceMax":null},
+      {"id":"sv1788851177243040","name":"Nanoplastia - Medium Length","category":"hair","durationMin":150,"price":25500,"priceMax":null},
+      {"id":"sv1788851177243041","name":"Nanoplastia - Waist Length","category":"hair","durationMin":180,"price":30000,"priceMax":null},
+      {"id":"sv1788851177243042","name":"Balayage - Shoulder Length","category":"hair","durationMin":180,"price":17999,"priceMax":null},
+      {"id":"sv1788851177243043","name":"Balayage - Medium Length","category":"hair","durationMin":210,"price":19999,"priceMax":null},
+      {"id":"sv1788851177243044","name":"Balayage - Waist Length","category":"hair","durationMin":240,"price":21999,"priceMax":null},
+      {"id":"sv1788851177243045","name":"Hair Keratin - Shoulder Length","category":"hair","durationMin":120,"price":17999,"priceMax":null},
+      {"id":"sv1788851177243046","name":"Hair Keratin - Medium Length","category":"hair","durationMin":150,"price":19999,"priceMax":null},
+      {"id":"sv1788851177243047","name":"Hair Keratin - Waist Length","category":"hair","durationMin":180,"price":25000,"priceMax":null},
+      {"id":"sv1788851177243048","name":"Organic Hair Keratin - Shoulder Length","category":"hair","durationMin":120,"price":20999,"priceMax":null},
+      {"id":"sv1788851177243049","name":"Organic Hair Keratin - Medium Length","category":"hair","durationMin":150,"price":25000,"priceMax":null},
+      {"id":"sv1788851177243050","name":"Organic Hair Keratin - Waist Length","category":"hair","durationMin":180,"price":30000,"priceMax":null},
+      {"id":"sv1788851177243051","name":"Hair Botox - Shoulder Length","category":"hair","durationMin":120,"price":15999,"priceMax":null},
+      {"id":"sv1788851177243052","name":"Hair Botox - Medium Length","category":"hair","durationMin":150,"price":17999,"priceMax":null},
+      {"id":"sv1788851177243053","name":"Hair Botox - Waist Length","category":"hair","durationMin":180,"price":19999,"priceMax":null},
+      {"id":"sv1788851177243054","name":"Hair Dye (One Shade) - Root Touch Up 1 Inch","category":"hair","durationMin":45,"price":2500,"priceMax":null},
+      {"id":"sv1788851177243055","name":"Hair Dye (One Shade) - Root Touch Up 2 Inches","category":"hair","durationMin":60,"price":3000,"priceMax":null},
+      {"id":"sv1788851177243056","name":"Hair Dye (One Shade) - Shoulder Length","category":"hair","durationMin":90,"price":8000,"priceMax":null},
+      {"id":"sv1788851177243057","name":"Hair Dye (One Shade) - Medium Length","category":"hair","durationMin":105,"price":10000,"priceMax":null},
+      {"id":"sv1788851177243058","name":"Hair Dye (One Shade) - Waist Length","category":"hair","durationMin":120,"price":12000,"priceMax":null},
+      {"id":"sv1788851177243059","name":"Fashion Dye Shade - Root Touch Up 1 Inch","category":"hair","durationMin":45,"price":3000,"priceMax":null},
+      {"id":"sv1788851177243060","name":"Fashion Dye Shade - Root Touch Up 2 Inches","category":"hair","durationMin":60,"price":3500,"priceMax":null},
+      {"id":"sv1788851177243061","name":"Fashion Dye Shade - Shoulder Length","category":"hair","durationMin":90,"price":9500,"priceMax":null},
+      {"id":"sv1788851177243062","name":"Fashion Dye Shade - Medium Length","category":"hair","durationMin":105,"price":13500,"priceMax":null},
+      {"id":"sv1788851177243063","name":"Fashion Dye Shade - Waist Length","category":"hair","durationMin":120,"price":18500,"priceMax":null},
+      {"id":"sv1788851177243064","name":"Low Lights - Shoulder Length","category":"hair","durationMin":150,"price":13999,"priceMax":null},
+      {"id":"sv1788851177243065","name":"Low Lights - Medium Length","category":"hair","durationMin":180,"price":15999,"priceMax":null},
+      {"id":"sv1788851177243066","name":"Low Lights - Waist Length","category":"hair","durationMin":210,"price":22500,"priceMax":null},
+      {"id":"sv1788851177243067","name":"High Lights - Shoulder Length","category":"hair","durationMin":150,"price":15999,"priceMax":null},
+      {"id":"sv1788851177243068","name":"High Lights - Medium Length","category":"hair","durationMin":180,"price":17999,"priceMax":null},
+      {"id":"sv1788851177243069","name":"High Lights - Waist Length","category":"hair","durationMin":210,"price":22500,"priceMax":null},
+      {"id":"sv1788851177243070","name":"Baby Cutting","category":"hair","durationMin":30,"price":1500,"priceMax":null},
+      {"id":"sv1788851177243071","name":"Hair Trimming","category":"hair","durationMin":30,"price":1000,"priceMax":null},
+      {"id":"sv1788851177243072","name":"U Shape Cutting","category":"hair","durationMin":45,"price":1500,"priceMax":null},
+      {"id":"sv1788851177243073","name":"V Shape Cutting","category":"hair","durationMin":45,"price":1500,"priceMax":null},
+      {"id":"sv1788851177243074","name":"Butterfly Cutting","category":"hair","durationMin":60,"price":2500,"priceMax":null},
+      {"id":"sv1788851177243075","name":"Wolf Cutting","category":"hair","durationMin":60,"price":2500,"priceMax":null},
+      {"id":"sv1788851177243076","name":"Layers Cutting","category":"hair","durationMin":60,"price":2500,"priceMax":null},
+      {"id":"sv1788851177243077","name":"Multi Layers Cutting","category":"hair","durationMin":60,"price":3000,"priceMax":null},
+      {"id":"sv1788851177243078","name":"Signature Cutting","category":"hair","durationMin":60,"price":3500,"priceMax":null},
+      {"id":"sv1788851177243079","name":"Hair Wash","category":"hair","durationMin":20,"price":500,"priceMax":null},
+      {"id":"sv1788851177243080","name":"Hair Protein Wash","category":"hair","durationMin":30,"price":1500,"priceMax":null},
+      {"id":"sv1788851177243081","name":"Protein Hair Treatment","category":"hair","durationMin":60,"price":3500,"priceMax":5000},
+      {"id":"sv1788851177243082","name":"Admiro Hair Treatment","category":"hair","durationMin":60,"price":6000,"priceMax":null},
+      {"id":"sv1788851177243083","name":"Sos Hair Treatment","category":"hair","durationMin":60,"price":5000,"priceMax":null},
+      {"id":"sv1788851177243084","name":"Bioplex Protein Treatment","category":"hair","durationMin":60,"price":6000,"priceMax":null},
+      {"id":"sv1788851177243085","name":"Hair Repairing Treatment","category":"hair","durationMin":60,"price":6000,"priceMax":null},
+      {"id":"sv1788851177243086","name":"Hair Styling - Baby Styling","category":"hair","durationMin":30,"price":1000,"priceMax":2000},
+      {"id":"sv1788851177243087","name":"Hair Styling - Simple Styling","category":"hair","durationMin":45,"price":2000,"priceMax":3500},
+      {"id":"sv1788851177243088","name":"Hair Styling - Hair Straightening","category":"hair","durationMin":45,"price":2000,"priceMax":3000},
+      {"id":"sv1788851177243089","name":"Hair Styling - Hair Curling","category":"hair","durationMin":45,"price":2000,"priceMax":3500},
+      {"id":"sv1788851177243090","name":"Hair Styling - Inward Setting","category":"hair","durationMin":45,"price":2000,"priceMax":3000},
+      {"id":"sv1788851177243091","name":"Hair Styling - Outward Setting","category":"hair","durationMin":45,"price":2500,"priceMax":3500},
+      {"id":"sv1788851177243092","name":"Signature Makeup - Eye Makeup With Lashes","category":"makeup","durationMin":45,"price":3500,"priceMax":null},
+      {"id":"sv1788851177243093","name":"Signature Makeup - Party Makeup","category":"makeup","durationMin":60,"price":7500,"priceMax":null},
+      {"id":"sv1788851177243094","name":"Signature Makeup - Glam Makeup","category":"makeup","durationMin":90,"price":12000,"priceMax":null},
+      {"id":"sv1788851177243095","name":"Signature Makeup - Engagement Makeup","category":"makeup","durationMin":120,"price":18000,"priceMax":null},
+      {"id":"sv1788851177243096","name":"Signature Makeup - Nikkah Makeup","category":"makeup","durationMin":120,"price":20000,"priceMax":null},
+      {"id":"sv1788851177243097","name":"Signature Makeup - Mehendi Makeup","category":"makeup","durationMin":120,"price":18000,"priceMax":null},
+      {"id":"sv1788851177243098","name":"Signature Makeup - Qawali Night Makeup","category":"makeup","durationMin":120,"price":18000,"priceMax":null},
+      {"id":"sv1788851177243099","name":"Signature Makeup - Barat Makeup","category":"makeup","durationMin":150,"price":40000,"priceMax":null},
+      {"id":"sv1788851177243100","name":"Signature Makeup - Walima Makeup","category":"makeup","durationMin":150,"price":35000,"priceMax":null},
+      {"id":"sv1788851177243101","name":"Signature Makeup - Soft Look","category":"makeup","durationMin":60,"price":10000,"priceMax":null},
+      {"id":"sv1788851177243102","name":"Senior Artist Makeup - Eye Makeup With Lashes","category":"makeup","durationMin":45,"price":3000,"priceMax":null},
+      {"id":"sv1788851177243103","name":"Senior Artist Makeup - Party Makeup","category":"makeup","durationMin":60,"price":6000,"priceMax":null},
+      {"id":"sv1788851177243104","name":"Senior Artist Makeup - Glam Makeup","category":"makeup","durationMin":90,"price":8000,"priceMax":null},
+      {"id":"sv1788851177243105","name":"Senior Artist Makeup - Engagement Makeup","category":"makeup","durationMin":120,"price":15000,"priceMax":null},
+      {"id":"sv1788851177243106","name":"Senior Artist Makeup - Nikkah Makeup","category":"makeup","durationMin":120,"price":18000,"priceMax":null},
+      {"id":"sv1788851177243107","name":"Senior Artist Makeup - Mehendi Makeup","category":"makeup","durationMin":120,"price":15000,"priceMax":null},
+      {"id":"sv1788851177243108","name":"Senior Artist Makeup - Qawali Night Makeup","category":"makeup","durationMin":120,"price":15000,"priceMax":null},
+      {"id":"sv1788851177243109","name":"Senior Artist Makeup - Barat Makeup","category":"makeup","durationMin":150,"price":30000,"priceMax":null},
+      {"id":"sv1788851177243110","name":"Senior Artist Makeup - Walima Makeup","category":"makeup","durationMin":150,"price":25000,"priceMax":null},
+      {"id":"sv1788851177243111","name":"Face Polisher","category":"skin","durationMin":30,"price":1000,"priceMax":null},
+      {"id":"sv1788851177243112","name":"Whitening Glow Polisher","category":"skin","durationMin":30,"price":1500,"priceMax":null},
+      {"id":"sv1788851177243113","name":"Skin Polisher","category":"skin","durationMin":45,"price":2000,"priceMax":null},
+      {"id":"sv1788851177243114","name":"Janssen Polisher","category":"skin","durationMin":45,"price":3500,"priceMax":null},
+      {"id":"sv1788851177243115","name":"Basic Facial","category":"skin","durationMin":45,"price":3000,"priceMax":null},
+      {"id":"sv1788851177243116","name":"Fruit Facial","category":"skin","durationMin":45,"price":3000,"priceMax":null},
+      {"id":"sv1788851177243117","name":"Herbal Facial","category":"skin","durationMin":45,"price":3000,"priceMax":null},
+      {"id":"sv1788851177243118","name":"Whitening Glow Facial","category":"skin","durationMin":45,"price":4000,"priceMax":null},
+      {"id":"sv1788851177243119","name":"Silky Gold Facial","category":"skin","durationMin":60,"price":4500,"priceMax":null},
+      {"id":"sv1788851177243120","name":"Gold Anti-Aging Facial","category":"skin","durationMin":60,"price":5000,"priceMax":null},
+      {"id":"sv1788851177243121","name":"Crystal Whitening Facial","category":"skin","durationMin":60,"price":5500,"priceMax":null},
+      {"id":"sv1788851177243122","name":"Double Gold Whitening Facial","category":"skin","durationMin":60,"price":6000,"priceMax":null},
+      {"id":"sv1788851177243123","name":"Diamond Whitening Facial","category":"skin","durationMin":60,"price":5500,"priceMax":null},
+      {"id":"sv1788851177243124","name":"Janssen Whitening Facial","category":"skin","durationMin":60,"price":7000,"priceMax":null},
+      {"id":"sv1788851177243125","name":"Janssen Anti Aging Facial","category":"skin","durationMin":60,"price":8000,"priceMax":null},
+      {"id":"sv1788851177243126","name":"Thalgo Brightening Glow Facial","category":"skin","durationMin":60,"price":8000,"priceMax":null},
+      {"id":"sv1788851177243127","name":"Thalgo Anti Aging Facial","category":"skin","durationMin":60,"price":9000,"priceMax":null},
+      {"id":"sv1788851177243128","name":"Ultra Korean Glass Treatment","category":"skin","durationMin":75,"price":10000,"priceMax":null},
+      {"id":"sv1788851177243129","name":"Glow Boost Dermalogica Premium","category":"skin","durationMin":75,"price":10000,"priceMax":null},
+      {"id":"sv1788851177243130","name":"Co Natural Glow Facial","category":"skin","durationMin":60,"price":6000,"priceMax":null},
+      {"id":"sv1788851177243131","name":"Hydra Facial - Basic","category":"skin","durationMin":60,"price":6500,"priceMax":null},
+      {"id":"sv1788851177243132","name":"Hydra Facial - Whitening Glow","category":"skin","durationMin":60,"price":7500,"priceMax":null},
+      {"id":"sv1788851177243133","name":"Hydra Facial - Anti Aging","category":"skin","durationMin":75,"price":8500,"priceMax":null},
+      {"id":"sv1788851177243134","name":"Hydra Facial - Anti Acne","category":"skin","durationMin":75,"price":8500,"priceMax":null},
+      {"id":"sv1788851177243135","name":"Hydra Facial - Janssen + Hydra","category":"skin","durationMin":75,"price":10000,"priceMax":null},
+      {"id":"sv1788851177243136","name":"Hydra Facial - Thalgo + Hydra","category":"skin","durationMin":90,"price":12000,"priceMax":null},
+      {"id":"sv1788851177243137","name":"Hydra Facial - Premium Korean Glass + Hydra","category":"skin","durationMin":90,"price":14000,"priceMax":null},
+      {"id":"sv1788851177243138","name":"BB Glow","category":"skin","durationMin":60,"price":8000,"priceMax":null},
+      {"id":"sv1788851177243139","name":"Hydra + BB Glow","category":"skin","durationMin":90,"price":12000,"priceMax":null},
+      {"id":"csv-eyebrows-threading","name":"Eyebrows Threading","category":"threading","durationMin":10,"price":300,"priceMax":null},
+      {"id":"csv-upper-lip-threading","name":"Upper Lip Threading","category":"threading","durationMin":10,"price":150,"priceMax":null},
+      {"id":"csv-forehead-threading","name":"Forehead Threading","category":"threading","durationMin":10,"price":200,"priceMax":null},
+      {"id":"csv-chin-threading","name":"Chin Threading","category":"threading","durationMin":10,"price":150,"priceMax":null},
+      {"id":"csv-lower-lip-threading","name":"Lower Lip Threading","category":"threading","durationMin":10,"price":100,"priceMax":null},
+      {"id":"csv-full-face-threading","name":"Full Face Threading","category":"threading","durationMin":30,"price":1500,"priceMax":null},
+      {"id":"csv-eyebrows-wax","name":"Eyebrows Wax","category":"waxing","durationMin":15,"price":500,"priceMax":null},
+      {"id":"csv-forehead-wax","name":"Forehead Wax","category":"waxing","durationMin":15,"price":400,"priceMax":null},
+      {"id":"csv-upper-lip-wax","name":"Upper Lip Wax","category":"waxing","durationMin":15,"price":250,"priceMax":null},
+      {"id":"csv-chin-wax","name":"Chin Wax","category":"waxing","durationMin":15,"price":350,"priceMax":null},
+      {"id":"csv-nose-wax","name":"Nose Wax","category":"waxing","durationMin":15,"price":200,"priceMax":null},
+      {"id":"csv-lower-lip-wax","name":"Lower Lip Wax","category":"waxing","durationMin":15,"price":200,"priceMax":null},
+      {"id":"csv-neck-wax","name":"Neck Wax","category":"waxing","durationMin":20,"price":500,"priceMax":null},
+      {"id":"csv-back-neck-wax","name":"Back Neck Wax","category":"waxing","durationMin":20,"price":500,"priceMax":null},
+      {"id":"csv-side-face-wax","name":"Side Face Wax","category":"waxing","durationMin":20,"price":750,"priceMax":null},
+      {"id":"csv-full-face-wax","name":"Full Face Wax","category":"waxing","durationMin":30,"price":2000,"priceMax":null},
+      {"id":"csv-half-arms-wax","name":"Half Arms Wax","category":"waxing","durationMin":20,"price":1000,"priceMax":null},
+      {"id":"csv-half-legs-wax","name":"Half Legs Wax","category":"waxing","durationMin":30,"price":1200,"priceMax":null},
+      {"id":"csv-full-arms-wax","name":"Full Arms Wax","category":"waxing","durationMin":30,"price":1500,"priceMax":null},
+      {"id":"csv-full-legs-wax","name":"Full Legs Wax","category":"waxing","durationMin":45,"price":3000,"priceMax":null},
+      {"id":"csv-under-arms-wax","name":"Under Arms Wax","category":"waxing","durationMin":15,"price":600,"priceMax":null},
+      {"id":"csv-under-legs-wax","name":"Under Legs Wax","category":"waxing","durationMin":30,"price":2000,"priceMax":null},
+      {"id":"csv-belly-wax","name":"Belly Wax","category":"waxing","durationMin":20,"price":1500,"priceMax":null},
+      {"id":"csv-capri-wax","name":"Capri Wax","category":"waxing","durationMin":40,"price":800,"priceMax":null},
+      {"id":"csv-three-quarter-wax","name":"Three Quarter Wax","category":"waxing","durationMin":45,"price":1200,"priceMax":null},
+      {"id":"csv-hand-wax","name":"Hand Wax","category":"waxing","durationMin":15,"price":500,"priceMax":null},
+      {"id":"csv-full-body-wax","name":"Full Body Wax","category":"waxing","durationMin":90,"price":10000,"priceMax":null},
+      {"id":"csv-simple-cleansing","name":"Simple Cleansing","category":"cleansing","durationMin":30,"price":1000,"priceMax":null},
+      {"id":"csv-double-cleansing","name":"Double Cleansing","category":"cleansing","durationMin":40,"price":1500,"priceMax":null},
+      {"id":"csv-janssen-cleansing","name":"Janssen Cleansing","category":"cleansing","durationMin":40,"price":1500,"priceMax":null},
+      {"id":"csv-korean-glass-cleansing","name":"Korean Glass Cleansing","category":"cleansing","durationMin":45,"price":2000,"priceMax":null}
+    ]
+  }
+];
+// SALONS:END
+
+const TAX = {
+  punjab: { label: 'Punjab (PRA)', rate: 16 },
+  sindh: { label: 'Sindh (SRB)', rate: 15 },
+  ict: { label: 'Islamabad (ICT)', rate: 16 },
+  kp: { label: 'Khyber Pakhtunkhwa (KPRA)', rate: 15 },
+  balochistan: { label: 'Balochistan (BRA)', rate: 15 },
+  unset: { label: 'Branches with no city set', rate: 16 },
 };
-
+// city → [lat, lon, tax province]
+const CITY = {
+  karachi: [24.86, 67.0, 'sindh'], hyderabad: [25.4, 68.37, 'sindh'], sukkur: [27.7, 68.86, 'sindh'],
+  lahore: [31.52, 74.35, 'punjab'], rawalpindi: [33.6, 73.07, 'punjab'], faisalabad: [31.42, 73.08, 'punjab'], multan: [30.16, 71.47, 'punjab'],
+  gujranwala: [32.16, 74.19, 'punjab'], sialkot: [32.49, 74.53, 'punjab'], bahawalpur: [29.4, 71.68, 'punjab'], sargodha: [32.08, 72.67, 'punjab'], gujrat: [32.57, 74.08, 'punjab'],
+  islamabad: [33.68, 73.05, 'ict'], peshawar: [34.01, 71.58, 'kp'], abbottabad: [34.15, 73.21, 'kp'], mardan: [34.2, 72.04, 'kp'],
+  quetta: [30.18, 67.0, 'balochistan'], gwadar: [25.13, 62.33, 'balochistan'],
+};
 const STATION_TYPES = { styling: 'Styling chair', wash: 'Wash basin', facial: 'Facial bed', nail: 'Mani-pedi chair', bridal: 'Bridal suite' };
+const BRIDAL_RE = /bridal|barat|baraat|walima|valima|nikk?ah|mehe?n?di makeup|engagement|qawali/i;
+const DESK_RE = /recep|front|desk|manager|owner|admin|cashier/i;
+const MAX_STATIONS = 6;
 
-// [id, name, category, minutes, price, priceMax, stationTypes, popularity]
-const SERVICES = [
-  ['cut', 'Haircut & Style', 'hair', 45, 2500, null, ['styling'], 6],
-  ['blowdry', 'Blow Dry', 'hair', 40, 2000, null, ['styling'], 5],
-  ['keratin', 'Keratin Treatment', 'hair', 180, 18000, null, ['wash', 'styling'], 1],
-  ['highlights', 'Highlights', 'hair', 150, 14000, null, ['styling'], 1.5],
-  ['colour', 'Hair Colour (global)', 'hair', 120, 9000, null, ['wash', 'styling'], 2],
-  ['protein', 'Protein Treatment', 'hair', 120, 12000, null, ['wash'], 2],
-  ['hydra', 'Hydra Facial', 'skin', 60, 8500, null, ['facial'], 3],
-  ['whitening', 'Whitening Facial', 'skin', 75, 5500, null, ['facial'], 3],
-  ['cleanup', 'Skin Cleanup', 'skin', 45, 3000, null, ['facial'], 3],
-  ['baraat', 'Baraat Bridal Makeup', 'bridal', 240, 60000, 150000, ['bridal'], 2],
-  ['walima', 'Walima Bridal Makeup', 'bridal', 210, 45000, 110000, ['bridal'], 1.5],
-  ['mehndi-bridal', 'Mehndi Bridal Makeup', 'bridal', 180, 35000, 75000, ['bridal'], 1.5],
-  ['engagement', 'Engagement Makeup', 'bridal', 180, 35000, 70000, ['bridal'], 1],
-  ['threading', 'Threading (brows & upper lip)', 'beauty', 15, 500, null, ['styling', 'facial'], 4],
-  ['waxing', 'Waxing (full arms & legs)', 'beauty', 60, 4000, null, ['facial'], 2],
-  ['manicure', 'Manicure', 'beauty', 45, 1800, null, ['nail', 'styling'], 3],
-  ['pedicure', 'Pedicure', 'beauty', 60, 2500, null, ['nail'], 3],
-  ['mehndi', 'Mehndi Application (both hands)', 'beauty', 60, 3000, null, ['nail', 'styling'], 2],
-].map(([id, name, category, durationMin, price, priceMax, stationTypes, w]) => ({ id, name, category, durationMin, price, priceMax, stationTypes, w }));
-const WALK_IN = ['cut', 'blowdry', 'threading', 'cleanup', 'manicure', 'pedicure', 'mehndi'];
+// Which kind of station a service needs, best first. Guessed from category and name.
+function stationTypesFor({ name, category }) {
+  const n = name.toLowerCase(), c = (category ?? '').toLowerCase();
+  if (/makeup|bridal/.test(c) || BRIDAL_RE.test(n)) return ['bridal', 'styling'];
+  if (/nail|mani|pedi/.test(`${c} ${n}`)) return ['nail'];
+  if (c === 'hair') return /wash|keratin|botox|nanoplast|protein|treatment|dye|colou?r/.test(n) ? ['wash', 'styling'] : ['styling'];
+  if (/thread/.test(c)) return ['facial', 'styling'];
+  if (/skin|facial|clean|massage|lash|wax|spa|body|brow/.test(c)) return ['facial'];
+  return ['styling'];
+}
+
+// Turns an exported salon into what the simulation needs: one station per working staff
+// member (front desk excluded). Each takes the kind of work she does that no station covers yet,
+// most common on the menu first; once every kind is covered, the most common kinds repeat.
+function prepareSalon(raw) {
+  const services = raw.services.map(s => ({
+    id: s.id, name: s.name, category: s.category, durationMin: s.durationMin, price: s.price, priceMax: s.priceMax ?? null,
+    staffIds: s.staffIds ?? null, bridal: /makeup|bridal/i.test(s.category) && BRIDAL_RE.test(s.name),
+    stationTypes: stationTypesFor(s), w: Math.max(0.3, 60 / s.durationMin),
+  }));
+  const branches = raw.branches.map(b => {
+    const c = CITY[(b.city ?? '').trim().toLowerCase()];
+    return { id: b.id, name: b.name, city: b.city || 'City not set', province: c?.[2] ?? 'unset', lat: c?.[0] ?? null, lon: c?.[1] ?? null, hours: b.hours ?? null };
+  });
+  const staff = [], stations = [];
+  for (const b of branches) {
+    const demand = {}, used = {};
+    for (const s of services) demand[s.stationTypes[0]] = (demand[s.stationTypes[0]] ?? 0) + 1;
+    let index = 0;
+    for (const p of raw.staff.filter(p => (p.branchId ?? branches[0].id) === b.id)) {
+      const desk = DESK_RE.test(p.role ?? '');
+      let stationId = null;
+      if (!desk && index < MAX_STATIONS) {
+        const types = [...new Set(services.filter(s => !s.staffIds || s.staffIds.includes(p.id)).map(s => s.stationTypes[0]))];
+        const type = types.sort((x, y) => (used[x] ?? 0) - (used[y] ?? 0) || demand[y] - demand[x])[0] ?? 'styling';
+        used[type] = (used[type] ?? 0) + 1;
+        stationId = `${b.id}-s${++index}`;
+        stations.push({ id: stationId, branchId: b.id, index: index - 1, type, label: `${index} · ${STATION_TYPES[type]}` });
+      }
+      staff.push({ id: p.id, branchId: b.id, name: p.name, role: p.role || (desk ? 'Front desk' : 'Staff'), stationId });
+    }
+  }
+  return { salon: { id: raw.id, name: raw.name }, branches, staff, stations, services };
+}
+
+// A branch's hours on a given PKT day (from its Settings → Hours, if exported).
+function hoursOn(branch, day) {
+  if (!branch.hours) return { open: true, from: '11:00', to: '21:00' };
+  const name = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Karachi', weekday: 'long' }).format(day + 12 * HOUR);
+  const h = branch.hours.find(x => x.day === name);
+  return h?.open ? { open: true, from: h.from, to: h.to } : { open: false, from: '11:00', to: '11:00' };
+}
+
 const METHODS = [['cash', 50], ['card', 16], ['jazzcash', 12], ['easypaisa', 12], ['raast', 6], ['bank', 4]];
 const SOURCES = [['whatsapp', 45], ['manual', 30], ['web', 25]];
 const GAPS = [[0, 40], [15, 28], [30, 15], [60, 10], [90, 7]];
@@ -251,23 +553,21 @@ const LAST = ['Khan', 'Malik', 'Butt', 'Sheikh', 'Chaudhry', 'Qureshi', 'Siddiqu
 const MOBILE_PREFIXES = ['300', '301', '302', '303', '304', '305', '306', '307', '308', '309', '310', '311', '312', '313', '315', '320', '321', '322', '323', '324', '331', '332', '333', '334', '335', '336', '340', '341', '342', '343', '344', '345', '346', '347'];
 
 class MockAdapter {
-  constructor(client, { seed = 20261011, speed = 30, now = Date.now() } = {}) {
-    this.client = client;
+  constructor(raw, { seed = 20261011, speed = 30, now = Date.now(), shadow = false } = {}) {
+    Object.assign(this, prepareSalon(raw));
     this.rng = mulberry32(seed);
     this.speed = speed;
-    this.tax = structuredClone(client.tax);
-    this.branches = client.branches.map(({ stations, staff, ...b }) => b);
-    this.stations = client.branches.flatMap(b => b.stations.map((type, i) => ({ id: `${b.id}-s${i + 1}`, branchId: b.id, index: i, type, label: `${i + 1} · ${STATION_TYPES[type]}` })));
-    this.staff = client.branches.flatMap(b => b.staff.map(([name, role, si], i) => ({ id: `${b.id}-p${i + 1}`, branchId: b.id, name, role, stationId: si == null ? null : `${b.id}-s${si + 1}` })));
+    this.tax = structuredClone(TAX);
     const names = new Set();
     while (names.size < 400) names.add(`${this.pick(FIRST)} ${this.pick(LAST)}`);
     this.clients = [...names].map((name, i) => ({ id: `C${1001 + i}`, name, phone: `+92 ${this.pick(MOBILE_PREFIXES)} ${String(Math.floor(this.rng() * 1e7)).padStart(7, '0')}` }));
 
-    // Start the simulated day at the current PKT time if the salons are open, else at 1:30 pm.
-    const day = pktMidnight(now), tod = now - day;
-    this.newDay(day);
-    const target = tod > hm('11:00') && tod < hm('20:30') ? now - (tod % MIN) : day + hm('13:30');
+    // Start the simulated day at the current PKT time if the salon is open, else midway through its day.
+    this.newDay(pktMidnight(now));
+    const target = now > this.dayStart && now < this.dayEnd - 30 * MIN ? now - (now % MIN) : this.dayStart + Math.round((this.dayEnd - this.dayStart) / 2 / MIN) * MIN;
     while (this.now < target) this.step();
+    // A second simulated day, one week earlier, run in lockstep: gives honest "vs last week" figures.
+    if (!shadow) this.lastWeek = new MockAdapter(raw, { seed: seed + 1, speed, now: now - 7 * DAY, shadow: true });
   }
 
   // ── randomness helpers
@@ -277,12 +577,18 @@ class MockAdapter {
 
   newDay(day) {
     this.day = day;
-    this.now = day + hm('10:30');
+    this.branches = this.branches.map(b => { const h = hoursOn(b, day); return { ...b, open: h.open, opensAt: h.from, closesAt: h.to }; });
+    const open = this.branches.filter(b => b.open);
+    this.dayStart = day + (open.length ? Math.min(...open.map(b => hm(b.opensAt))) : hm('11:00'));
+    this.dayEnd = day + (open.length ? Math.max(...open.map(b => hm(b.closesAt))) : hm('21:00'));
+    this.now = this.dayStart - 30 * MIN;
     this.appts = []; this.payments = []; this.events = []; this.sim = new Map(); this.seq = 0;
     for (const st of this.stations) {
       const b = this.branches.find(x => x.id === st.branchId);
-      const close = day + hm(b.closesAt);
-      const menu = SERVICES.filter(s => s.stationTypes.includes(st.type)).map(s => [s, s.w]);
+      if (!b.open) continue;
+      const close = day + hm(b.closesAt), who = this.staffFor(st);
+      const menu = this.services.filter(s => s.stationTypes.includes(st.type) && (!s.staffIds || s.staffIds.includes(who.id))).map(s => [s, s.w]);
+      if (!menu.length) continue;
       let t = day + hm(b.opensAt) + this.pick([0, 0, 15, 30]) * MIN;
       for (;;) {
         let svc = this.weighted(menu);
@@ -294,15 +600,16 @@ class MockAdapter {
     }
   }
 
+  staffFor(station) { return this.staff.find(p => p.stationId === station.id); }
+
   book(station, svc, start, source, status) {
-    const client = this.pick(this.clients);
-    const price = svc.priceMax ? svc.price + Math.round(this.rng() * (svc.priceMax - svc.price) / 5000) * 5000 : svc.price;
+    const client = this.pick(this.clients), bridal = svc.bridal, step = bridal ? 5000 : 500;
+    const price = svc.priceMax ? svc.price + Math.round(this.rng() * (svc.priceMax - svc.price) / step) * step : svc.price;
     const a = {
       id: `A${this.day / DAY | 0}-${++this.seq}`, branchId: station.branchId, stationId: station.id,
-      staffId: this.staff.find(p => p.stationId === station.id).id, clientId: client.id, serviceId: svc.id,
+      staffId: this.staffFor(station).id, clientId: client.id, serviceId: svc.id,
       start, end: start + svc.durationMin * MIN, status, source, price,
     };
-    const bridal = svc.category === 'bridal';
     if (bridal) {
       const due = Math.round(price * 0.4 / 1000) * 1000, r = this.rng();
       const advanceStatus = r < 0.7 ? 'paid' : r < 0.9 ? 'partial' : 'pending';
@@ -319,9 +626,10 @@ class MockAdapter {
   }
 
   step() {
+    this.lastWeek?.step();
     this.now += MIN;
     const now = this.now;
-    if (now >= this.day + hm('22:30')) return this.newDay(this.day + DAY);
+    if (now >= this.dayEnd + 90 * MIN) return this.newDay(this.day + DAY);
 
     for (const a of this.appts) {
       const s = this.sim.get(a.id);
@@ -340,15 +648,17 @@ class MockAdapter {
       if (next) { next.status = 'in-progress'; next.startedAt = now; }
     }
     for (const b of this.branches) {
-      if (now > this.day + hm(b.opensAt) && now < this.day + hm(b.closesAt) - HOUR && this.rng() < 0.012) this.walkIn(b);
+      if (b.open && now > this.day + hm(b.opensAt) && now < this.day + hm(b.closesAt) - HOUR && this.rng() < 0.012) this.walkIn(b);
     }
   }
 
   walkIn(b) {
     const stations = this.stations.filter(s => s.branchId === b.id);
-    const options = SERVICES.filter(s => WALK_IN.includes(s.id) && stations.some(st => s.stationTypes.includes(st.type)));
+    const can = (st, s) => s.stationTypes.includes(st.type) && (!s.staffIds || s.staffIds.includes(this.staffFor(st).id));
+    const options = this.services.filter(s => !s.bridal && s.durationMin <= 45 && stations.some(st => can(st, s)));
+    if (!options.length) return;
     const svc = this.pick(options), now = this.now;
-    const free = stations.find(st => svc.stationTypes.includes(st.type) &&
+    const free = stations.find(st => can(st, svc) &&
       !this.appts.some(a => a.stationId === st.id && ACTIVE.includes(a.status) && a.start < now + (svc.durationMin + 10) * MIN && (a.status === 'in-progress' || a.end > now)));
     if (!free) return this.event(b.id, 'info', 'walk-in-lost', `Walk-in for ${svc.name} turned away — no free ${svc.stationTypes.map(t => STATION_TYPES[t].toLowerCase()).join(' or ')}`);
     const a = this.book(free, svc, now, 'walk-in', 'arrived');
@@ -367,7 +677,7 @@ class MockAdapter {
     this.events.push({ id: `ev${this.events.length}-${this.now}`, branchId, level, kind, text, at: this.now, appointmentId });
   }
 
-  svc(a) { return SERVICES.find(s => s.id === a.serviceId); }
+  svc(a) { return this.services.find(s => s.id === a.serviceId); }
   clientName(a) { return this.clients.find(c => c.id === a.clientId).name; }
 
   alerts() {
@@ -395,12 +705,19 @@ class MockAdapter {
 
   snapshot() {
     return {
-      now: this.now, live: false, speed: this.speed, salon: this.client.salon,
+      now: this.now, live: false, speed: this.speed, salon: this.salon, salons: SALONS.map(({ id, name }) => ({ id, name })),
       config: { tax: structuredClone(this.tax) },
-      branches: this.branches, stations: this.stations, staff: this.staff, clients: this.clients,
-      services: SERVICES.map(({ w, ...s }) => s),
+      branches: this.branches.map(({ hours, ...b }) => b), stations: this.stations, staff: this.staff, clients: this.clients,
+      services: this.services.map(({ w, staffIds, ...s }) => s),
       appointments: this.appts.map(a => ({ ...a, bridal: a.bridal && { ...a.bridal } })),
       payments: [...this.payments], alerts: this.alerts(),
+      lastWeek: this.lastWeek && {
+        date: this.lastWeek.day,
+        byBranch: Object.fromEntries(this.branches.map(b => [b.id, {
+          collected: this.lastWeek.payments.filter(p => p.branchId === b.id).reduce((t, p) => t + p.total, 0),
+          served: this.lastWeek.appts.filter(a => a.branchId === b.id && a.status === 'completed').length,
+        }])),
+      },
     };
   }
 
@@ -502,6 +819,26 @@ function stats(s, branchId = null) {
   };
 }
 
+// Same figures for the same weekday last week, or null when the source doesn't provide them.
+function lastWeekStats(s, branchId = null) {
+  if (!s.lastWeek) return null;
+  const rows = Object.entries(s.lastWeek.byBranch).filter(([id]) => !branchId || id === branchId).map(([, v]) => v);
+  return { collected: rows.reduce((t, r) => t + r.collected, 0), served: rows.reduce((t, r) => t + r.served, 0) };
+}
+
+// Today by opening hour: money collected and clients finished in each hour.
+function hourly(s, branchId = null) {
+  const inScope = x => !branchId || x.branchId === branchId, day = pktMidnight(s.now);
+  const bs = s.branches.filter(b => (!branchId || b.id === branchId) && b.open !== false);
+  if (!bs.length) return { rows: [], current: -1 };
+  const h0 = Math.min(...bs.map(b => hm(b.opensAt))) / HOUR, h1 = Math.ceil(Math.max(...bs.map(b => hm(b.closesAt))) / HOUR);
+  const rows = Array.from({ length: h1 - h0 }, (_, i) => ({ h: h0 + i, collected: 0, served: 0 }));
+  const slot = t => rows[Math.min(rows.length - 1, Math.max(0, Math.floor((t - day) / HOUR) - h0))];
+  for (const p of s.payments) if (inScope(p)) slot(p.at).collected += p.total;
+  for (const a of s.appointments) if (inScope(a) && a.status === 'completed') slot(a.completedAt).served++;
+  return { rows, current: Math.floor((s.now - day) / HOUR) - h0 };
+}
+
 function stationState(s, station) {
   const mine = s.appointments.filter(a => a.stationId === station.id);
   const current = mine.find(a => a.status === 'in-progress') ?? null;
@@ -529,25 +866,40 @@ function selfTest() {
   assert(maskPhone('+92 321 4567890') === '+92 321 ****890', 'phone mask');
   assert(rs(1234567.4) === 'Rs 1,234,567', 'PKR format');
   assert(taxOn(10000, 16) === 1600 && taxOn(2500, 15) === 375, 'tax');
-  const m = new MockAdapter(CLIENT, { seed: 7, now: Date.UTC(2026, 9, 11, 14, 0) }); // 19:00 PKT
+  // A made-up two-city salon exercises the setup rules; the real salons are run below.
+  const fixture = prepareSalon({ id: 't', name: 'Test', branches: [{ id: 'a', name: 'A', city: 'Lahore' }, { id: 'b', name: 'B', city: ' karachi ' }, { id: 'c', name: 'C', city: '' }],
+    staff: [{ id: 'p1', name: 'P1', role: 'Receptionist', branchId: 'a' }, ...Array.from({ length: 8 }, (_, i) => ({ id: `q${i}`, name: `Q${i}`, role: '', branchId: 'a' }))],
+    services: [{ id: 'x', name: 'Barat Makeup', category: 'makeup', durationMin: 150, price: 40000 }, { id: 'y', name: 'Party Makeup', category: 'makeup', durationMin: 60, price: 7500 }, { id: 'z', name: 'Gel Nails', category: 'nails', durationMin: 60, price: 6000 }] });
+  assert(fixture.branches.map(b => b.province).join() === 'punjab,sindh,unset' && fixture.branches[2].lat === null, 'city → province / unset');
+  assert(fixture.staff[0].stationId === null && fixture.stations.length === MAX_STATIONS, 'front desk has no station; stations capped');
+  assert(fixture.services[0].bridal && !fixture.services[1].bridal && fixture.services[2].stationTypes[0] === 'nail', 'service kinds');
+  const sunday = Date.UTC(2026, 9, 11, 7, 0); // Sunday 12:00 PKT
+  const closed = new MockAdapter({ ...SALONS[0], branches: SALONS[0].branches.map(b => ({ ...b, hours: [{ day: 'Sunday', open: false, from: '10:00', to: '18:00' }] })) }, { seed: 3, now: sunday });
+  assert(closed.snapshot().appointments.length === 0 && closed.snapshot().branches.every(b => !b.open), 'closed day has no bookings');
+
+  const m = new MockAdapter(SALONS[0], { seed: 7, now: Date.UTC(2026, 9, 11, 14, 0) }); // 19:00 PKT
   const s = m.snapshot();
   for (const st of s.stations) {
     const booked = s.appointments.filter(a => a.stationId === st.id && a.source !== 'walk-in').sort((a, b) => a.start - b.start);
     booked.forEach((a, i) => assert(i === 0 || a.start >= booked[i - 1].end, `no double-booking on ${st.id}`));
     assert(s.appointments.filter(a => a.stationId === st.id && a.status === 'in-progress').length <= 1, `one client per station ${st.id}`);
   }
-  for (const a of s.appointments.filter(a => a.bridal)) {
-    const mins = (a.end - a.start) / MIN;
-    assert(mins >= 180 && mins <= 240 && a.price >= 35000 && a.price <= 150000, `bridal shape ${a.id}`);
+  for (const a of s.appointments) {
+    const svc = s.services.find(x => x.id === a.serviceId);
+    assert(a.price >= svc.price && a.price <= (svc.priceMax ?? svc.price) && (a.end - a.start) / MIN === svc.durationMin, `price and length from the menu ${a.id}`);
+    assert(!svc.bridal || (a.bridal && a.bridal.advancePaid <= a.bridal.advanceDue), `bridal advance ${a.id}`);
   }
   for (const p of s.payments) assert(p.total === p.subtotal + p.tax + p.tip && p.tax === taxOn(p.subtotal, p.taxRate), `payment maths ${p.id}`);
   assert(s.clients.every(c => /^\+92 3\d\d \d{7}$/.test(c.phone)), 'phone format');
   const st = stats(s);
   assert(st.collected === st.net + st.tax + st.tips, 'collected adds up');
+  assert(m.lastWeek.now === m.now - 7 * DAY, 'last week runs in lockstep');
+  const hr = hourly(s), one = hourly(s, s.branches[0].id);
+  assert(one.rows.reduce((t, r) => t + r.collected, 0) === stats(s, s.branches[0].id).collected, 'hourly per branch');
+  assert(hr.rows.reduce((t, r) => t + r.collected, 0) === st.collected && hr.rows.reduce((t, r) => t + r.served, 0) === st.done, 'hourly totals match');
   return `Self-test passed (${s.appointments.length} appointments, ${s.payments.length} payments)`;
 }
 // ═══════════════════════════════ END DATA LAYER ═══════════════════════════
-
 // ═══════════════════════════════ UI ═══════════════════════════════
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -555,128 +907,279 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 
 const $ = sel => document.querySelector(sel);
 const params = new URLSearchParams(location.search);
-const view = { branchId: null };
+// sel = selected appointment id; closed = owner closed the card, so don't auto-pick another.
+const view = { branchId: null, sel: null, closed: false, tab: 'stations', collapsed: false };
 const dismissed = new Set();
 let S = null;
 
-// ── Panels
-function renderHeader(s) {
+const ICON = {
+  wallet: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  chair: '<path d="M19 9V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3"/><path d="M3 16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z"/><path d="M5 18v2"/><path d="M19 18v2"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  scissors: '<circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+};
+const icon = name => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICON[name]}</svg>`;
+
+const STATUS = { booked: ['Booked', 'muted'], confirmed: ['Confirmed', 'green'], arrived: ['Waiting', 'blue'], 'in-progress': ['In chair', 'orange'], completed: ['Done', 'purple'], 'no-show': ['No-show', 'red'], cancelled: ['Cancelled', 'muted'] };
+const isLate = (s, a) => a.status === 'in-progress' && s.now > a.startedAt + (a.end - a.start);
+const chip = (s, a) => { const [t, c] = isLate(s, a) ? ['Running over', 'red'] : STATUS[a.status]; return `<span class="chip ${c}">${t}</span>`; };
+const STATION_CHIP = { free: '<span class="chip green">Free</span>', busy: '<span class="chip orange">In service</span>', late: '<span class="chip red">Running over</span>' };
+const SOURCE_LABEL = { whatsapp: 'WhatsApp', 'walk-in': 'Walk-in', web: 'Online booking', manual: 'Phone / desk' };
+const LEVEL_RANK = { critical: 0, warn: 1, info: 2 };
+const inScope = x => !view.branchId || x.branchId === view.branchId;
+
+function sortedAlerts(s) {
+  return s.alerts.filter(a => inScope(a) && !dismissed.has(a.id)).sort((a, b) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level] || b.at - a.at);
+}
+
+// Keep keyboard focus on the same control when a panel re-renders.
+function paint(el, html) {
+  const key = el.contains(document.activeElement) ? document.activeElement.dataset.fk : null;
+  el.innerHTML = html;
+  if (key) el.querySelector(`[data-fk="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+}
+
+function trend(now, before, label) {
+  if (!before) return '';
+  const pct = Math.round((now - before) / before * 100);
+  return `<div class="t ${pct >= 0 ? 'green' : 'red'}">${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct)}% <span>vs ${label}</span></div>`;
+}
+
+// ── Top bar
+function renderTop(s) {
   $('#salonName').textContent = s.salon.name;
   document.title = `Salonflow · ${s.salon.name}`;
   $('#clock').textContent = `${dateFmt.format(s.now)} · ${clock(s.now)} PKT`;
-  const badge = $('#sourceBadge');
-  badge.textContent = s.live ? 'Live' : 'Simulated data';
-  badge.className = `badge${s.live ? ' live' : ''}`;
   const speeds = [[0, 'Pause'], [1, '1×'], [30, '30×'], [120, '120×']];
   $('#speed').hidden = s.speed == null;
-  $('#speed').innerHTML = speeds.map(([v, l]) => `<button type="button" data-speed="${v}" aria-pressed="${s.speed === v}">${l}</button>`).join('');
+  paint($('#speed'), speeds.map(([v, l]) => `<button type="button" data-speed="${v}" data-fk="speed${v}" aria-pressed="${s.speed === v}">${l}</button>`).join(''));
   const b = view.branchId && idx(s).branch.get(view.branchId);
-  $('#crumbs').innerHTML = b
-    ? `<button type="button" data-back>← All branches</button><span class="sep">/</span><b>${esc(b.name)}, ${esc(b.city)}</b>`
-    : `<b>All branches</b>`;
-  $('#hint').textContent = b ? 'Drag to rotate · scroll to zoom · Esc to go back' : 'Click a branch to look inside · drag to rotate · scroll to zoom';
+  paint($('#crumbs'), b ? `<button type="button" data-back data-fk="back">← All branches</button><span>${esc(b.name)}, ${esc(b.city)}</span>` : '<span>All branches</span>');
+  const urgent = sortedAlerts(s).filter(a => a.level !== 'info').length;
+  const pill = $('#alertPill');
+  pill.className = `alertpill${urgent ? '' : ' calm'}`;
+  pill.innerHTML = `${icon('alert')}${urgent ? `${urgent} need${urgent === 1 ? 's' : ''} attention` : 'All clear'}`;
 }
 
+// ── KPI cards
 function renderKpis(s) {
-  const st = stats(s, view.branchId);
+  const st = stats(s, view.branchId), lw = lastWeekStats(s, view.branchId), hr = hourly(s, view.branchId);
+  const lwLabel = s.lastWeek ? `last ${new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'short' }).format(s.lastWeek.date)}` : '';
+  const bars = key => {
+    const max = Math.max(1, ...hr.rows.map(r => r[key]));
+    return `<div class="bars" aria-hidden="true">${hr.rows.map((r, i) => `<i class="${i > hr.current ? 'future' : i === hr.current ? 'now' : ''}" style="height:${i > hr.current ? 8 : Math.max(6, r[key] / max * 100)}%" title="${String(r.h).padStart(2, '0')}:00 · ${key === 'collected' ? rs(r[key]) : `${r[key]} clients`}"></i>`).join('')}</div>`;
+  };
+  const stations = s.stations.filter(inScope).map(st2 => stationState(s, st2).state);
   const pct = st.stations ? Math.round(st.busy / st.stations * 100) : 0;
-  const mix = Object.entries(st.byMethod).sort((a, b) => b[1] - a[1]);
   $('#kpis').innerHTML = `
-    <h2>${view.branchId ? 'This branch today' : 'All branches today'}</h2>
-    <div class="kpi"><div class="l">Collected</div><div class="v">${rs(st.collected)}</div>
-      <div class="sub">Services ${rs(st.net)} · Tax ${rs(st.tax)} · Tips ${rs(st.tips)}</div></div>
-    <div class="kpi"><div class="l">Stations in use now</div><div class="v">${st.busy} / ${st.stations} <span class="small muted">${pct}%</span></div>
-      <div class="meter"><i style="width:${pct}%"></i></div>
-      ${st.late ? `<div class="sub" style="color:var(--late)">${st.late} running over time</div>` : ''}</div>
-    <div class="kpi"><div class="l">Waiting now</div><div class="v">${st.waiting}</div>
-      <div class="sub">${st.waiting ? `Longest wait ${st.longestWait} min` : 'Nobody waiting'}</div></div>
-    <div class="kpi"><div class="l">Appointments</div><div class="v">${st.done} <span class="small muted">of ${st.booked} done</span></div>
-      <div class="sub">${st.walkIns} walk-in${st.walkIns === 1 ? '' : 's'} · ${st.noShows} no-show${st.noShows === 1 ? '' : 's'}</div></div>
-    <div class="kpi"><div class="l">Bridal today</div><div class="v">${st.bridal}</div>
-      <div class="sub">${rs(st.bridalValue)} booked · ${rs(st.advancesHeld)} advances held${st.advancesOpen ? ` · <span style="color:var(--late)">${st.advancesOpen} advance${st.advancesOpen > 1 ? 's' : ''} not paid</span>` : ''}</div></div>
-    <h2>Payment methods</h2>
-    ${mix.length ? `<div class="mix">${mix.map(([m, v]) => `<span>${METHOD_LABEL[m]}</span><div class="meter"><i style="width:${v / st.collected * 100}%"></i></div><span>${rs(v)}</span>`).join('')}</div>` : '<div class="empty">No payments yet today</div>'}`;
+    <div class="kpi glass"><div class="ic">${icon('wallet')}</div><div class="body"><div class="l">Collected today</div>
+      <div class="row"><div><div class="v num">${rs(st.collected)}</div>${trend(st.collected, lw?.collected, lwLabel)}</div>${bars('collected')}</div></div></div>
+    <div class="kpi glass"><div class="ic">${icon('users')}</div><div class="body"><div class="l">Clients served</div>
+      <div class="row"><div><div class="v num">${st.done} <span class="faint" style="font-size:13px">/ ${st.booked}</span></div>${trend(st.done, lw?.served, lwLabel)}</div>${bars('served')}</div></div></div>
+    <div class="kpi glass"><div class="ic">${icon('chair')}</div><div class="body"><div class="l">Stations in use</div>
+      <div class="row"><div><div class="v num">${st.busy}/${st.stations} <span class="faint" style="font-size:13px">${pct}%</span></div>
+      <div class="t ${st.late ? 'red' : 'green'}">${st.late ? `${st.late} running over` : 'All on time'}</div></div>
+      <div class="pips" aria-hidden="true">${stations.map(x => `<i style="background:${COLORS[x]}"></i>`).join('')}</div></div></div></div>
+    <div class="kpi glass"><div class="ic">${icon('clock')}</div><div class="body"><div class="l">Waiting now</div>
+      <div class="v num">${st.waiting}</div><div class="t ${st.longestWait >= 15 ? 'red' : 'green'}">${st.waiting ? `Longest ${st.longestWait} min` : 'Nobody waiting'}</div></div></div>`;
 }
 
-const LEVEL_RANK = { critical: 0, warn: 1, info: 2 };
-function alertList(s) {
-  const alerts = s.alerts.filter(a => (!view.branchId || a.branchId === view.branchId) && !dismissed.has(a.id))
-    .sort((a, b) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level] || b.at - a.at);
-  if (!alerts.length) return '<div class="empty">All clear</div>';
-  const B = idx(s).branch;
-  return `<ul class="list">${alerts.slice(0, 10).map(a => `<li><span class="dot ${a.level}" title="${a.level}"></span>
-    <div class="grow">${esc(a.text)}<div class="small muted">${view.branchId ? '' : `${esc(B.get(a.branchId).name)} · `}${clock(a.at)}</div></div>
-    <button class="x" type="button" data-dismiss="${esc(a.id)}" aria-label="Dismiss">×</button></li>`).join('')}</ul>
-    ${alerts.length > 10 ? `<div class="small muted">+${alerts.length - 10} more</div>` : ''}`;
+// ── Selection
+function pickDefault(s) {
+  const I = idx(s), cur = I.appt.get(view.sel);
+  if (cur && inScope(cur)) return;
+  view.sel = null;
+  if (view.closed) return;
+  const fromAlert = sortedAlerts(s).find(a => a.appointmentId && I.appt.has(a.appointmentId));
+  const running = s.appointments.filter(a => inScope(a) && a.status === 'in-progress').sort((a, b) => b.price - a.price)[0];
+  view.sel = fromAlert?.appointmentId ?? running?.id ?? null;
+}
+function select(id) { view.sel = id; view.closed = false; render(S); }
+
+// ── Detail card (top right)
+function renderDetail(s) {
+  const el = $('#detail'), I = idx(s), a = I.appt.get(view.sel);
+  el.hidden = !a;
+  if (!a) return;
+  const c = I.client.get(a.clientId), svc = I.service.get(a.serviceId), b = I.branch.get(a.branchId);
+  const pay = s.payments.find(p => p.appointmentId === a.id);
+  const rate = s.config.tax[b.province].rate;
+  const due = a.price - (a.bridal?.advancePaid ?? 0);
+  const estEnd = a.startedAt ? a.startedAt + (a.end - a.start) : a.end;
+  const endLine = a.completedAt ? `Finished <b>${clock(a.completedAt)}</b>`
+    : a.startedAt ? `Est. finish <b class="${isLate(s, a) ? 'red' : 'green'}">${clock(estEnd)}</b>` : '';
+  const startLine = a.startedAt ? `Started <b>${clock(a.startedAt)}</b>` : a.arrivedAt ? `Arrived <b>${clock(a.arrivedAt)}</b>` : a.status === 'no-show' ? '<b class="red">Did not come</b>' : 'Not arrived yet';
+  el.innerHTML = `
+    <div class="head"><div class="who"><div class="name">${esc(c.name)}</div><div class="muted small">${esc(maskPhone(c.phone))} · ${SOURCE_LABEL[a.source]}</div></div>
+      ${chip(s, a)}<button class="x" type="button" data-close aria-label="Close">×</button></div>
+    <div class="route">
+      <div><div class="big num">${clock(a.start)}</div><div class="muted">Booked from</div><div class="num">${startLine}</div></div>
+      <div class="mid">${icon('scissors')}</div>
+      <div class="r"><div class="big num">${clock(a.end)}</div><div class="muted">Booked until</div><div class="num">${endLine}</div></div>
+    </div>
+    <dl class="kv">
+      <dt>Service</dt><dd>${esc(svc.name)}</dd>
+      <dt>Station</dt><dd>${esc(I.station.get(a.stationId).label)}</dd>
+      <dt>Staff</dt><dd>${esc(I.staff.get(a.staffId).name)}</dd>
+      <dt>Branch</dt><dd>${esc(b.name)}, ${esc(b.city)}</dd>
+      <dt>Price</dt><dd class="num">${rs(a.price)}</dd>
+      ${a.bridal ? `<dt>Advance</dt><dd class="num">${rs(a.bridal.advancePaid)} of ${rs(a.bridal.advanceDue)} <span class="chip ${{ paid: 'green', partial: 'orange', pending: 'red' }[a.bridal.advanceStatus]}">${a.bridal.advanceStatus}</span></dd>` : ''}
+      ${pay ? `<dt>Paid</dt><dd class="num">${rs(pay.total)} <span class="muted">· ${METHOD_LABEL[pay.method]} · tax ${rs(pay.tax)}${pay.tip ? ` · tip ${rs(pay.tip)}` : ''}</span></dd>`
+        : ['no-show', 'cancelled'].includes(a.status) ? '' : `<dt>To collect</dt><dd class="num">${rs(due + taxOn(due, rate))} <span class="muted">incl. ${rate}% tax</span></dd>`}
+    </dl>`;
 }
 
-function renderSide(s) {
-  const I = idx(s);
-  if (!view.branchId) {
-    const bridal = s.appointments.filter(a => a.bridal && a.status !== 'cancelled').sort((a, b) => a.start - b.start);
-    $('#side').innerHTML = `
-      <h2>Needs attention</h2>${alertList(s)}
-      <h2>Branches</h2>
-      <table><thead><tr><th>Branch</th><th class="r">Collected</th><th class="r">In use</th><th class="r">Waiting</th></tr></thead><tbody>
-      ${s.branches.map(b => { const st = stats(s, b.id); return `<tr data-branch="${b.id}" tabindex="0"><td><b>${esc(b.name)}</b><div class="small muted">${esc(b.city)}</div></td>
-        <td class="r">${rs(st.collected)}</td><td class="r">${st.busy}/${st.stations}${st.late ? ` <span style="color:var(--late)">(${st.late} late)</span>` : ''}</td><td class="r">${st.waiting}</td></tr>`; }).join('')}
-      </tbody></table>
-      <h2>Bridal bookings today</h2>
-      ${bridal.length ? `<ul class="list">${bridal.map(a => `<li><div class="grow"><b>${esc(I.service.get(a.serviceId).name)}</b>
-        <div class="small">${esc(I.client.get(a.clientId).name)} · ${esc(I.branch.get(a.branchId).name)} · ${clock(a.start)}–${clock(a.end)}</div>
-        <div class="small muted">${esc(I.staff.get(a.staffId).name)} · ${a.status.replace('-', ' ')}</div></div>
-        <div class="r">${rs(a.price)}<div><span class="pill ${a.bridal.advanceStatus}">advance ${a.bridal.advanceStatus}</span></div>
-        <div class="small muted">${rs(a.bridal.advancePaid)} of ${rs(a.bridal.advanceDue)}</div></div></li>`).join('')}</ul>` : '<div class="empty">No bridal bookings today</div>'}`;
-    return;
+// ── Service tracker (bottom left)
+function renderTracker(s) {
+  const el = $('#tracker'), I = idx(s), a = I.appt.get(view.sel);
+  el.hidden = !a;
+  if (!a) return;
+  const svc = I.service.get(a.serviceId), pay = s.payments.find(p => p.appointmentId === a.id);
+  const planned = a.end - a.start, estEnd = a.startedAt ? a.startedAt + planned : a.end;
+  const steps = [];
+  if (a.bridal) steps.push({ l: 'Advance', t: a.bridal.advanceStatus === 'paid' ? 'Paid' : a.bridal.advanceStatus === 'partial' ? 'Half paid' : 'Not paid', done: a.bridal.advanceStatus === 'paid', bad: a.bridal.advanceStatus !== 'paid' });
+  steps.push({ l: 'Booked slot', t: clock(a.start), done: true });
+  steps.push(a.status === 'no-show' ? { l: 'Arrived', t: 'No-show', bad: true } : { l: 'Arrived', t: a.arrivedAt ? clock(a.arrivedAt) : '—', done: !!a.arrivedAt });
+  steps.push({ l: `In ${svc.category === 'skin' ? 'treatment' : 'chair'}`, t: a.startedAt ? clock(a.startedAt) : '—', done: !!a.startedAt });
+  steps.push({ l: a.completedAt ? 'Finished' : 'Est. finish', t: clock(a.completedAt ?? estEnd), done: !!a.completedAt, est: !a.completedAt });
+  steps.push({ l: 'Paid', t: pay ? rs(pay.total) : '—', done: !!pay });
+  const nowIdx = steps.findIndex(x => !x.done && !x.bad);
+
+  let cls = '', n, sub;
+  if (a.status === 'in-progress') {
+    const left = Math.round((estEnd - s.now) / MIN);
+    [cls, n, sub] = left >= 0 ? ['', `${left} min left`, 'On schedule'] : ['late', `+${-left} min`, 'Running over time'];
+  } else if (a.status === 'arrived') {
+    const w = Math.max(0, Math.round((s.now - Math.max(a.arrivedAt, a.start)) / MIN));
+    [cls, n, sub] = [w >= 15 ? 'late' : 'wait', `Waiting ${w} min`, w ? 'Station still busy' : 'Starting shortly'];
+  } else if (a.status === 'booked' || a.status === 'confirmed') {
+    const m = Math.round((a.start - s.now) / MIN);
+    [cls, n, sub] = m >= 0 ? ['idle', `In ${m} min`, a.status === 'confirmed' ? 'Confirmed' : 'Not yet confirmed'] : ['late', `${-m} min late`, 'Client not here yet'];
+  } else if (a.status === 'completed') {
+    const over = Math.round((a.completedAt - a.startedAt - planned) / MIN);
+    [cls, n, sub] = ['', 'Done', over > 0 ? `Took ${over} min longer than booked` : 'Finished on time'];
+  } else [cls, n, sub] = ['late', STATUS[a.status][0], 'Slot lost'];
+
+  el.innerHTML = `
+    <div class="top"><div><div class="panel-title">Service Tracker</div>
+      <div class="sub"><span class="tag">${esc(shortName(I.client.get(a.clientId).name))}</span><span>${esc(svc.name)}</span><span>${esc(I.branch.get(a.branchId).name)} · ${esc(I.station.get(a.stationId).label)}</span></div></div>
+      <div class="count ${cls}"><div class="n num">${n}</div><div class="s ${cls === 'late' ? 'red' : cls === 'wait' ? 'orange' : cls === 'idle' ? 'muted' : 'green'}">${sub}</div></div></div>
+    <div class="steps">${steps.map((x, i) => `<div class="step${x.done ? ' done' : ''}${i === nowIdx ? ' now' : ''}${x.bad ? ' bad' : ''}${x.est ? ' est' : ''}">
+      <span class="c">${x.done ? icon('check') : x.bad ? icon('x') : ''}</span><div class="t num">${x.t}</div><div class="l">${x.l}</div></div>`).join('')}</div>`;
+}
+
+// ── Operations table (bottom right)
+function renderOps(s) {
+  const I = idx(s), net = !view.branchId;
+  const appts = s.appointments.filter(inScope);
+  const alerts = sortedAlerts(s), pays = s.payments.filter(inScope).sort((a, b) => b.at - a.at);
+  const stations = s.stations.filter(inScope);
+  const bridal = appts.filter(a => a.bridal).sort((a, b) => a.start - b.start);
+  const tabs = [['stations', `Stations (${stations.length})`], ['appointments', `Appointments (${appts.length})`], ['bridal', `Bridal (${bridal.length})`], ['payments', `Payments (${pays.length})`], ['alerts', `Alerts (${alerts.length})`]];
+  if (net) tabs.push(['branches', `Branches (${s.branches.length})`]);
+  if (!tabs.some(t => t[0] === view.tab)) view.tab = 'stations';
+  const bcol = a => net ? `<td>${esc(I.branch.get(a.branchId).name)}</td>` : '';
+  const bth = net ? '<th>Branch</th>' : '';
+  const row = (a, cells) => `<tr data-sel="${a.id}" data-fk="row-${a.id}" tabindex="0" class="${a.id === view.sel ? 'sel' : ''}">${cells}</tr>`;
+  const table = (head, rows, empty) => rows.length ? `<table><thead><tr>${head}</tr></thead><tbody>${rows.join('')}</tbody></table>` : `<div class="empty">${empty}</div>`;
+
+  let body;
+  if (view.tab === 'stations') {
+    body = table(`<th>Station</th>${bth}<th>Staff</th><th>Client</th><th>Service</th><th>Status</th><th class="r">Ends / Next</th>`,
+      stations.map(st => {
+        const ss = stationState(s, st), a = ss.current ?? ss.next, b = I.branch.get(st.branchId);
+        const staff = I.staff.get(a?.staffId) ?? s.staff.find(p => p.stationId === st.id);
+        const when = ss.current ? (ss.state === 'late' ? `<span class="red">+${-ss.minsLeft} min</span>` : `${clock(ss.current.startedAt + ss.current.end - ss.current.start)}`) : ss.next ? `Next ${clock(ss.next.start)}` : '—';
+        const cells = `<td><b>${esc(st.label)}</b></td>${net ? `<td>${esc(b.name)}</td>` : ''}<td>${esc(staff.name)}</td>
+          <td>${ss.current ? esc(I.client.get(ss.current.clientId).name) : '<span class="muted">—</span>'}</td>
+          <td>${ss.current ? esc(I.service.get(ss.current.serviceId).name) : '<span class="muted">—</span>'}</td><td>${STATION_CHIP[ss.state]}</td><td class="r num">${when}</td>`;
+        return a ? row(a, cells) : `<tr>${cells}</tr>`;
+      }), 'No stations');
+  } else if (view.tab === 'appointments') {
+    body = table(`<th>Time</th><th>Client</th><th>Phone</th><th>Service</th><th>Staff</th>${bth}<th>Status</th><th class="r">Amount</th>`,
+      appts.sort((a, b) => a.start - b.start).map(a => { const c = I.client.get(a.clientId); return row(a, `<td class="num"><b>${clock(a.start)}</b></td><td>${esc(c.name)}</td><td class="num muted">${esc(maskPhone(c.phone))}</td>
+        <td>${esc(I.service.get(a.serviceId).name)}</td><td>${esc(I.staff.get(a.staffId).name)}</td>${bcol(a)}<td>${chip(s, a)}</td><td class="r num">${rs(a.price)}</td>`); }),
+      'No appointments today');
+  } else if (view.tab === 'bridal') {
+    body = table(`<th>Time</th><th>Bride</th><th>Look</th><th>Artist</th>${bth}<th>Status</th><th class="r">Price</th><th class="r">Advance</th>`,
+      bridal.map(a => row(a, `<td class="num"><b>${clock(a.start)}–${clock(a.end)}</b></td><td>${esc(I.client.get(a.clientId).name)}</td><td>${esc(I.service.get(a.serviceId).name)}</td>
+        <td>${esc(I.staff.get(a.staffId).name)}</td>${bcol(a)}<td>${chip(s, a)}</td><td class="r num">${rs(a.price)}</td>
+        <td class="r num">${rs(a.bridal.advancePaid)} / ${rs(a.bridal.advanceDue)} <span class="chip ${{ paid: 'green', partial: 'orange', pending: 'red' }[a.bridal.advanceStatus]}">${a.bridal.advanceStatus}</span></td>`)),
+      'No bridal bookings today');
+  } else if (view.tab === 'payments') {
+    const mix = {};
+    for (const p of pays) mix[p.method] = (mix[p.method] ?? 0) + p.total;
+    body = `<div class="mixline">${Object.entries(mix).sort((a, b) => b[1] - a[1]).map(([m, v]) => `<span>${METHOD_LABEL[m]} <b class="num">${rs(v)}</b></span>`).join('')}</div>` +
+      table(`<th>Time</th><th>Client</th><th>Service</th>${bth}<th>Method</th><th class="r">Service</th><th class="r">Tax</th><th class="r">Tip</th><th class="r">Total</th>`,
+        pays.map(p => { const a = I.appt.get(p.appointmentId); return row(a, `<td class="num">${clock(p.at)}</td><td>${esc(I.client.get(a.clientId).name)}</td><td>${esc(I.service.get(a.serviceId).name)}${a.bridal ? ' <span class="muted">(balance)</span>' : ''}</td>${bcol(p)}
+          <td>${METHOD_LABEL[p.method]}</td><td class="r num">${rs(p.subtotal)}</td><td class="r num muted">${rs(p.tax)} <span class="faint">${p.taxRate}%</span></td><td class="r num muted">${p.tip ? rs(p.tip) : '—'}</td><td class="r num"><b>${rs(p.total)}</b></td>`); }),
+        'No payments yet today');
+  } else if (view.tab === 'alerts') {
+    body = table(`<th></th><th>What needs attention</th>${bth}<th>Since</th><th></th>`,
+      alerts.map(al => { const cells = `<td><span class="dot ${al.level}" title="${al.level}"></span></td><td class="wrap">${esc(al.text)}</td>${net ? `<td>${esc(I.branch.get(al.branchId).name)}</td>` : ''}<td class="num">${clock(al.at)}</td>
+        <td class="r"><button class="x2" type="button" data-dismiss="${esc(al.id)}" data-fk="dis-${esc(al.id)}" aria-label="Dismiss">×</button></td>`;
+        return al.appointmentId && I.appt.has(al.appointmentId) ? row(I.appt.get(al.appointmentId), cells) : `<tr>${cells}</tr>`; }),
+      'All clear — nothing needs attention');
+  } else {
+    body = table('<th>Branch</th><th class="r">Collected</th><th class="r">vs last week</th><th class="r">Served</th><th class="r">In use</th><th class="r">Waiting</th><th class="r">Alerts</th>',
+      s.branches.map(b => { const st = stats(s, b.id), lw = lastWeekStats(s, b.id), n = s.alerts.filter(a => a.branchId === b.id && a.level !== 'info' && !dismissed.has(a.id)).length;
+        const pct = lw?.collected ? Math.round((st.collected - lw.collected) / lw.collected * 100) : null;
+        return `<tr data-branch="${b.id}" data-fk="br-${b.id}" tabindex="0"><td><b>${esc(b.name)}</b> <span class="muted">${esc(b.city)}</span></td><td class="r num"><b>${rs(st.collected)}</b></td>
+          <td class="r num ${pct == null ? '' : pct >= 0 ? 'green' : 'red'}">${pct == null ? '—' : `${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct)}%`}</td><td class="r num">${st.done}</td>
+          <td class="r num">${st.busy}/${st.stations}${st.late ? ` <span class="red">(${st.late} over)</span>` : ''}</td><td class="r num">${st.waiting}</td><td class="r num ${n ? 'red' : ''}">${n}</td></tr>`; }),
+      'No branches');
   }
-  const appts = s.appointments.filter(a => a.branchId === view.branchId);
-  const waiting = appts.filter(a => a.status === 'arrived').sort((a, b) => a.arrivedAt - b.arrivedAt);
-  const upcoming = appts.filter(a => a.status === 'booked' || a.status === 'confirmed').sort((a, b) => a.start - b.start).slice(0, 8);
-  const pays = s.payments.filter(p => p.branchId === view.branchId).sort((a, b) => b.at - a.at).slice(0, 8);
-  const person = a => { const c = I.client.get(a.clientId); return `${esc(c.name)} <span class="small muted">${esc(maskPhone(c.phone))}</span>`; };
-  $('#side').innerHTML = `
-    <h2>Needs attention</h2>${alertList(s)}
-    <h2>Waiting (${waiting.length})</h2>
-    ${waiting.length ? `<ul class="list">${waiting.map(a => `<li><div class="grow">${person(a)}<div class="small muted">${esc(I.service.get(a.serviceId).name)} · ${esc(I.staff.get(a.staffId).name)} · booked ${clock(a.start)}${a.source === 'walk-in' ? ' · walk-in' : ''}</div></div>
-      <div class="r">${Math.max(0, Math.round((s.now - Math.max(a.arrivedAt, a.start)) / MIN))} min</div></li>`).join('')}</ul>` : '<div class="empty">Nobody waiting</div>'}
-    <h2>Coming up</h2>
-    ${upcoming.length ? `<ul class="list">${upcoming.map(a => `<li><div class="r" style="width:44px;text-align:left"><b>${clock(a.start)}</b></div><div class="grow">${person(a)}
-      <div class="small muted">${esc(I.service.get(a.serviceId).name)} · ${esc(I.staff.get(a.staffId).name)} · ${a.status}${a.bridal ? ` · <span class="pill ${a.bridal.advanceStatus}">advance ${a.bridal.advanceStatus}</span>` : ''}</div></div>
-      <div class="r">${rs(a.price)}</div></li>`).join('')}</ul>` : '<div class="empty">Nothing else booked today</div>'}
-    <h2>Recent payments</h2>
-    ${pays.length ? `<ul class="list">${pays.map(p => { const a = I.appt.get(p.appointmentId); return `<li><div class="r" style="width:44px;text-align:left">${clock(p.at)}</div>
-      <div class="grow">${esc(I.client.get(a.clientId).name)}<div class="small muted">${esc(I.service.get(a.serviceId).name)} · ${METHOD_LABEL[p.method]}</div></div>
-      <div class="r"><b>${rs(p.total)}</b><div class="small muted">incl. ${rs(p.tax)} tax${p.tip ? ` · ${rs(p.tip)} tip` : ''}</div></div></li>`; }).join('')}</ul>` : '<div class="empty">No payments yet today</div>'}`;
+
+  const ops = $('#ops');
+  ops.classList.toggle('collapsed', view.collapsed);
+  const scroll = ops.querySelector('.tablewrap')?.scrollTop ?? 0;
+  paint(ops, `<div class="bar"><div class="tabs" role="tablist">${tabs.map(([id, l]) => `<button type="button" role="tab" data-tab="${id}" data-fk="tab-${id}" aria-selected="${view.tab === id}">${l}</button>`).join('')}</div>
+    <span class="live ${s.live ? 'on' : ''}"><i></i>${s.live ? 'Live operations' : 'Simulated operations'}</span>
+    <button class="caret" type="button" data-collapse data-fk="collapse" aria-label="${view.collapsed ? 'Expand' : 'Collapse'} table">${view.collapsed ? '▴' : '▾'}</button></div>
+    <div class="tablewrap" role="tabpanel">${body}</div>`);
+  ops.querySelector('.tablewrap').scrollTop = scroll;
 }
 
 // ── 3D: shared scene
 const stage = $('#stage');
-const dark = matchMedia('(prefers-color-scheme: dark)').matches;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const COLORS = { free: '#2a9384', busy: '#f0a12e', late: '#e0453a' };
+const COLORS = { free: '#22c55e', busy: '#f97316', late: '#ef4444' };
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-stage.prepend(renderer.domElement);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+stage.append(renderer.domElement);
 const labelRenderer = new CSS2DRenderer();
 labelRenderer.domElement.className = 'labels';
 stage.append(labelRenderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(dark ? '#1d1815' : '#efe6dc');
+{ // Dusk sky: brand purple overhead fading to a warm horizon.
+  const c = Object.assign(document.createElement('canvas'), { width: 2, height: 512 });
+  const ctx = c.getContext('2d'), g = ctx.createLinearGradient(0, 0, 0, 512);
+  [[0, '#0f0a1e'], [0.4, '#2a1450'], [0.72, '#6b2a6e'], [0.9, '#c4573f'], [1, '#f08a4b']].forEach(([o, col]) => g.addColorStop(o, col));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 2, 512);
+  scene.background = new THREE.CanvasTexture(c);
+  scene.background.colorSpace = THREE.SRGBColorSpace;
+}
 const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 300);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.maxPolarAngle = 1.25;
-scene.add(new THREE.HemisphereLight(0xfff4e8, 0x7d6c5c, dark ? 0.8 : 1.15));
-const sun = new THREE.DirectionalLight(0xffffff, dark ? 1.1 : 1.5);
-sun.position.set(10, 18, 8);
+scene.add(new THREE.HemisphereLight(0xc9b5ff, 0x3a2440, 1.1));
+const sun = new THREE.DirectionalLight(0xffb27a, 2.2);
+sun.position.set(-14, 12, 10);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20 });
+Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 22, bottom: -22 });
 scene.add(sun);
+scene.add(new THREE.AmbientLight(0xffe6d0, 0.35));
 
 const matCache = new Map();
 const clay = (color, extra = {}) => {
@@ -684,6 +1187,7 @@ const clay = (color, extra = {}) => {
   if (!matCache.has(key)) matCache.set(key, new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true, ...extra }));
   return matCache.get(key);
 };
+const glow = (color, intensity = 1.2) => clay(color, { emissive: color, emissiveIntensity: intensity });
 function mesh(geo, mat, x = 0, y = 0, z = 0, parent) {
   const m = new THREE.Mesh(geo, typeof mat === 'string' ? clay(mat) : mat);
   m.position.set(x, y, z);
@@ -699,6 +1203,11 @@ function label(el, x, y, z, parent) {
   return o;
 }
 const div = (cls, html = '') => Object.assign(document.createElement(cls === 'blabel' ? 'button' : 'div'), { className: cls, innerHTML: html });
+function tree(g, x, z, y = 0, s = 1) {
+  mesh(new THREE.CylinderGeometry(0.04 * s, 0.06 * s, 0.6 * s, 5), '#6b4a34', x, y + 0.3 * s, z, g);
+  const top = mesh(new THREE.IcosahedronGeometry(0.32 * s, 0), '#3f7a4f', x, y + 0.7 * s, z, g);
+  top.scale.y = 0.75;
+}
 
 // CSS2D labels are DOM elements, so hiding a group has to hide its labels explicitly.
 function setShown(g, on) {
@@ -716,7 +1225,7 @@ const OUTLINE = [[61.6, 25.2], [64.6, 25.3], [66.6, 25.4], [67.0, 24.8], [67.5, 
 const CITIES = [['Karachi', 67.0, 24.86], ['Hyderabad', 68.37, 25.4], ['Lahore', 74.35, 31.52], ['Islamabad', 73.05, 33.68], ['Faisalabad', 73.08, 31.42], ['Multan', 71.47, 30.16], ['Peshawar', 71.58, 34.01], ['Quetta', 67.0, 30.18], ['Sialkot', 74.53, 32.49], ['Gwadar', 62.33, 25.13], ['Gilgit', 74.31, 35.92]];
 const K = 1.45, BOARD_TOP = 0.45;
 const proj = (lon, lat) => new THREE.Vector3((lon - 69.3) * K, BOARD_TOP, -(lat - 30.2) * K);
-const NET_HOME = { pos: new THREE.Vector3(1, 31, 17), target: new THREE.Vector3(1, 0, 0) };
+const NET_HOME = { pos: new THREE.Vector3(3, 27, 21), target: new THREE.Vector3(2.5, 0, 0) };
 
 const network = { group: new THREE.Group(), buildings: new Map(), key: '' };
 scene.add(network.group);
@@ -730,24 +1239,25 @@ function buildNetwork(s) {
 
   const shape = new THREE.Shape(OUTLINE.map(([lon, lat]) => { const p = proj(lon, lat); return new THREE.Vector2(p.x, -p.z); }));
   const board = mesh(new THREE.ExtrudeGeometry(shape, { depth: BOARD_TOP, bevelEnabled: true, bevelSize: 0.15, bevelThickness: 0.1, bevelSegments: 1 }),
-    [clay(dark ? '#6d5e50' : '#e6d5bd'), clay(dark ? '#4e4237' : '#c9ae8a')], 0, 0, 0, g);
+    [clay('#cdb08f'), clay('#7a5a46')], 0, 0, 0, g);
   board.rotation.x = -Math.PI / 2;
   board.position.y = -0.1;
-  mesh(new THREE.CylinderGeometry(19, 19, 0.2, 7), dark ? '#24323a' : '#cfe0e2', 0, -0.25, -1, g).receiveShadow = true;
+  mesh(new THREE.CylinderGeometry(26, 26, 0.2, 9), '#241a3f', 0, -0.25, -1, g).receiveShadow = true;
   // Northern mountains, purely decorative.
   [[74.8, 35.8, 1.5], [76.2, 35.4, 1.2], [73.6, 36.2, 1.1], [72.3, 35.9, 0.9], [71.8, 35.4, 0.8], [75.6, 36.4, 1.0], [67.2, 30.8, 0.6], [66.4, 28.5, 0.5]].forEach(([lon, lat, h]) => {
     const p = proj(lon, lat);
-    mesh(new THREE.ConeGeometry(h * 0.6, h, 5), dark ? '#7d7366' : '#b8ab98', p.x, BOARD_TOP + h / 2, p.z, g);
+    mesh(new THREE.ConeGeometry(h * 0.6, h, 5), '#8f7f8f', p.x, BOARD_TOP + h / 2, p.z, g);
+    mesh(new THREE.ConeGeometry(h * 0.22, h * 0.35, 5), '#f2ecf5', p.x, BOARD_TOP + h * 0.83, p.z, g);
   });
   const branchCities = new Set(s.branches.map(b => b.city));
   for (const [name, lon, lat] of CITIES) {
     const p = proj(lon, lat);
-    mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 8), dark ? '#a99886' : '#8f7a63', p.x, BOARD_TOP + 0.03, p.z, g);
+    mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.06, 8), glow('#ffc977', 0.8), p.x, BOARD_TOP + 0.03, p.z, g);
     if (!branchCities.has(name)) label(div('clabel', name), p.x, BOARD_TOP + 0.1, p.z + 0.35, g);
   }
 
   // Branches in the same city are fanned out so buildings never overlap.
-  const byCity = Map.groupBy ? Map.groupBy(s.branches, b => b.city) : s.branches.reduce((m, b) => m.set(b.city, [...(m.get(b.city) ?? []), b]), new Map());
+  const byCity = s.branches.reduce((m, b) => m.set(b.city, [...(m.get(b.city) ?? []), b]), new Map());
   for (const list of byCity.values()) list.forEach((b, i) => {
     const p = proj(b.lon, b.lat);
     const shift = i - (list.length - 1) / 2;
@@ -755,19 +1265,22 @@ function buildNetwork(s) {
     const bg = new THREE.Group();
     bg.position.copy(p);
     bg.userData.branchId = b.id;
-    box(1.2, 0.8, 0.9, dark ? '#c48f7a' : '#e2a68c', 0, 0.4, 0, bg);
-    const roof = mesh(new THREE.ConeGeometry(0.95, 0.5, 4), dark ? '#8a4560' : '#a14e6e', 0, 1.05, 0, bg);
+    box(1.6, 0.04, 1.6, '#e9dccd', 0, 0.02, 0.15, bg); // plot
+    box(1.2, 0.8, 0.9, '#f1e4d4', 0, 0.42, 0, bg);
+    const roof = mesh(new THREE.ConeGeometry(0.95, 0.5, 4), '#6d28d9', 0, 1.07, 0, bg);
     roof.rotation.y = Math.PI / 4;
     roof.scale.z = 0.75;
-    box(0.3, 0.45, 0.04, '#5b3a2c', 0, 0.23, 0.46, bg); // door
-    box(1.4, 0.06, 0.5, dark ? '#8b7b6c' : '#f4ece2', 0, 0.03, 0.75, bg); // pip plinth
+    for (const wx of [-0.38, 0.38]) box(0.26, 0.24, 0.03, glow('#ffc977'), wx, 0.55, 0.46, bg); // lit windows
+    box(0.26, 0.4, 0.03, glow('#ffb35c', 0.7), 0, 0.24, 0.46, bg); // door
+    box(1.4, 0.06, 0.4, '#2b2340', 0, 0.06, 0.72, bg); // pip plinth
     const stations = s.stations.filter(st => st.branchId === b.id);
     const pips = stations.map((st, k) => {
-      const pip = mesh(new THREE.SphereGeometry(0.11, 10, 8), new THREE.MeshStandardMaterial({ color: COLORS.free, emissive: COLORS.free, emissiveIntensity: 0.2, roughness: 0.4 }),
-        (k - (stations.length - 1) / 2) * 0.3, 0.16, 0.75, bg);
+      const pip = mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshStandardMaterial({ color: COLORS.free, emissive: COLORS.free, emissiveIntensity: 0.3, roughness: 0.4 }),
+        (k - (stations.length - 1) / 2) * 0.3, 0.17, 0.72, bg);
       pip.userData.stationId = st.id;
       return pip;
     });
+    tree(bg, -0.75, -0.45); tree(bg, 0.78, -0.35, 0, 0.85); tree(bg, -0.8, 0.6, 0, 0.7);
     // Same-city labels are pushed apart sideways so they never cover each other.
     const el = div('blabel');
     el.type = 'button';
@@ -775,7 +1288,7 @@ function buildNetwork(s) {
     el.addEventListener('click', () => openBranch(b.id));
     const wrap = document.createElement('div');
     wrap.append(el);
-    label(wrap, 0, 1.6, 0, bg);
+    label(wrap, 0, 1.7, 0, bg);
     g.add(bg);
     network.buildings.set(b.id, { group: bg, pips, el });
   });
@@ -783,7 +1296,7 @@ function buildNetwork(s) {
 
 function updateNetwork(s) {
   const key = s.branches.map(b => b.id).join() + s.stations.length;
-  if (key !== network.key) { network.key = key; buildNetwork(s); }
+  if (key !== network.key) { network.key = key; buildNetwork(s); setShown(network.group, !view.branchId); }
   const I = idx(s);
   for (const [id, bld] of network.buildings) {
     const b = I.branch.get(id), st = stats(s, id);
@@ -795,56 +1308,58 @@ function updateNetwork(s) {
     }
     const warn = [st.late && `${st.late} over time`, st.longestWait >= 15 && `wait ${st.longestWait} min`].filter(Boolean).join(' · ');
     bld.el.innerHTML = `<b>${esc(b.name)}</b><span class="occ">${esc(b.city)}</span>
-      <div class="rev">${rs(st.collected)}</div><div class="occ">${st.busy}/${st.stations} in use · ${st.waiting} waiting</div>${warn ? `<div class="warnline">${warn}</div>` : ''}`;
+      <div class="rev num">${rs(st.collected)}</div><div class="occ">${st.busy}/${st.stations} in use · ${st.waiting} waiting</div>${warn ? `<div class="warnline">${warn}</div>` : ''}`;
     bld.el.setAttribute('aria-label', `${b.name}, ${b.city}: ${rs(st.collected)} collected, ${st.busy} of ${st.stations} stations in use. Open floor view.`);
   }
 }
 
 // ── Floor view: one branch interior
-const floor = { group: null, branchId: null, stations: new Map(), people: new Map(), sofa: [], standing: [], desk: null, door: null, recLabel: null, home: null };
+const floor = { group: null, branchId: null, stations: new Map(), people: new Map(), sofa: [], standing: [], desk: null, door: null, recLabel: null, home: null, fresh: false };
 const SKIN = ['#c68f6e', '#b47d5c', '#d8a98a', '#a8714f', '#c99a7a'];
 const OUTFITS = ['#e79fb3', '#9fc3d9', '#c8b6e2', '#f2c57c', '#a8d5ba', '#e8907a', '#d4a5a5', '#7fb3a8'];
+const MIRROR = () => clay('#c7d6e6', { metalness: 0.6, roughness: 0.12, emissive: '#3a2a55', emissiveIntensity: 0.25 });
 
 // Each builder draws furniture at the origin, wall side towards -z, and returns where people go.
 const FURNITURE = {
   styling(g) {
     box(1.5, 0.85, 0.45, '#f1e7da', 0, 0.425, -1.05, g);
     box(1.15, 1.45, 0.06, '#c9a26b', 0, 1.65, -1.25, g);
-    box(1.0, 1.3, 0.02, clay('#bcd3dc', { metalness: 0.5, roughness: 0.15 }), 0, 1.65, -1.21, g);
-    chair(g, '#3b2f2f');
+    box(1.0, 1.3, 0.02, MIRROR(), 0, 1.65, -1.21, g);
+    for (const lx of [-0.62, 0.62]) box(0.05, 1.3, 0.05, glow('#ffe1b0', 1.5), lx, 1.65, -1.2, g);
+    chair(g, '#2a2236');
     return { seat: [0, 0.38, 0], rot: Math.PI, pose: 'sit', work: [0.6, 0, 0.55], workRot: Math.PI * 1.15 };
   },
   wash(g) {
     box(1.1, 0.85, 0.55, '#f1e7da', 0, 0.425, -1.0, g);
     mesh(new THREE.CylinderGeometry(0.33, 0.22, 0.2, 8), '#2d2a28', 0, 0.95, -0.95, g);
-    box(0.65, 0.4, 1.0, '#3b2f2f', 0, 0.2, 0.05, g);
-    const back = box(0.65, 0.1, 0.7, '#3b2f2f', 0, 0.7, -0.5, g);
+    box(0.65, 0.4, 1.0, '#2a2236', 0, 0.2, 0.05, g);
+    const back = box(0.65, 0.1, 0.7, '#2a2236', 0, 0.7, -0.5, g);
     back.rotation.x = -0.6;
-    return { seat: [0, 0.4, 0.35], rot: 0, pose: 'recline', work: [0, 0, -0.55], workRot: 0, workBehind: true };
+    return { seat: [0, 0.4, 0.35], rot: 0, pose: 'recline', work: [0, 0, -0.55], workRot: 0 };
   },
   facial(g) {
     box(0.8, 0.55, 1.9, '#d9cfc2', 0, 0.275, 0, g);
     box(0.82, 0.1, 1.92, '#ffffff', 0, 0.6, 0, g);
-    box(0.5, 0.1, 0.3, '#f6e7ee', 0, 0.7, -0.75, g);
+    box(0.5, 0.1, 0.3, '#ede4f7', 0, 0.7, -0.75, g);
     mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 6), '#9b9b9b', 0.65, 0.75, -0.6, g);
-    const ring = mesh(new THREE.TorusGeometry(0.2, 0.04, 6, 14), clay('#ffffff', { emissive: '#fff6d8', emissiveIntensity: 0.6 }), 0.45, 1.45, -0.55, g);
+    const ring = mesh(new THREE.TorusGeometry(0.2, 0.04, 6, 14), glow('#fff6d8', 1.2), 0.45, 1.45, -0.55, g);
     ring.rotation.x = Math.PI / 2;
     box(0.45, 0.6, 0.4, '#c9a26b', -0.8, 0.3, -0.6, g); // trolley
     return { seat: [0, 0.68, 0.65], rot: 0, pose: 'lie', work: [0.65, 0, -0.15], workRot: -Math.PI / 2 };
   },
   nail(g) {
     box(0.85, 0.3, 0.8, '#d9cfc2', 0, 0.15, -0.3, g);
-    chair(g, '#7a5c8a', -0.3, 0.3);
+    chair(g, '#7c3aed', -0.3, 0.3);
     mesh(new THREE.CylinderGeometry(0.26, 0.22, 0.2, 8), '#9ecbd6', 0, 0.1, 0.55, g);
     mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.35, 8), '#c9a26b', 0, 0.175, 1.2, g); // technician stool
     return { seat: [0, 0.68, -0.3], rot: 0, pose: 'sit', work: [0, 0.2, 1.25], workRot: Math.PI };
   },
   bridal(g) {
-    box(2.4, 0.02, 2.4, '#ebcbd6', 0, 0.01, 0, g);
+    box(2.4, 0.02, 2.4, '#d8c4f0', 0, 0.01, 0, g);
     box(1.6, 0.8, 0.5, '#f4ece2', 0, 0.4, -1.05, g);
-    mesh(new THREE.CircleGeometry(0.55, 16), clay('#bcd3dc', { metalness: 0.5, roughness: 0.15 }), 0, 1.75, -1.24, g);
-    mesh(new THREE.TorusGeometry(0.6, 0.05, 6, 24), clay('#ffffff', { emissive: '#fff4dc', emissiveIntensity: 0.9 }), 0, 1.75, -1.22, g);
-    chair(g, '#9b2f55');
+    mesh(new THREE.CircleGeometry(0.55, 16), MIRROR(), 0, 1.75, -1.24, g);
+    mesh(new THREE.TorusGeometry(0.6, 0.05, 6, 24), glow('#fff4dc', 1.6), 0, 1.75, -1.22, g);
+    chair(g, '#9333ea');
     return { seat: [0, 0.38, 0], rot: Math.PI, pose: 'sit', work: [-0.65, 0, 0.5], workRot: Math.PI * 0.85 };
   },
 };
@@ -857,7 +1372,7 @@ function chair(g, color, z = 0, y0 = 0) {
 
 function person(color, skin, staff) {
   const g = new THREE.Group();
-  mesh(new THREE.CylinderGeometry(0.15, 0.22, 0.75, 7), staff ? '#6d3352' : color, 0, 0.375, 0, g);
+  mesh(new THREE.CylinderGeometry(0.15, 0.22, 0.75, 7), staff ? '#5b21b6' : color, 0, 0.375, 0, g);
   mesh(new THREE.IcosahedronGeometry(0.15, 0), skin, 0, 0.9, 0, g);
   mesh(new THREE.SphereGeometry(0.16, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2), '#2b1d16', 0, 0.93, -0.02, g); // hair
   if (!staff) { const d = mesh(new THREE.TorusGeometry(0.17, 0.05, 4, 10), color, 0, 0.72, 0, g); d.rotation.x = Math.PI / 2; } // dupatta
@@ -866,7 +1381,6 @@ function person(color, skin, staff) {
 
 function buildFloor(s, branchId) {
   if (floor.group) disposeGroup(floor.group);
-  for (const p of floor.people.values()) disposeGroup(p.obj);
   floor.people.clear();
   floor.stations.clear();
   const g = floor.group = new THREE.Group();
@@ -877,40 +1391,55 @@ function buildFloor(s, branchId) {
   const stations = s.stations.filter(st => st.branchId === branchId).sort((a, c) => a.index - c.index);
   const W = Math.max(13, stations.length * 2.8 + 3), D = 8.5;
 
-  box(W, 0.1, D, dark ? '#5e5248' : '#ece2d6', 0, -0.05, 0, g);
-  box(W, 2.6, 0.15, dark ? '#4b3f37' : '#f7efe6', 0, 1.3, -D / 2, g);
-  box(0.15, 2.6, D, dark ? '#443931' : '#efe3d6', -W / 2, 1.3, 0, g);
+  box(W + 4, 0.1, D + 4, '#3a3048', 0, -0.12, 1, g); // pavement
+  box(W, 0.1, D, '#e3d3c0', 0, -0.05, 0, g);
+  box(W, 2.6, 0.15, '#f3e8dc', 0, 1.3, -D / 2, g);
+  box(W, 0.12, 0.17, '#7c3aed', 0, 2.1, -D / 2 + 0.01, g); // brand stripe
+  box(0.15, 2.6, D, '#ecdfd1', -W / 2, 1.3, 0, g);
   // Sign on the side wall.
   const c = Object.assign(document.createElement('canvas'), { width: 512, height: 128 });
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#8a3b5c'; ctx.fillRect(0, 0, 512, 128);
-  ctx.fillStyle = '#fff'; ctx.font = '600 40px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(s.salon.name, 256, 50); ctx.font = '26px system-ui, sans-serif'; ctx.fillText(`${b.name}, ${b.city}`, 256, 94);
-  const sign = mesh(new THREE.PlaneGeometry(2.6, 0.65), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c) }), -W / 2 + 0.09, 1.9, 1.2, g);
+  const ctx = c.getContext('2d'), grad = ctx.createLinearGradient(0, 0, 512, 128);
+  grad.addColorStop(0, '#5B21B6'); grad.addColorStop(1, '#9333EA');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, 512, 128);
+  ctx.fillStyle = '#fff'; ctx.font = '600 40px Montserrat, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(s.salon.name, 256, 50); ctx.font = '26px Montserrat, system-ui, sans-serif'; ctx.fillText(`${b.name}, ${b.city}`, 256, 94);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sign = mesh(new THREE.PlaneGeometry(2.6, 0.65), new THREE.MeshBasicMaterial({ map: tex }), -W / 2 + 0.09, 1.9, 1.2, g);
   sign.rotation.y = Math.PI / 2;
-  sign.material.map.colorSpace = THREE.SRGBColorSpace;
+  // Warm ceiling light over the work area.
+  for (const lx of [-W / 4, W / 4]) {
+    const l = new THREE.PointLight(0xffd2a0, 18, 9, 1.6);
+    l.position.set(lx, 3.2, -1.5);
+    g.add(l);
+  }
 
   stations.forEach((st, i) => {
     const sg = new THREE.Group();
     sg.position.set(-(stations.length - 1) * 1.4 + i * 2.8, 0, -D / 2 + 1.4);
+    sg.userData.stationId = st.id;
     const spots = FURNITURE[st.type](sg);
-    const ring = mesh(new THREE.RingGeometry(1.0, 1.15, 28), new THREE.MeshBasicMaterial({ color: COLORS.free, transparent: true, opacity: 0.85 }), 0, 0.02, 0.15, sg);
+    const ring = mesh(new THREE.RingGeometry(1.0, 1.15, 28), new THREE.MeshBasicMaterial({ color: COLORS.free, transparent: true, opacity: 0.9 }), 0, 0.02, 0.15, sg);
     ring.rotation.x = -Math.PI / 2;
     ring.castShadow = false;
+    const selRing = mesh(new THREE.RingGeometry(1.2, 1.28, 28), new THREE.MeshBasicMaterial({ color: '#a78bfa' }), 0, 0.02, 0.15, sg);
+    selRing.rotation.x = -Math.PI / 2;
+    selRing.castShadow = false;
     const el = div('slabel');
-    label(el, 0, 2.75, -0.6, sg);
+    el.addEventListener('click', () => { const ss = stationState(S, idx(S).station.get(st.id)); const a = ss.current ?? ss.next; if (a) select(a.id); });
+    label(el, 0, 2.45, -0.6, sg);
     g.add(sg);
     const at = v => sg.localToWorld(new THREE.Vector3(...v));
     sg.updateMatrixWorld();
-    floor.stations.set(st.id, { ring, el, seat: at(spots.seat), rot: spots.rot, pose: spots.pose, work: at(spots.work), workRot: spots.workRot, idle: at([1.0, 0, 0.9]) });
+    floor.stations.set(st.id, { ring, selRing, el, seat: at(spots.seat), rot: spots.rot, pose: spots.pose, work: at(spots.work), workRot: spots.workRot, idle: at([1.0, 0, 0.9]) });
   });
 
   // Reception desk with tablet.
   const dx = -W / 2 + 2.3, dz = 2.2;
-  box(2.2, 1.0, 0.6, '#8a3b5c', dx, 0.5, dz, g);
+  box(2.2, 1.0, 0.6, '#5b21b6', dx, 0.5, dz, g);
   box(2.3, 0.06, 0.75, '#f4ece2', dx, 1.03, dz - 0.05, g);
   box(0.06, 0.25, 0.06, '#333', dx + 0.4, 1.17, dz - 0.15, g);
-  const tablet = box(0.42, 0.3, 0.03, clay('#1c2a3a', { emissive: '#6fa8ff', emissiveIntensity: 0.55 }), dx + 0.4, 1.3, dz - 0.12, g);
+  const tablet = box(0.42, 0.3, 0.03, glow('#a78bfa', 0.9), dx + 0.4, 1.3, dz - 0.12, g);
   tablet.rotation.x = -0.45;
   floor.desk = { staff: new THREE.Vector3(dx - 0.3, 0, dz - 0.75), rot: 0 };
   floor.recLabel = div('rlabel');
@@ -918,43 +1447,45 @@ function buildFloor(s, branchId) {
 
   // Waiting sofa along the right side, facing the room.
   const sx = W / 2 - 1.0, sz = 1.4;
-  box(0.85, 0.4, 2.7, '#7b8f8a', sx, 0.2, sz, g);
-  box(0.25, 0.85, 2.7, '#6b7f7a', sx + 0.4, 0.45, sz, g);
-  box(0.85, 0.6, 0.15, '#6b7f7a', sx, 0.3, sz - 1.35, g);
-  box(0.85, 0.6, 0.15, '#6b7f7a', sx, 0.3, sz + 1.35, g);
+  box(0.85, 0.4, 2.7, '#6d5a8c', sx, 0.2, sz, g);
+  box(0.25, 0.85, 2.7, '#5d4b7c', sx + 0.4, 0.45, sz, g);
+  box(0.85, 0.6, 0.15, '#5d4b7c', sx, 0.3, sz - 1.35, g);
+  box(0.85, 0.6, 0.15, '#5d4b7c', sx, 0.3, sz + 1.35, g);
   box(0.7, 0.4, 1.2, '#c9a26b', sx - 1.3, 0.2, sz, g); // coffee table
-  box(0.3, 0.03, 0.22, '#e05a7a', sx - 1.3, 0.415, sz - 0.2, g);
+  box(0.3, 0.03, 0.22, '#ec4899', sx - 1.3, 0.415, sz - 0.2, g);
   floor.sofa = [-0.85, 0, 0.85].map(o => new THREE.Vector3(sx, 0.2, sz + o));
   floor.standing = [0, 1, 2, 3, 4].map(k => new THREE.Vector3(sx - 2.4 - (k % 2) * 0.6, 0, sz + 1.8 - k * 0.5));
   floor.door = new THREE.Vector3(W / 2 - 3.5, 0, D / 2 + 1.5);
-  // Plants.
   for (const [px, pz] of [[-W / 2 + 0.6, -D / 2 + 0.6], [W / 2 - 0.6, -D / 2 + 0.6]]) {
     mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.4, 7), '#b5653f', px, 0.2, pz, g);
     mesh(new THREE.IcosahedronGeometry(0.4, 0), '#5f8f5a', px, 0.75, pz, g);
   }
-  floor.home = { pos: new THREE.Vector3(W * 0.5, W * 0.9, W * 1.15), target: new THREE.Vector3(0, 0.4, 0.2) };
+  for (const tx of [-W / 2 - 1, W / 2 + 1]) for (const tz of [-2, 1.5, 4.5]) tree(g, tx, tz, 0, 1.6);
+  floor.home = { pos: new THREE.Vector3(W * 0.55, W * 1.0, W * 1.3), target: new THREE.Vector3(0.6, 1.4, 0.2) };
 }
 
 function updateFloor(s) {
-  const I = idx(s);
-  const want = new Map(); // id → { color, skin, staff, pos, rot, pose }
+  const I = idx(s), selAppt = I.appt.get(view.sel);
+  const want = new Map();
   const staffAt = new Map();
   for (const [id, f] of floor.stations) {
     const st = I.station.get(id), ss = stationState(s, st);
     const staffer = I.staff.get(ss.current?.staffId) ?? s.staff.find(p => p.stationId === id);
+    const selected = selAppt?.stationId === id;
     f.ring.material.color.set(COLORS[ss.state]);
-    f.el.className = `slabel ${ss.state}`;
+    f.selRing.visible = selected;
+    f.el.className = `slabel ${ss.state}${selected ? ' sel' : ''}`;
     if (ss.current) {
       const a = ss.current, c = I.client.get(a.clientId);
       want.set(a.clientId, { pos: f.seat, rot: f.rot, pose: f.pose });
       staffAt.set(a.staffId, { pos: f.work, rot: f.workRot });
       f.el.innerHTML = `<div class="t">${esc(st.label)} <span>${esc(staffer.name.split(' ')[0])}</span></div>
         <div>${esc(I.service.get(a.serviceId).name)}</div><div class="muted">${esc(shortName(c.name))}${a.source === 'walk-in' ? ' · walk-in' : ''}</div>
-        <div class="bar"><i style="width:${Math.round(ss.progress * 100)}%"></i></div>
-        ${ss.state === 'late' ? `<div class="late-t">Running ${-ss.minsLeft} min over</div>` : `<div>${ss.minsLeft} min left · ends ${clock(a.startedAt + a.end - a.start)}</div>`}`;
+        <div class="pb"><i style="width:${Math.round(ss.progress * 100)}%"></i></div>
+        ${ss.state === 'late' ? `<div class="red"><b>Running ${-ss.minsLeft} min over</b></div>` : `<div class="num">${ss.minsLeft} min left · ends ${clock(a.startedAt + a.end - a.start)}</div>`}`;
     } else {
       f.el.innerHTML = `<div class="t">${esc(st.label)} <span>${esc(staffer.name.split(' ')[0])}</span></div>
-        <div>Free</div><div class="muted">${ss.next ? `Next ${clock(ss.next.start)} · ${esc(shortName(I.client.get(ss.next.clientId).name))}` : 'Nothing more booked'}</div>`;
+        <div class="green"><b>Free</b></div><div class="muted">${ss.next ? `Next ${clock(ss.next.start)} · ${esc(shortName(I.client.get(ss.next.clientId).name))}` : 'Nothing more booked'}</div>`;
     }
   }
   const waiting = s.appointments.filter(a => a.branchId === floor.branchId && a.status === 'arrived').sort((a, b) => a.arrivedAt - b.arrivedAt);
@@ -984,7 +1515,7 @@ function updateFloor(s) {
   for (const [id, p] of floor.people) if (!want.has(id)) Object.assign(p, { pos: floor.door, pose: 'stand', leaving: true });
 }
 
-const POSE = { stand: [0, 0], sit: [0, 0], recline: [-0.5, 0], lie: [-Math.PI / 2, 0] };
+const POSE = { stand: 0, sit: 0, recline: -0.5, lie: -Math.PI / 2 };
 function animatePeople(dt) {
   for (const [id, p] of floor.people) {
     const o = p.obj, to = p.pos, d = Math.hypot(to.x - o.position.x, to.z - o.position.z);
@@ -1000,7 +1531,7 @@ function animatePeople(dt) {
       floor.people.delete(id);
     } else {
       o.position.copy(to);
-      o.rotation.set(POSE[p.pose][0], p.rot, 0, 'YXZ');
+      o.rotation.set(POSE[p.pose], p.rot, 0, 'YXZ');
     }
   }
 }
@@ -1010,6 +1541,12 @@ let flight = null;
 function flyTo({ pos, target }, ms = 900) {
   if (reduceMotion) ms = 0;
   return new Promise(done => { flight = { p0: camera.position.clone(), t0: controls.target.clone(), pos, target, start: performance.now(), ms, done }; });
+}
+// Portrait screens: back the camera off and centre it (the desktop framing leaves room for side panels).
+function fit({ pos, target }) {
+  const k = Math.max(1, 1.5 / camera.aspect), dx = camera.aspect < 1 ? -target.x : 0;
+  const t = target.clone().add(new THREE.Vector3(dx, 0, 0));
+  return { pos: t.clone().add(pos.clone().sub(target).multiplyScalar(k)), target: t };
 }
 function jumpTo({ pos, target }) { camera.position.copy(pos); controls.target.copy(target); flight = null; }
 const fade = on => { stage.classList.toggle('fade', on); return new Promise(r => setTimeout(r, reduceMotion ? 0 : 180)); };
@@ -1025,13 +1562,14 @@ async function openBranch(id) {
   }
   await fade(true);
   view.branchId = id;
+  if (view.tab === 'branches') view.tab = 'stations';
   setShown(network.group, false);
   buildFloor(S, id);
   controls.minDistance = 6; controls.maxDistance = 30;
   jumpTo({ pos: floor.home.pos.clone().multiplyScalar(1.6), target: floor.home.target });
   render(S);
   await fade(false);
-  await flyTo(floor.home, 700);
+  await flyTo(fit(floor.home), 700);
   controls.enabled = true;
   switching = false;
 }
@@ -1051,30 +1589,37 @@ async function showNetwork() {
   jumpTo({ pos: p.clone().add(new THREE.Vector3(0, 2.5, 3.2)), target: p.clone() });
   render(S);
   await fade(false);
-  await flyTo(NET_HOME, 900);
+  await flyTo(fit(NET_HOME), 900);
   controls.enabled = true;
   switching = false;
 }
 
-// Clicking a building in 3D (ignoring drags).
+// Clicking in 3D (ignoring drags): a building opens its branch, a station selects its client.
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 let downAt = null;
-function hitBranch(e) {
-  if (view.branchId) return null;
+function hit(e) {
   const r = renderer.domElement.getBoundingClientRect();
   ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
   ray.setFromCamera(ndc, camera);
-  for (const h of ray.intersectObjects([...network.buildings.values()].map(b => b.group), true)) {
-    for (let o = h.object; o; o = o.parent) if (o.userData.branchId) return o.userData.branchId;
+  const targets = view.branchId ? (floor.group ? floor.group.children : []) : [...network.buildings.values()].map(b => b.group);
+  for (const h of ray.intersectObjects(targets, true)) {
+    for (let o = h.object; o; o = o.parent) {
+      if (o.userData.branchId) return { branchId: o.userData.branchId };
+      if (o.userData.stationId) return { stationId: o.userData.stationId };
+    }
   }
   return null;
 }
 renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
 renderer.domElement.addEventListener('pointerup', e => {
-  if (downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) < 5) { const id = hitBranch(e); if (id) openBranch(id); }
+  if (downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) < 5) {
+    const h = hit(e);
+    if (h?.branchId) openBranch(h.branchId);
+    if (h?.stationId) { const ss = stationState(S, idx(S).station.get(h.stationId)); const a = ss.current ?? ss.next; if (a) select(a.id); }
+  }
   downAt = null;
 });
-renderer.domElement.addEventListener('pointermove', e => { if (!downAt) renderer.domElement.style.cursor = hitBranch(e) ? 'pointer' : ''; });
+renderer.domElement.addEventListener('pointermove', e => { if (!downAt) renderer.domElement.style.cursor = hit(e) ? 'pointer' : ''; });
 
 // ── Loop
 function resize() {
@@ -1099,7 +1644,7 @@ renderer.setAnimationLoop(now => {
   controls.update();
   if (network.group.visible && !reduceMotion) {
     const pulse = 0.6 + 0.4 * Math.sin(now / 220);
-    for (const b of network.buildings.values()) for (const pip of b.pips) pip.material.emissiveIntensity = pip.userData.state === 'late' ? 0.4 + pulse : pip.userData.state === 'busy' ? 0.8 : 0.15;
+    for (const b of network.buildings.values()) for (const pip of b.pips) pip.material.emissiveIntensity = pip.userData.state === 'late' ? 0.5 + pulse : pip.userData.state === 'busy' ? 0.9 : 0.35;
   }
   if (floor.group) animatePeople(dt);
   renderer.render(scene, camera);
@@ -1108,24 +1653,33 @@ renderer.setAnimationLoop(now => {
 
 // ── Wiring
 function render(s) {
-  renderHeader(s);
+  pickDefault(s);
+  renderTop(s);
   renderKpis(s);
-  renderSide(s);
+  renderDetail(s);
+  renderTracker(s);
+  renderOps(s);
   updateNetwork(s);
   if (view.branchId && floor.group) updateFloor(s);
 }
 
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-speed],[data-back],[data-branch],[data-dismiss]');
+  const t = e.target.closest('[data-speed],[data-back],[data-branch],[data-dismiss],[data-sel],[data-tab],[data-close],[data-collapse],#alertPill');
   if (!t) return;
-  if (t.dataset.speed) DataSource.command('setSpeed', Number(t.dataset.speed));
+  if (t.id === 'alertPill') { view.tab = 'alerts'; view.collapsed = false; render(S); }
+  else if (t.dataset.speed) DataSource.command('setSpeed', Number(t.dataset.speed));
   else if ('back' in t.dataset) showNetwork();
   else if (t.dataset.branch) openBranch(t.dataset.branch);
-  else if (t.dataset.dismiss) { dismissed.add(t.dataset.dismiss); render(S); }
+  else if (t.dataset.dismiss) { e.stopPropagation(); dismissed.add(t.dataset.dismiss); render(S); }
+  else if (t.dataset.sel) select(t.dataset.sel);
+  else if (t.dataset.tab) { view.tab = t.dataset.tab; render(S); }
+  else if ('close' in t.dataset) { view.sel = null; view.closed = true; render(S); }
+  else if ('collapse' in t.dataset) { view.collapsed = !view.collapsed; render(S); }
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('#taxDlg').open) showNetwork();
   if (e.key === 'Enter' && e.target.dataset?.branch) openBranch(e.target.dataset.branch);
+  if (e.key === 'Enter' && e.target.dataset?.sel) select(e.target.dataset.sel);
 });
 
 $('#taxBtn').addEventListener('click', () => {
@@ -1142,7 +1696,7 @@ $('#taxDlg').addEventListener('close', () => {
 });
 
 resize();
-jumpTo(NET_HOME);
+jumpTo(fit(NET_HOME));
 controls.minDistance = 8; controls.maxDistance = 60;
 DataSource.subscribe(s => { const first = !S; S = s; render(s); if (first && idx(s).branch.has(params.get('branch'))) openBranch(params.get('branch')); });
 
@@ -1151,11 +1705,10 @@ if (params.get('source') === 'api') {
   // e.g. ?source=api&api=https://api.example.com&ws=wss://api.example.com — token comes from your login flow.
   DataSource.use(new ApiAdapter({ baseUrl: params.get('api'), wsUrl: params.get('ws'), token: sessionStorage.getItem('salonflowToken') }), showError);
 } else {
-  DataSource.use(new MockAdapter(CLIENT), showError);
+  DataSource.use(new MockAdapter(SALONS.find(x => x.id === params.get('salon')) ?? SALONS[0]), showError);
 }
 if (params.has('selftest')) {
-  try { const msg = selfTest(); console.log(msg); $('#hint').textContent = msg; }
-  catch (err) { console.error(err); showError(err); }
+  try { console.log(selfTest()); } catch (err) { console.error(err); showError(err); }
 }
 </script>
 </body>
