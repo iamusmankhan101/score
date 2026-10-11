@@ -4,7 +4,7 @@ Tags: booking, appointments, salon, spa, beauty
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.3.0
+Stable tag: 1.4.1
 License: GPLv2 or later
 
 Show your Salon Central online booking form on your website. Bookings go straight into your Salon Central dashboard.
@@ -32,10 +32,27 @@ Yes. Settings → Salon Central Booking → Button colour sets it for every form
 = The form is too long =
 Choose the Grid layout under Settings → Salon Central Booking → Layout. Service categories then show as tiles in a few columns instead of one row each. Per block: the block's sidebar → Layout. Shortcode: [salon_central_booking layout="grid"]
 
+= Is the settings-page preview a test form? =
+No. It's your live booking form, so a booking made in the preview is a real booking (with real confirmations). Use a test salon link if you want to try a full booking.
+
 = The form is cut off before the page has loaded =
 It resizes itself once it loads. To change the starting height: [salon_central_booking height="1100"]
 
 == Changelog ==
+
+= 1.4.1 =
+* Fix: clearing the booking link and saving now removes it (it used to restore the old link).
+* Fix: saving a link that isn't a Salon Central booking link now keeps your working link and shows an error, instead of taking the form off your website.
+* Fix: the Layout and Button colour settings now always win over any ?layout= or ?accent= already in a pasted link, on the website and in the preview.
+* Fix: wide and full-width block alignment now shows on the live page, not just in the editor.
+* Settings preview hides itself and explains why while the link is invalid or empty, instead of showing the previous salon.
+* Previews use the same frame permissions as the live form; the unused clipboard permission was removed.
+* Note: the settings preview is your live booking form. Bookings made in it are real.
+
+= 1.4.0 =
+* Security: only Salon Central booking links (https://app.saloncentral.xyz/book/…) are accepted, so the block and shortcode can't be used to show other websites.
+* Security: the form runs in a restricted (sandboxed) frame that can't navigate or take over your page; size messages are validated.
+* Deleting the plugin now removes all of its saved settings.
 
 = 1.3.0 =
 * Settings page shows desktop and mobile previews side by side, updating live as you change the layout or colour.
