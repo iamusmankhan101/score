@@ -1241,13 +1241,14 @@ labelRenderer.domElement.className = 'labels';
 stage.append(labelRenderer.domElement);
 
 const scene = new THREE.Scene();
-const skyCanvas = Object.assign(document.createElement('canvas'), { width: 2, height: 512 });
-scene.background = new THREE.CanvasTexture(skyCanvas);
-scene.background.colorSpace = THREE.SRGBColorSpace;
+// Sky: a dome coloured by height, so the horizon glow sits on the real horizon behind the skyline.
+const skyDome = new THREE.Mesh(new THREE.SphereGeometry(150, 32, 24), new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
+skyDome.geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(skyDome.geometry.attributes.position.count * 3), 3));
+skyDome.renderOrder = -1;
 const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 300);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.maxPolarAngle = 1.25;
+controls.maxPolarAngle = 1.42;
 const hemi = new THREE.HemisphereLight(0xc9b5ff, 0x3a2440, 1.1);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffb27a, 2.2);
@@ -1258,15 +1259,16 @@ Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 22, bottom: -22 })
 scene.add(sun);
 const ambient = new THREE.AmbientLight(0xffe6d0, 0.35);
 scene.add(ambient);
+scene.add(skyDome);
 
 // Time of day follows the snapshot clock (PKT): night → dusk → day and back. Each look is
-// [sky stops top→horizon, hemisphere sky, hemisphere ground, hemisphere, sun colour, sun, ambient, window glow].
+// [sky stops zenith→horizon, hemisphere sky, hemisphere ground, hemisphere, sun colour, sun, ambient, window glow, clouds].
 const LOOKS = {
-  night: [['#07061a', '#120d33', '#1f1750', '#2e2260', '#3a2b6a'], '#8a7cd6', '#2a2140', 0.75, '#9fb0ff', 0.5, 0.3, 1],
-  dusk: [['#0f0a1e', '#2a1450', '#6b2a6e', '#c4573f', '#f08a4b'], '#c9b5ff', '#3a2440', 1.1, '#ffb27a', 2.2, 0.35, 0.7],
-  day: [['#2a6bd1', '#4f8fe3', '#86b7ee', '#bcd8f5', '#e8f1fb'], '#dcebff', '#8c7f6c', 1.5, '#fff3dc', 2.8, 0.5, 0],
+  night: [['#07061a', '#120d33', '#1f1750', '#2e2260', '#4a3478'], '#8a7cd6', '#2a2140', 0.75, '#9fb0ff', 0.5, 0.3, 1, '#3a2f5c'],
+  dusk: [['#1a1240', '#3a2470', '#8a3f86', '#e0704a', '#ffa45c'], '#c9b5ff', '#3a2440', 1.1, '#ffb27a', 2.2, 0.35, 0.7, '#ffb08a'],
+  day: [['#2366d1', '#3f86e6', '#7db6f0', '#ffd9a0', '#ffc183'], '#dcebff', '#8c7f6c', 1.6, '#fff1d6', 2.9, 0.55, 0, '#fff6ea'],
 };
-const SKY_STOPS = [0, 0.4, 0.72, 0.9, 1];
+const SKY_STOPS = [1, 0.35, 0.15, 0.05, 0]; // elevation (sin of angle above the horizon) for each stop
 const mixHex = (a, b, k) => `#${new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString()}`;
 const mixNum = (a, b, k) => a + (b - a) * k;
 // 0 = night, 1 = full day; dawn 05:00–07:00, dusk 17:00–19:30.
@@ -1280,15 +1282,24 @@ function applySky(now) {
   if (d === skyAt) return;
   skyAt = d;
   const [a, b, k] = d < 0.5 ? [LOOKS.night, LOOKS.dusk, d * 2] : [LOOKS.dusk, LOOKS.day, d * 2 - 1];
-  const ctx = skyCanvas.getContext('2d'), g = ctx.createLinearGradient(0, 0, 0, 512);
-  SKY_STOPS.forEach((o, i) => g.addColorStop(o, mixHex(a[0][i], b[0][i], k)));
-  ctx.fillStyle = g; ctx.fillRect(0, 0, 2, 512);
-  scene.background.needsUpdate = true;
+  const stops = a[0].map((c, i) => new THREE.Color(mixHex(c, b[0][i], k)));
+  const pos = skyDome.geometry.attributes.position, col = skyDome.geometry.attributes.color, tmp = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const e = Math.max(0, pos.getY(i) / 150);
+    let n = SKY_STOPS.findIndex(st => e >= st);
+    if (n <= 0) tmp.copy(stops[0]);
+    else tmp.copy(stops[n - 1]).lerp(stops[n], (SKY_STOPS[n - 1] - e) / (SKY_STOPS[n - 1] - SKY_STOPS[n]));
+    tmp.toArray(col.array, i * 3);
+  }
+  col.needsUpdate = true;
+  scene.background = stops[0];
+  scene.fog.color.copy(stops[4]);
   hemi.color.set(mixHex(a[1], b[1], k)); hemi.groundColor.set(mixHex(a[2], b[2], k)); hemi.intensity = mixNum(a[3], b[3], k);
   sun.color.set(mixHex(a[4], b[4], k)); sun.intensity = mixNum(a[5], b[5], k); ambient.intensity = mixNum(a[6], b[6], k);
   windowGlow = mixNum(a[7], b[7], k);
   for (const m of [...FACADES, LAMP]) m.emissiveIntensity = windowGlow;
-  scene.fog.color.set(mixHex(a[0][3], b[0][3], k));
+  for (const m of NEON) m.emissiveIntensity = 0.9 + windowGlow * 1.6;
+  CLOUD.color.set(mixHex(a[8], b[8], k));
   // The sun crosses from east to west over the day; at night the same light stands in for the moon.
   const arc = Math.PI * Math.min(1, Math.max(0, ((now + PKT_OFFSET) % DAY / HOUR - 6) / 13));
   sun.position.set(-18 * Math.cos(arc), 6 + 10 * Math.sin(arc), 10);
@@ -1334,28 +1345,30 @@ function disposeGroup(g) {
 }
 
 // ── Network view: the city
-// A made-up modern city on a block grid that runs out to the horizon and fades into the sky. Branches get
-// blocks near the middle; downtown is tallest, the outskirts low. Laid out from a fixed seed so it looks the
-// same on every visit. Buildings, trees and street lights are merged into a few meshes so the GPU draws the
-// whole city in a handful of calls.
+// A bright, futuristic cartoon city on a block grid that runs out to the horizon: colourful towers, glass
+// domes, capsule pods, rooftop gardens, a TV tower, twin towers with a sky bridge, and an elevated ring
+// highway with a cable-stayed bridge and a monorail. Branches get blocks near the middle and everything in
+// front of them stays low so the camera can see them. Laid out from a fixed seed, so it looks the same on
+// every visit. Static parts are merged per material, so the GPU draws the whole city in a few dozen calls.
 const PITCH = 3.4, ROAD = 0.9, BLOCK = PITCH - ROAD, HALF = 9; // blocks run -HALF..HALF on both axes
-const CORE = 4; // clients live and cars drive within this many blocks of the middle, where the camera looks
+const CORE = 4; // clients live and cars drive within this many blocks of the middle
 const EDGE = (HALF + 0.5) * PITCH, SIDEWALK = ROAD / 2 - 0.1;
-const NET_HOME = { pos: new THREE.Vector3(0, 17, 22), target: new THREE.Vector3(0, 0, 0.5) };
+const NET_HOME = { pos: new THREE.Vector3(0, 7.5, 23), target: new THREE.Vector3(0, 1.5, 0) };
 const WALK = 40 * MIN; // how long a client takes to walk in, or home again
 const CLIENT_RING = { coming: '#a78bfa', waiting: '#f97316', leaving: '#22c55e' };
-scene.fog = new THREE.Fog('#bcd8f5', 34, 80);
+const RING = 2.5 * PITCH, RING_R = 1.6, DECK = 1.5; // elevated ring highway: half-size, corner radius, deck height
+scene.fog = new THREE.Fog('#ffc183', 40, 95);
 
-const network = { group: new THREE.Group(), buildings: new Map(), clients: new Map(), cars: [], people: null, key: '' };
+const network = { group: new THREE.Group(), buildings: new Map(), clients: new Map(), cars: [], movers: [], people: null, key: '' };
 scene.add(network.group);
 
-// Facades, 4 window columns per world unit and 16 floors per 3.2 units. Each has a glow map lighting some
-// windows after dark (applySky sets how much).
+// Facades, 4 window columns per world unit and 16 floors per 3.2 units, white so the building colour shows.
+// Each has a glow map lighting some windows after dark (applySky sets how much).
 function facade(kind) {
   const c = Object.assign(document.createElement('canvas'), { width: 64, height: 128 }), ctx = c.getContext('2d');
   const n = Object.assign(document.createElement('canvas'), { width: 64, height: 128 }), nctx = n.getContext('2d');
   const rng = mulberry32(kind.length * 31);
-  const [wall, glass] = { grid: ['#cfd2dc', '#5f7fa8'], curtain: ['#d7dde8', '#6f93bf'], ribbon: ['#e3ddd3', '#4f6f96'] }[kind];
+  const [wall, glass] = { grid: ['#f7f7f9', '#9db6d6'], curtain: ['#eef2f8', '#9fbde0'], ribbon: ['#f8f5ef', '#8fa9cc'] }[kind];
   ctx.fillStyle = wall; ctx.fillRect(0, 0, 64, 128);
   nctx.fillStyle = '#000'; nctx.fillRect(0, 0, 64, 128);
   for (let y = 0; y < 16; y++) {
@@ -1377,16 +1390,21 @@ function facade(kind) {
 const FACADES = ['grid', 'curtain', 'ribbon'].map(kind => {
   const [map, emissiveMap] = facade(kind);
   return new THREE.MeshStandardMaterial({ map, emissiveMap, emissive: '#ffffff', emissiveIntensity: 0.7, vertexColors: true,
-    roughness: kind === 'curtain' ? 0.25 : 0.55, metalness: kind === 'curtain' ? 0.45 : 0.15 });
+    roughness: kind === 'curtain' ? 0.25 : 0.55, metalness: kind === 'curtain' ? 0.35 : 0.1 });
 });
+const PLAIN = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.05 });
+const DOME = new THREE.MeshStandardMaterial({ color: '#8fe3ea', emissive: '#2aa7b5', emissiveIntensity: 0.25, roughness: 0.15, metalness: 0.5 });
 const LAMP = new THREE.MeshStandardMaterial({ color: '#fff6dc', emissive: '#ffd27a', emissiveIntensity: 0.7 });
+const NEON = ['#ff8a2a', '#3ff2c8', '#ff4fa3'].map(c => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1 }));
+const CLOUD = new THREE.MeshStandardMaterial({ color: '#fff6ea', emissive: '#ffffff', emissiveIntensity: 0.25, roughness: 1, fog: false });
+const TINTS = ['#f28c3b', '#ea8fd0', '#36b5a6', '#7d6ce2', '#f7cd4f', '#5aaef0', '#9fe3cf', '#ffffff', '#c5a3ff', '#ff9f8a'];
 let windowGlow = 0.7;
 
 // Collects geometry per material, then merges each lot into one mesh.
 function batcher() {
   const lots = new Map();
   return {
-    add(geo, mat, x, y, z, ry = 0) { if (ry) geo.rotateY(ry); geo.translate(x, y, z); (lots.get(mat) ?? lots.set(mat, []).get(mat)).push(geo); },
+    add(geo, mat, x = 0, y = 0, z = 0, ry = 0) { if (ry) geo.rotateY(ry); geo.translate(x, y, z); (lots.get(mat) ?? lots.set(mat, []).get(mat)).push(geo); },
     flush(parent, shadows = true) {
       for (const [mat, geos] of lots) {
         const m = new THREE.Mesh(mergeGeometries(geos), typeof mat === 'string' ? clay(mat) : mat);
@@ -1397,21 +1415,56 @@ function batcher() {
     },
   };
 }
-
-// A building box with world-scale window UVs (so windows stay the same size on any building), a random
-// window pattern and a plain roof.
-function buildingGeo(w, h, d, tint, rng) {
-  const geo = new THREE.BoxGeometry(w, h, d), uv = geo.attributes.uv;
+function tintGeo(geo, color) {
+  const col = new THREE.Color(color), arr = new Float32Array(geo.attributes.position.count * 3);
+  for (let i = 0; i < geo.attributes.position.count; i++) col.toArray(arr, i * 3);
+  geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  return geo;
+}
+// World-scale window UVs on the walls (windows stay the same size on any building); roofs get plain wall.
+function windowsUV(geo, h, uSpan, rng) {
+  const uv = geo.attributes.uv, nrm = geo.attributes.normal, pos = geo.attributes.position;
   const du = Math.floor(rng() * 4) / 4, dv = Math.floor(rng() * 16) / 16;
-  for (let face = 0; face < 6; face++) for (let k = 0; k < 4; k++) {
-    const i = face * 4 + k;
-    if (face === 2 || face === 3) { uv.setXY(i, 0.01, 0.995); continue; } // roof and floor: plain wall colour
-    const span = face < 2 ? d : w;
-    uv.setXY(i, uv.getX(i) * span + du, uv.getY(i) * h / 3.2 + dv);
+  for (let i = 0; i < uv.count; i++) {
+    if (Math.abs(nrm.getY(i)) > 0.5) uv.setXY(i, 0.01, 0.995);
+    else uv.setXY(i, uv.getX(i) * uSpan(i) + du, (pos.getY(i) + h / 2) / 3.2 + dv);
   }
-  const col = new THREE.Color(tint), colors = new Float32Array(uv.count * 3);
-  for (let i = 0; i < uv.count; i++) col.toArray(colors, i * 3);
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return geo;
+}
+const boxGeo = (w, h, d, tint, rng) => tintGeo(windowsUV(new THREE.BoxGeometry(w, h, d), h, i => (i < 8 ? d : w), rng), tint);
+const cylGeo = (r, h, tint, rng, sides = 16) => tintGeo(windowsUV(new THREE.CylinderGeometry(r, r, h, sides, 1), h, () => 2 * Math.PI * r, rng), tint);
+const capGeo = (r, color) => tintGeo(new THREE.SphereGeometry(r, 16, 6, 0, Math.PI * 2, 0, Math.PI / 2), color);
+
+// A thin box from a to b (cables, sky bridges).
+function beamGeo(a, b, t) {
+  const geo = new THREE.BoxGeometry(t, t, a.distanceTo(b));
+  geo.applyMatrix4(new THREE.Matrix4().lookAt(a, b, new THREE.Vector3(0, 1, 0)));
+  return geo.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+}
+
+// The ring highway's centre line: a rounded square along the roads, corners cut across the block corners.
+function ringCurve() {
+  const pts = [], R = RING, r = RING_R;
+  for (const [cx, cz, a0] of [[R - r, R - r, 0], [-(R - r), R - r, 0.5], [-(R - r), -(R - r), 1], [R - r, -(R - r), 1.5]]) {
+    for (let k = 0; k <= 8; k++) { const a = (a0 + k / 16) * Math.PI; pts.push(new THREE.Vector3(cx + r * Math.cos(a), DECK, cz + r * Math.sin(a))); }
+  }
+  return new THREE.CatmullRomCurve3(pts, true, 'centripetal');
+}
+// Sweeps a cross-section ([sideways offset, height] pairs) along a flat closed curve.
+function sweep(curve, profile, n = 320) {
+  const pos = [], up = new THREE.Vector3(0, 1, 0);
+  const at = i => { const u = (i % n) / n, p = curve.getPointAt(u), side = curve.getTangentAt(u).cross(up).normalize(); return [p, side]; };
+  for (let i = 0; i < n; i++) {
+    const [p0, s0] = at(i), [p1, s1] = at(i + 1);
+    for (let k = 0; k < profile.length - 1; k++) {
+      const v = (p, sd, [o, y]) => [p.x + sd.x * o, y, p.z + sd.z * o];
+      const a = v(p0, s0, profile[k]), b = v(p0, s0, profile[k + 1]), c = v(p1, s1, profile[k + 1]), d = v(p1, s1, profile[k]);
+      pos.push(...a, ...b, ...c, ...a, ...c, ...d);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.computeVertexNormals();
   return geo;
 }
 
@@ -1425,135 +1478,235 @@ function car(color) {
   }
   return g;
 }
+function train() {
+  const g = new THREE.Group();
+  for (let c = 0; c < 3; c++) {
+    const body = mesh(new THREE.CapsuleGeometry(0.11, 0.5, 4, 10), '#f4f6fb', -c * 0.72, 0.16, 0, g);
+    body.rotation.z = Math.PI / 2;
+    box(0.62, 0.05, 0.225, glow('#3b82f6', 0.6), -c * 0.72, 0.18, 0, g); // window band
+  }
+  return g;
+}
 
 function buildNetwork(s) {
   disposeGroup(network.group);
   network.group = new THREE.Group();
-  network.buildings.clear(); network.clients.clear(); network.cars = [];
+  network.buildings.clear(); network.clients.clear(); network.cars = []; network.movers = [];
   scene.add(network.group);
   const g = network.group, rng = mulberry32(7), city = batcher(), still = batcher();
+  const pick = arr => arr[Math.floor(rng() * arr.length)];
 
-  // Ground: asphalt under the grid, running far past it so the horizon is city and fog, never an edge.
-  mesh(new THREE.PlaneGeometry(400, 400), '#3b3a45', 0, 0, 0, g).rotation.x = -Math.PI / 2;
+  // Ground: asphalt under the grid, running far past it so the horizon is city and haze, never an edge.
+  mesh(new THREE.PlaneGeometry(400, 400), '#45434f', 0, 0, 0, g).rotation.x = -Math.PI / 2;
   for (let k = -HALF - 1; k <= HALF; k++) { // lane markings
     const at = (k + 0.5) * PITCH;
-    still.add(new THREE.BoxGeometry(EDGE * 2, 0.01, 0.04), '#b9b6c6', 0, 0.006, at);
-    still.add(new THREE.BoxGeometry(0.04, 0.01, EDGE * 2), '#b9b6c6', at, 0.006, 0);
+    still.add(new THREE.BoxGeometry(EDGE * 2, 0.01, 0.04), '#c9c6d6', 0, 0.006, at);
+    still.add(new THREE.BoxGeometry(0.04, 0.01, EDGE * 2), '#c9c6d6', at, 0.006, 0);
   }
 
-  // Branches take the blocks nearest the middle; their neighbours stay low so the salons can be seen.
+  // Branches take the blocks nearest the middle; around them and in front of them (towards the camera)
+  // everything stays low so the salons can be seen.
   const blocks = [];
   for (let i = -HALF; i <= HALF; i++) for (let j = -HALF; j <= HALF; j++) blocks.push([i, j]);
   blocks.sort((a, b) => Math.hypot(a[0], a[1] - 0.4) - Math.hypot(b[0], b[1] - 0.4));
   const salonBlocks = new Map(s.branches.slice(0, blocks.length).map((b, n) => [blocks[n].join(), b]));
   const nearSalon = (i, j) => [...salonBlocks.keys()].some(k => { const [a, b] = k.split(',').map(Number); return Math.max(Math.abs(a - i), Math.abs(b - j)) <= 1; });
-  const landmarks = new Set([[2, -2], [-3, 1]].map(p => p.join()));
-  const TINTS = ['#ffffff', '#e4ddff', '#ffe6da', '#dcecff', '#f1f1f1', '#e8f3ec'];
+  const ringCorners = new Set([[2, 2], [-2, 2], [-2, -2], [2, -2]].map(p => p.join())); // under the highway's bends
 
-  const tree = (x, z, sc = 1) => {
-    still.add(new THREE.CylinderGeometry(0.04 * sc, 0.06 * sc, 0.5 * sc, 5), '#6b4a34', x, 0.35 * sc, z);
+  const tree = (x, z, sc = 1, y = 0) => {
+    still.add(new THREE.CylinderGeometry(0.04 * sc, 0.06 * sc, 0.5 * sc, 5), '#6b4a34', x, y + 0.35 * sc, z);
     const crown = new THREE.IcosahedronGeometry(0.3 * sc, 0); crown.scale(1, 0.8, 1);
-    still.add(crown, '#3f7a4f', x, 0.75 * sc, z);
+    still.add(crown, '#3f9a52', x, y + 0.75 * sc, z);
   };
-  const building = (x, z, w, d, h, rngTint) => {
-    const fac = FACADES[Math.floor(rng() * 3)], tint = TINTS[Math.floor(rngTint * TINTS.length)];
-    city.add(buildingGeo(w, h, d, tint, rng), fac, x, 0.1 + h / 2, z);
-    return fac;
+  const garden = (x, z, w, d, y) => { // rooftop garden
+    still.add(new THREE.BoxGeometry(w * 0.85, 0.05, d * 0.85), '#5fbf5a', x, y + 0.025, z);
+    for (let t = 0; t < 2; t++) { const b = new THREE.IcosahedronGeometry(0.13, 0); b.scale(1, 0.7, 1); still.add(b, '#3f9a52', x + (rng() - 0.5) * w * 0.6, y + 0.12, z + (rng() - 0.5) * d * 0.6); }
+  };
+  const neon = (x, z, w, h, y0) => still.add(new THREE.BoxGeometry(0.05, h, 0.05), pick(NEON), x + w / 2, y0 + h / 2, z + w / 2); // light strip on a corner
+  const tower = (x, z, w, h, tint, fancy) => { // box tower, sometimes stepped, with roof extras
+    const fac = pick(FACADES);
+    if (fancy && h > 2.6 && rng() < 0.45) { // three steps
+      const parts = [[w, h * 0.5], [w * 0.75, h * 0.3], [w * 0.5, h * 0.2]];
+      let y = 0.1;
+      for (const [pw, ph] of parts) { city.add(boxGeo(pw, ph, pw, tint, rng), fac, x, y + ph / 2, z); if (rng() < 0.6) garden(x, z, pw, pw, y + ph); y += ph; }
+      return;
+    }
+    city.add(boxGeo(w, h, w, tint, rng), fac, x, 0.1 + h / 2, z);
+    const r = rng();
+    if (fancy && r < 0.3) garden(x, z, w, w, 0.1 + h);
+    else if (r < 0.55) still.add(new THREE.BoxGeometry(w * 0.35, 0.2, w * 0.3), '#a9a6b6', x + w * 0.15, 0.2 + h, z); // plant room
+    if (fancy && h > 2 && rng() < 0.35) neon(x, z, w, h * 0.7, 0.1 + h * 0.15);
+  };
+  const roundTower = (x, z, w, h, tint) => { // glass cylinder with a dome or a ring
+    const r = w / 2;
+    city.add(cylGeo(r, h, tint, rng), FACADES[1], x, 0.1 + h / 2, z);
+    if (rng() < 0.6) still.add(new THREE.SphereGeometry(r * 0.95, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), DOME, x, 0.1 + h, z);
+    else { still.add(tintGeo(new THREE.CylinderGeometry(r * 1.15, r * 1.15, 0.12, 16), '#e9e6f2'), PLAIN, x, 0.1 + h - 0.4, z); garden(x, z, w * 0.7, w * 0.7, 0.1 + h); }
+  };
+  const pods = (x, z, w, h, tint) => { // a row of rounded capsule towers on a podium
+    city.add(boxGeo(w, 0.4, w, '#d9d4e6', rng), FACADES[0], x, 0.3, z);
+    const n = 3, r = w / (n * 2) * 0.9;
+    for (let p = 0; p < n; p++) {
+      const px = x - w / 2 + w / n * (p + 0.5), ph = h * (0.75 + rng() * 0.25);
+      city.add(cylGeo(r, ph, tint, rng, 12), FACADES[0], px, 0.5 + ph / 2, z);
+      still.add(capGeo(r, tint), PLAIN, px, 0.5 + ph, z);
+    }
   };
 
   for (const [i, j] of blocks) {
-    const cx = i * PITCH, cz = j * PITCH, dist = Math.hypot(i, j);
-    still.add(new THREE.BoxGeometry(BLOCK, 0.1, BLOCK), '#a3a0ad', cx, 0.05, cz); // pavement
-    // Street lights on two corners of every block.
-    for (const [sx, sz] of [[-1, -1], [1, 1]]) {
+    const cx = i * PITCH, cz = j * PITCH, dist = Math.hypot(i, j), key = `${i},${j}`;
+    still.add(new THREE.BoxGeometry(BLOCK, 0.1, BLOCK), '#b9b4c4', cx, 0.05, cz); // pavement
+    for (const [sx, sz] of [[-1, -1], [1, 1]]) { // street lights
       const lx = cx + sx * (BLOCK / 2 - 0.06), lz = cz + sz * (BLOCK / 2 - 0.06);
       still.add(new THREE.BoxGeometry(0.03, 0.55, 0.03), '#3d3a48', lx, 0.37, lz);
       still.add(new THREE.BoxGeometry(0.1, 0.04, 0.1), LAMP, lx, 0.66, lz);
     }
-    const branch = salonBlocks.get(`${i},${j}`);
+    const branch = salonBlocks.get(key);
     if (branch) { buildSalon(s, branch, cx, cz, g); continue; }
-    const r = rng();
-    if (landmarks.has(`${i},${j}`)) { // downtown landmark: podium, slender tower, crown and spire
-      building(cx, cz, BLOCK - 0.2, BLOCK - 0.2, 0.6, rng());
-      const h = 7 + rng() * 3;
-      building(cx, cz, 1.1, 1.1, h, 0);
-      city.add(buildingGeo(0.8, 0.6, 0.8, '#ffffff', rng), FACADES[1], cx, 0.1 + h + 0.3, cz);
-      still.add(new THREE.CylinderGeometry(0.02, 0.05, 1.4, 5), '#d8d8e0', cx, 0.1 + h + 1.3, cz);
+    if (key === '-2,-3') { // TV tower in a little park
+      still.add(new THREE.BoxGeometry(BLOCK - 0.2, 0.04, BLOCK - 0.2), '#5fbf5a', cx, 0.12, cz);
+      still.add(tintGeo(new THREE.CylinderGeometry(0.1, 0.22, 9, 8), '#e8e4ef'), PLAIN, cx, 4.6, cz);
+      still.add(tintGeo(new THREE.CylinderGeometry(0.6, 0.35, 0.35, 16), '#5aaef0'), PLAIN, cx, 6, cz);
+      still.add(new THREE.SphereGeometry(0.42, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), DOME, cx, 6.17, cz);
+      still.add(tintGeo(new THREE.CylinderGeometry(0.32, 0.32, 0.2, 16), '#f28c3b'), PLAIN, cx, 7.6, cz);
+      still.add(tintGeo(new THREE.ConeGeometry(0.08, 1.6, 8), '#ef4444'), PLAIN, cx, 8.9, cz);
+      still.add(new THREE.SphereGeometry(0.07, 8, 6), NEON[2], cx, 9.75, cz);
+      for (let t = 0; t < 6; t++) tree(cx + (rng() - 0.5) * (BLOCK - 0.6), cz + (rng() - 0.5) * (BLOCK - 0.6), 0.8);
       continue;
     }
-    if (r < 0.06 && dist > 1.5) { // park
-      still.add(new THREE.BoxGeometry(BLOCK - 0.2, 0.04, BLOCK - 0.2), '#4f8a5a', cx, 0.12, cz);
+    if (key === '3,-2') { // twin glass towers with a sky bridge
+      city.add(boxGeo(BLOCK - 0.2, 0.6, BLOCK - 0.4, '#d9d4e6', rng), FACADES[0], cx, 0.4, cz);
+      for (const [sx, h] of [[-0.6, 8], [0.6, 7]]) {
+        city.add(cylGeo(0.42, h, '#36b5a6', rng), FACADES[1], cx + sx, 0.7 + h / 2, cz);
+        still.add(new THREE.SphereGeometry(0.4, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), DOME, cx + sx, 0.7 + h, cz);
+        still.add(new THREE.BoxGeometry(0.05, h * 0.8, 0.05), NEON[1], cx + sx, 0.7 + h * 0.45, cz + 0.43);
+      }
+      still.add(tintGeo(beamGeo(new THREE.Vector3(cx - 0.6, 5, cz), new THREE.Vector3(cx + 0.6, 5, cz), 0.3), '#f4f2f8'), PLAIN);
+      garden(cx, cz, 0.6, 0.6, 5.15);
+      continue;
+    }
+    if (ringCorners.has(key) || (rng() < 0.05 && dist > 1.5)) { // park
+      still.add(new THREE.BoxGeometry(BLOCK - 0.2, 0.04, BLOCK - 0.2), '#5fbf5a', cx, 0.12, cz);
       for (let t = 0; t < 7; t++) tree(cx + (rng() - 0.5) * (BLOCK - 0.6), cz + (rng() - 0.5) * (BLOCK - 0.6), 0.7 + rng() * 0.5);
       continue;
     }
-    // Taller towards the middle; low around the salons.
-    const low = nearSalon(i, j), peak = low ? 1.1 : Math.max(1.2, 6.5 - dist * 0.55);
-    if (r < 0.2) { // one long slab across the block
-      building(cx, cz, BLOCK - 0.25, BLOCK / 2 - 0.1, 0.5 + rng() * peak * 0.5, rng());
-      for (let t = 0; t < 4; t++) tree(cx - BLOCK / 2 + 0.3 + t * (BLOCK - 0.6) / 3, cz + BLOCK / 2 - 0.35, 0.7);
-      continue;
-    }
+    // Taller towards the middle; low around the salons and in the view corridor in front of them.
+    let peak = nearSalon(i, j) ? 1.1 : Math.max(1.3, 7 - dist * 0.55);
+    if (Math.abs(i) <= 1 && j >= 1) peak = Math.min(peak, Math.max(0.6, 0.26 * cz - 0.4));
+    const fancy = dist <= 6;
+    const tint = pick(TINTS);
+    if (fancy && peak > 2.5 && rng() < 0.18) { pods(cx, cz, BLOCK - 0.5, Math.min(peak, 2.2 + rng() * 2), tint); continue; }
     for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
       const x = cx + lx * BLOCK / 4, z = cz + lz * BLOCK / 4, w = BLOCK / 2 - 0.18 - rng() * 0.2;
-      if (rng() < 0.1) { tree(x, z, 0.8); continue; }
-      const h = 0.4 + rng() * peak, tint = rng();
-      if (h > 2.4) { // podium with a set-back tower
-        building(x, z, w, w, 0.45, tint);
-        const tw = w * (0.6 + rng() * 0.2);
-        building(x, z, tw, tw, h, tint);
-        if (rng() < 0.6) still.add(new THREE.BoxGeometry(tw * 0.35, 0.2, tw * 0.3), '#9a98a8', x + tw * 0.15, 0.1 + h + 0.1, z); // plant room
-      } else {
-        building(x, z, w, w, h, tint);
-        if (rng() < 0.4) still.add(new THREE.CylinderGeometry(0.08, 0.08, 0.16, 8), '#b8b2a8', x - w * 0.2, 0.1 + h + 0.08, z + w * 0.2); // water tank
-      }
+      if (rng() < 0.08) { tree(x, z, 0.8); continue; }
+      const h = 0.4 + rng() * peak, t = rng() < 0.6 ? tint : pick(TINTS);
+      if (fancy && h > 2 && rng() < 0.25) roundTower(x, z, w, h, t); else tower(x, z, w, h, t, fancy);
     }
   }
+
+  // Elevated ring highway: deck with barriers, glowing edge strips, pillars, and a cable-stayed pylon.
+  const curve = ringCurve();
+  const deck = new THREE.Mesh(sweep(curve, [[-0.46, DECK - 0.14], [-0.46, DECK + 0.1], [-0.42, DECK + 0.1], [-0.42, DECK], [0.42, DECK], [0.42, DECK + 0.1], [0.46, DECK + 0.1], [0.46, DECK - 0.14], [-0.46, DECK - 0.14]]), clay('#d6dbe8'));
+  deck.castShadow = deck.receiveShadow = true;
+  g.add(deck);
+  for (const o of [-0.44, 0.44]) g.add(new THREE.Mesh(sweep(curve, [[o - 0.02, DECK + 0.1], [o + 0.02, DECK + 0.1]]), NEON[1]));
+  for (let p = 0; p < 40; p++) {
+    const at = curve.getPointAt(p / 40);
+    still.add(new THREE.CylinderGeometry(0.07, 0.09, DECK - 0.14, 8), '#c4c9d8', at.x, (DECK - 0.14) / 2, at.z);
+  }
+  const top = new THREE.Vector3(RING, 6, 0);
+  for (const sx of [-0.4, 0.4]) still.add(beamGeo(new THREE.Vector3(RING + sx, 0, 0), new THREE.Vector3(RING + sx * 0.2, 6.2, 0), 0.12), '#eef0f6');
+  still.add(new THREE.BoxGeometry(0.9, 0.12, 0.15), '#eef0f6', RING, DECK + 1.2, 0);
+  for (let c = 1; c <= 6; c++) for (const sz of [-1, 1]) for (const sx of [-0.4, 0.4]) {
+    still.add(beamGeo(top.clone().setX(RING + sx * 0.2), new THREE.Vector3(RING + sx, DECK + 0.1, sz * c * 0.75), 0.02), '#ffffff');
+  }
+
+  // Clouds far out over the horizon.
+  const clouds = [];
+  for (let n = 0; n < 14; n++) {
+    const a = rng() * Math.PI * 2, r = 70 + rng() * 40, y = 14 + rng() * 22;
+    for (let p = 0; p < 5; p++) {
+      const puff = new THREE.SphereGeometry(3 + rng() * 3, 10, 6); puff.scale(1.8, 0.7, 1);
+      puff.translate(Math.cos(a) * r + (p - 2) * 4, y + rng() * 2, Math.sin(a) * r + (rng() - 0.5) * 4);
+      clouds.push(puff);
+    }
+  }
+  g.add(new THREE.Mesh(mergeGeometries(clouds), CLOUD));
+  clouds.forEach(c => c.dispose());
+
   city.flush(g);
   still.flush(g);
 
-  // Traffic near the middle, both directions.
+  // Traffic: cars on the streets near the middle, and a monorail and cars on the ring highway.
   for (let n = 0; n < 36; n++) {
     const axis = n % 2 ? 'x' : 'z', dir = rng() < 0.5 ? 1 : -1, line = (Math.floor(rng() * (2 * CORE + 2)) - CORE - 0.5) * PITCH;
     const obj = car(['#ef4444', '#f2ecf5', '#3b82f6', '#eab308', '#1f1b2e', '#9ca3af', '#a78bfa'][n % 7]);
     obj.rotation.y = (axis === 'x' ? 0 : -Math.PI / 2) + (dir < 0 ? Math.PI : 0);
     g.add(obj);
-    network.cars.push({ obj, axis, dir, line: line + dir * 0.18, speed: 1.2 + rng() * 1.2, at: rng() * EDGE * 2 });
+    network.cars.push({ obj, axis, dir, line: line + dir * 0.21, speed: 1.2 + rng() * 1.2, at: rng() * EDGE * 2 });
   }
+  network.movers.push({ obj: train(), curve, lane: 0, speed: 0.035, u: 0 });
+  for (let n = 0; n < 8; n++) network.movers.push({ obj: car(['#ef4444', '#f7cd4f', '#3b82f6', '#f2ecf5'][n % 4]), curve, lane: n % 2 ? 0.24 : -0.24, speed: (n % 2 ? 1 : -1) * (0.02 + rng() * 0.012), u: rng() });
+  for (const m of network.movers) g.add(m.obj);
 
   network.people = new THREE.Group();
   g.add(network.people);
 }
 
-// A modern two-storey shopfront with a purple sign band, on a little plaza.
+// A lit-up sign with the salon's name, like a shopfront's neon letters.
+function nameSign(text, width) {
+  const c = Object.assign(document.createElement('canvas'), { width: 2048, height: 320 }), ctx = c.getContext('2d');
+  let size = 220;
+  ctx.font = `800 ${size}px Montserrat, sans-serif`;
+  while (ctx.measureText(text).width > 1960 && size > 60) ctx.font = `800 ${size -= 4}px Montserrat, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round'; ctx.lineWidth = 22; ctx.strokeStyle = '#3b0f80'; ctx.strokeText(text, 1024, 168);
+  ctx.fillStyle = '#ffb547'; ctx.fillText(text, 1024, 168);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return new THREE.Mesh(new THREE.PlaneGeometry(width, width * 320 / 2048), new THREE.MeshBasicMaterial({ map: t, transparent: true, toneMapped: false, side: THREE.DoubleSide }));
+}
+
+// A colourful futuristic shopfront: capsule towers on both sides, a glowing sign band and the salon's
+// name in lights on the roof.
 function buildSalon(s, b, cx, cz, g) {
   const bg = new THREE.Group();
   bg.position.set(cx, 0.1, cz);
-  bg.scale.setScalar(1.25);
+  bg.scale.setScalar(1.55);
   bg.userData.branchId = b.id;
-  box(1.7, 0.04, 1.7, '#e9dccd', 0, 0.02, 0.1, bg); // plaza
-  box(1.3, 1.0, 1.0, '#f4efe9', 0, 0.5, -0.1, bg);
-  box(1.1, 0.45, 0.02, glow('#ffd9a8', 0.55), 0, 0.3, 0.41, bg); // shop window
-  box(0.24, 0.42, 0.025, glow('#ffb35c', 0.8), 0.32, 0.25, 0.42, bg); // door
-  for (const wx of [-0.38, 0, 0.38]) box(0.28, 0.2, 0.02, glow('#ffe1b5', 0.5), wx, 0.72, 0.41, bg); // upstairs windows
-  box(1.36, 0.16, 1.06, glow('#6d28d9', 0.45), 0, 0.92, -0.1, bg); // sign band
-  box(1.4, 0.05, 1.1, '#d9d3e6', 0, 1.02, -0.1, bg); // roof slab
-  const awning = box(1.2, 0.03, 0.28, '#a78bfa', 0, 0.56, 0.53, bg);
+  box(1.6, 0.04, 1.58, '#efe7dc', 0, 0.02, 0.05, bg); // plaza
+  box(1.1, 1.0, 1.0, '#f3eefc', 0, 0.5, -0.1, bg);
+  box(0.9, 0.45, 0.02, glow('#ffd9a8', 0.55), 0, 0.3, 0.41, bg); // shop window
+  box(0.24, 0.42, 0.025, glow('#ffb35c', 0.8), 0.28, 0.25, 0.42, bg); // door
+  for (const wx of [-0.3, 0, 0.3]) box(0.22, 0.2, 0.02, glow('#ffe1b5', 0.5), wx, 0.72, 0.41, bg); // upstairs windows
+  box(1.16, 0.16, 1.06, glow('#7c3aed', 0.6), 0, 0.92, -0.1, bg); // sign band
+  box(1.2, 0.05, 1.1, '#e3dcf3', 0, 1.02, -0.1, bg); // roof slab
+  for (const sx of [-0.68, 0.68]) { // capsule towers
+    mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.2, 14), '#f28c3b', sx, 0.6, -0.15, bg);
+    mesh(new THREE.SphereGeometry(0.2, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2), '#f28c3b', sx, 1.2, -0.15, bg);
+    for (const y of [0.45, 0.8]) box(0.12, 0.2, 0.02, glow('#3ff2c8', 0.8), sx, y, 0.06, bg);
+  }
+  const awning = box(1.0, 0.03, 0.28, '#a78bfa', 0, 0.56, 0.53, bg);
   awning.rotation.x = 0.25;
-  box(1.4, 0.06, 0.3, '#2b2340', 0, 0.06, 0.82, bg); // pip plinth
+  const sign = nameSign(s.salon.name, 2.1);
+  sign.position.set(0, 1.42, 0.1);
+  bg.add(sign);
+  box(1.4, 0.06, 0.26, '#2b2340', 0, 0.06, 0.7, bg); // pip plinth
   const stations = s.stations.filter(st => st.branchId === b.id);
   const pips = stations.map((st, k) => {
     const pip = mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshStandardMaterial({ color: COLORS.free, emissive: COLORS.free, emissiveIntensity: 0.3, roughness: 0.4 }),
-      (k - (stations.length - 1) / 2) * 0.27, 0.17, 0.82, bg);
+      (k - (stations.length - 1) / 2) * 0.27, 0.17, 0.7, bg);
     pip.userData.stationId = st.id;
     return pip;
   });
-  tree(bg, -0.75, -0.6, 0, 0.8); tree(bg, 0.78, -0.55, 0, 0.75);
+  tree(bg, -0.72, 0.55, 0, 0.5); tree(bg, 0.72, 0.5, 0, 0.45);
   const el = div('blabel');
   el.type = 'button';
   el.addEventListener('click', () => openBranch(b.id));
   const wrap = document.createElement('div');
   wrap.append(el);
-  label(wrap, 0, 1.6, 0, bg);
+  label(wrap, 0, 2.05, 0, bg);
   g.add(bg);
   // Clients walk the pavement: along their own street, up the road beside the salon, then to its door.
   const door = new THREE.Vector3(cx, 0.1, cz + PITCH / 2 - SIDEWALK);
@@ -1616,6 +1769,12 @@ function animateCity(dt) {
     c.at = (c.at + c.dir * c.speed * dt + EDGE * 4) % (EDGE * 2);
     const run = c.at - EDGE;
     if (c.axis === 'x') c.obj.position.set(run, 0.02, c.line); else c.obj.position.set(c.line, 0.02, run);
+  }
+  for (const m of network.movers) { // along the ring highway
+    m.u = ((m.u + m.speed * dt) % 1 + 1) % 1;
+    const p = m.curve.getPointAt(m.u), t = m.curve.getTangentAt(m.u).multiplyScalar(Math.sign(m.speed));
+    m.obj.position.set(p.x - t.z * m.lane, DECK, p.z + t.x * m.lane);
+    m.obj.rotation.y = Math.atan2(-t.z, t.x);
   }
   for (const { obj, pos } of network.clients.values()) {
     const dx = pos.x - obj.position.x, dz = pos.z - obj.position.z, d = Math.hypot(dx, dz);
