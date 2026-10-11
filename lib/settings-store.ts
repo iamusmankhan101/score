@@ -134,6 +134,8 @@ const defaults = {
   },
   appearance: {
     accent: "#7C3AED",
+    // Online booking page (/book/…, also embedded by the WordPress plugin): show no prices.
+    hideBookingPrices: false,
     dateFormat: "DD/MM/YYYY",
     timeFormat: "12-hour (1:00pm)",
   },

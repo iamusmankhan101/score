@@ -483,7 +483,48 @@ function SalonProfile() {
       )}
       <SaveButton onClick={save} label={saving ? "Saving…" : "Save Changes"} disabled={saving} />
       <BookingLinkCard />
+      <BookingPricesToggle />
     </section>
+  );
+}
+
+/** Hide prices on the online booking page (and the WordPress plugin, which embeds it). Saves on toggle. */
+function BookingPricesToggle() {
+  const appearance = settingsStore.appearance as { hideBookingPrices?: boolean };
+  const [hidden, setHidden] = useState(appearance.hideBookingPrices === true);
+  const [status, setStatus] = useState<"" | "saved" | "error">("");
+
+  async function toggle() {
+    const next = !hidden;
+    setHidden(next);
+    setStatus("");
+    appearance.hideBookingPrices = next;
+    const ok = await saveSettings();
+    if (!ok) {
+      // Didn't reach the database, so customers would still see the old setting — undo and say so.
+      appearance.hideBookingPrices = !next;
+      setHidden(!next);
+      void saveSettings();
+    }
+    setStatus(ok ? "saved" : "error");
+  }
+
+  return (
+    <div style={{ marginTop: 20, paddingTop: 20, borderTop: "1px solid #eeeaf6", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+      <div>
+        <div style={{ color: "#29263d", fontSize: 12, fontWeight: 800 }}>Hide prices on booking page</div>
+        <div style={{ fontSize: 11, color: "#9995ad", marginTop: 3, lineHeight: 1.5 }}>
+          Customers see services, durations and times but no prices or totals. Bookings still record the amount for you.
+          Also applies to the booking form on your website (WordPress plugin).
+        </div>
+        {status && (
+          <div style={{ fontSize: 11, marginTop: 4, color: status === "saved" ? "#059669" : "#dc2626" }}>
+            {status === "saved" ? (hidden ? "Prices are now hidden." : "Prices are now shown.") : "Couldn't save — check your connection and try again."}
+          </div>
+        )}
+      </div>
+      <Toggle value={hidden} onChange={() => void toggle()} />
+    </div>
   );
 }
 

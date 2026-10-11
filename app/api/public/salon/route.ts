@@ -41,7 +41,7 @@ function publicSettings(settings: Json): Json {
     hours: Array.isArray(settings.hours)
       ? settings.hours.map((h) => pick(h, ["day", "open", "from", "to"]))
       : [],
-    appearance: pick(settings.appearance, ["accent"]),
+    appearance: pick(settings.appearance, ["accent", "hideBookingPrices"]),
     payments: publicPayments(settings.payments),
     loyalty: publicLoyalty(settings.loyalty),
   };

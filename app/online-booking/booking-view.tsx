@@ -393,7 +393,7 @@ function OnlineBookingInner({ salonIdOverride }: { salonIdOverride?: string }) {
         <span className="svcRowCheck">{checked && <Check size={12} strokeWidth={3} />}</span>
         <span className="svcRowName">{sv.name}</span>
         <span className="svcRowDur"><Clock size={11} /> {sv.durationMin}m</span>
-        <span className="svcRowPrice">{sv.variablePrice && sv.priceRangeMin && sv.priceRangeMax ? `${fmt(sv.priceRangeMin)} - ${fmt(sv.priceRangeMax)}` : fmt(sv.price)}</span>
+        {!hidePrices && <span className="svcRowPrice">{sv.variablePrice && sv.priceRangeMin && sv.priceRangeMax ? `${fmt(sv.priceRangeMin)} - ${fmt(sv.priceRangeMax)}` : fmt(sv.price)}</span>}
       </button>
     );
   }
@@ -426,6 +426,10 @@ function OnlineBookingInner({ salonIdOverride }: { salonIdOverride?: string }) {
     return availableMethods({ payAtCounter: raw.payAtCounter !== false, jazzcash: on("jazzcash"), easypaisa: on("easypaisa"), bank: on("bank") });
   }, [salonId, remoteSettings]);
   const chosenPay = payMethods.find((m) => m.id === payMethod) ?? payMethods[0];
+  // Salon setting (Account → Salon Profile): show services, durations and times, but no prices.
+  // The amounts are still stored on the booking for the salon; customers just don't see them.
+  const hidePrices = ((salonId ? remoteSettings?.appearance : settingsStore.appearance) as { hideBookingPrices?: boolean } | undefined)?.hideBookingPrices === true;
+
   const salonAccent = salonId
     ? (remoteSettings?.appearance as { accent?: string } | undefined)?.accent
     : (settingsStore.appearance as { accent?: string }).accent;
@@ -591,7 +595,7 @@ function OnlineBookingInner({ salonIdOverride }: { salonIdOverride?: string }) {
                           <button key={cat} className={`svcTile ${open ? "active" : ""}`} aria-expanded={open}
                             onClick={() => setOpenCats(open ? new Set() : new Set([cat]))}>
                             <span className="svcGroupName">{categoryLabel(cat)}</span>
-                            <span className="svcGroupMeta">{items.length} service{items.length === 1 ? "" : "s"} · from {fmt(from)}</span>
+                            <span className="svcGroupMeta">{items.length} service{items.length === 1 ? "" : "s"}{hidePrices ? "" : ` · from ${fmt(from)}`}</span>
                             {picked > 0 && <span className="svcGroupBadge svcTileBadge">{picked}</span>}
                           </button>
                         );
@@ -613,7 +617,7 @@ function OnlineBookingInner({ salonIdOverride }: { salonIdOverride?: string }) {
                       <button className="svcGroupHead" onClick={() => toggleCat(cat)} aria-expanded={open}>
                         <span className="svcGroupText">
                           <span className="svcGroupName">{categoryLabel(cat)}</span>
-                          <span className="svcGroupMeta">{items.length} service{items.length === 1 ? "" : "s"} · from {fmt(from)}</span>
+                          <span className="svcGroupMeta">{items.length} service{items.length === 1 ? "" : "s"}{hidePrices ? "" : ` · from ${fmt(from)}`}</span>
                         </span>
                         {picked > 0 && <span className="svcGroupBadge">{picked}</span>}
                         <ChevronDown size={18} className="svcGroupChev" />
@@ -628,7 +632,7 @@ function OnlineBookingInner({ salonIdOverride }: { salonIdOverride?: string }) {
                 <button className={`btnNext ${selectedServiceIds.length > 0 ? "active" : "disabled"}`} disabled={selectedServiceIds.length === 0} onClick={() => setStep(2)}>
                   {selectedServiceIds.length === 0 ? "Select a service" : (
                     <>
-                      <span className="btnNextMeta">{selectedServiceIds.length} · {totalLabel}</span>
+                      <span className="btnNextMeta">{hidePrices ? `${selectedServiceIds.length} selected` : `${selectedServiceIds.length} · ${totalLabel}`}</span>
                       Continue <ChevronRight size={16} />
                     </>
                   )}
@@ -752,10 +756,12 @@ function OnlineBookingInner({ salonIdOverride }: { salonIdOverride?: string }) {
 
               {bookError && <div className="dateWarning">{bookError}</div>}
 
-              <div className="totalRow">
-                <span>Total</span>
-                <span className="totalAmount">{totalLabel}</span>
-              </div>
+              {!hidePrices && (
+                <div className="totalRow">
+                  <span>Total</span>
+                  <span className="totalAmount">{totalLabel}</span>
+                </div>
+              )}
 
               <div className="stepNav">
                 <button className="btnBack" onClick={() => setStep(2)}><ChevronLeft size={16} /> Back</button>
@@ -784,12 +790,12 @@ function OnlineBookingInner({ salonIdOverride }: { salonIdOverride?: string }) {
                 <div className="successRow"><span className="successLabel">Time</span><span className="successValue">{fmtTime12(selectedTime)}</span></div>
                 <div className="successRow"><span className="successLabel">Duration</span><span className="successValue">{totalDuration} min</span></div>
                 <div className="successRow"><span className="successLabel">Payment</span><span className="successValue">{chosenPay.label}</span></div>
-                <div className="successRow highlight"><span className="successLabel">Total</span><span className="successValue">{totalLabel}</span></div>
+                {!hidePrices && <div className="successRow highlight"><span className="successLabel">Total</span><span className="successValue">{totalLabel}</span></div>}
               </div>
 
               {chosenPay.id !== "counter" && (
                 <section className="po-card payDone">
-                  <div className="po-card-title">Send {fmt(totalPrice)} via {chosenPay.label}</div>
+                  <div className="po-card-title">{hidePrices ? `Pay via ${chosenPay.label} — the salon will confirm the amount on WhatsApp` : `Send ${fmt(totalPrice)} via ${chosenPay.label}`}</div>
                   <MethodDetails method={chosenPay} />
                   {salonId && bookedId && <ProofUpload salonId={salonId} appointmentId={bookedId} method={chosenPay.id} />}
                 </section>
