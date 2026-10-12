@@ -15,7 +15,7 @@ import { db } from "./db";
 import { backupExistingSalonData } from "./data-backup";
 import { activeWhatsAppCredential, isFakePlaceholderPhone, type WhatsAppProviderConfig, ycloudConfigOf } from "./whatsapp-provider";
 import { appointmentStartHasPassed, timezoneFromSettings } from "./appointment-time";
-import type { Client, Appointment, Service } from "./types";
+import type { Client, Appointment, Service, Staff } from "./types";
 
 export async function ensureBookingTables(): Promise<void> {
   await db.execute(`
@@ -272,4 +272,62 @@ export async function createBooking(
   }
 
   return { ok: true, duplicate: false };
+}
+
+// ─── Public booking requests ──────────────────────────────────────────────────
+
+async function loadList<T>(entity: string): Promise<T[]> {
+  const row = await db.execute({ sql: "SELECT data FROM salon_data WHERE entity = ?", args: [entity] });
+  try { return row.rows.length ? JSON.parse(row.rows[0].data as string) : []; } catch { return []; }
+}
+
+const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+const ID = /^[\w-]{1,64}$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+const plusMinutes = (t: string, m: number) => { const x = Number(t.slice(0, 2)) * 60 + Number(t.slice(3)) + m; return `${String(Math.floor(x / 60) % 24).padStart(2, "0")}:${String(x % 60).padStart(2, "0")}`; };
+const newId = (p: string) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+
+/** The booking and new-client records exactly as the two booking pages build them, from trusted data only. */
+export async function cleanPublicBooking(salonId: string, body: { appointment?: Partial<Appointment>; client?: Partial<Client>; clientPhone?: unknown }) {
+  const a = body.appointment ?? {};
+  const [services, staff] = await Promise.all([loadList<Service>(`${salonId}_services`), loadList<Staff>(`${salonId}_staff`)]);
+  const menu = new Map(services.filter((sv) => sv.isActive !== false).map((sv) => [sv.id, sv]));
+  const team = new Map(staff.filter((p) => p.isActive !== false).map((p) => [p.id, p]));
+
+  const chosen = [...new Set(Array.isArray(a.serviceIds) ? a.serviceIds : [])].map((id) => menu.get(String(id))).filter((sv): sv is Service => !!sv).slice(0, 20);
+  const date = str(a.date, 10), startTime = str(a.startTime, 5);
+  const phone = str(body.clientPhone ?? body.client?.phone, 20).replace(/\D/g, "");
+  const name = str(a.clientName ?? body.client?.name, 80);
+  if (!chosen.length || !DATE.test(date) || !TIME.test(startTime) || phone.length < 10 || phone.length > 15 || !name) return null;
+
+  const named = [...new Set([a.staffId, ...(Array.isArray(a.staffIds) ? a.staffIds : [])].map(String))].filter((id) => team.has(id));
+  const total = chosen.reduce((t, sv) => t + (Number(sv.price) || 0), 0);
+  const minutes = chosen.reduce((t, sv) => t + (Number(sv.durationMin) || 0), 0) || 60;
+  const clientId = ID.test(String(a.clientId ?? "")) ? String(a.clientId) : newId("c");
+
+  const appointment: Appointment = {
+    id: ID.test(String(a.id ?? "")) ? String(a.id) : newId("a"),
+    clientId, clientName: name,
+    staffId: named[0] ?? "any",
+    staffName: named[0] ? team.get(named[0])!.name : "Any Stylist",
+    ...(named.length > 1 ? { staffIds: named, staffNames: named.map((id) => team.get(id)!.name) } : {}),
+    serviceIds: chosen.map((sv) => sv.id),
+    serviceNames: chosen.map((sv) => sv.name),
+    date, startTime, endTime: plusMinutes(startTime, minutes),
+    status: "booked",
+    totalAmount: total,
+    source: "web",
+    notes: str(a.notes, 1000) || undefined,
+    createdAt: new Date().toISOString(),
+  };
+  // Only used when the number is new to the salon; a returning client's record is never replaced.
+  const client: Client | undefined = body.client ? {
+    id: clientId, name, phone,
+    ...(["female", "male", "other"].includes(String(body.client.gender)) ? { gender: body.client.gender } : {}),
+    locationId: "main", tags: ["New"], source: "web",
+    createdAt: new Date().toISOString().slice(0, 10),
+    totalVisits: 1, totalSpend: total, lastVisitDate: date, averageRating: 5.0,
+  } : undefined;
+  return { appointment, client, phone };
 }

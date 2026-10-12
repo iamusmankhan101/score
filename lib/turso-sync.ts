@@ -281,6 +281,9 @@ async function retryFetch(url: string, options: RequestInit, label: string, trie
   if (isDefinitelyOffline()) return false;
   try {
     const r = await fetch(url, options);
+    // 403: this login isn't allowed to save that data (a staff member without the page).
+    // Retrying or queueing it can never succeed, so drop it rather than leave it pending forever.
+    if (r.status === 403) { console.warn(`[${label}] refused: no permission`); return true; }
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return true;
   } catch (err) {

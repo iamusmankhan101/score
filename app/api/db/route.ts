@@ -1,12 +1,48 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { resolveActor } from "@/lib/api-auth";
+import { can, resolveActor, type ResolvedActor } from "@/lib/api-auth";
 import { backupExistingSalonData } from "@/lib/data-backup";
 import { invalidatePublicSalon } from "@/lib/public-salon-cache";
 
 const DELETED_RECORDS_ENTITY = "deleted_records";
 
 const ALLOWED = new Set(["clients", "appointments", "staff", "services", "inventory", "salon_invoices", "expenses", "attendance", "payouts", "cash_flow_income", "held_sales", "inventory_log", "consultations", "treatment_plans", "consents", "clinic_photos", "prescriptions", "leads", "treatment_charts", "waitlist", DELETED_RECORDS_ENTITY]);
+
+/**
+ * Staff logins see only what their ticked pages need (see PERMISSION_OPTIONS on the Account
+ * page). Entities not listed here — clients, appointments, services, inventory, invoices… —
+ * are used across POS, calendar and booking, so every staff login keeps them.
+ */
+const ENTITY_PERMISSIONS: Record<string, string[]> = {
+  payouts: ["payouts"],
+  expenses: ["cash-flow", "revenue", "clinic-reports"],
+  cash_flow_income: ["cash-flow", "revenue"],
+  consultations: ["medical"],
+  treatment_plans: ["medical"],
+  clinic_photos: ["medical"],
+  prescriptions: ["medical"],
+  treatment_charts: ["medical"],
+  consents: ["medical", "consent-forms"],
+  leads: ["leads"],
+};
+const mayRead = (actor: ResolvedActor, entity: string) => !ENTITY_PERMISSIONS[entity] || can(actor, ...ENTITY_PERMISSIONS[entity]);
+// The staff list feeds every staff picker, so everyone reads it — but only the Staff page
+// (or Attendance, for leave and days off) may save it, and pay stays with Staff/Payouts.
+// Saves are a union, so writing never reveals or removes what's stored: a refund on the
+// Invoices page books a "refunds" expense even for staff who can't open Cash Flow.
+const EXTRA_WRITERS: Record<string, string[]> = { staff: ["staff", "attendance"], expenses: ["invoices"] };
+const mayWrite = (actor: ResolvedActor, entity: string) =>
+  entity === "staff" ? can(actor, ...EXTRA_WRITERS.staff) : mayRead(actor, entity) || can(actor, ...(EXTRA_WRITERS[entity] ?? []));
+const PAY_FIELDS = ["payType", "commissionRate", "baseSalary", "upsellCommissionRate"];
+const seesPay = (actor: ResolvedActor) => can(actor, "staff", "payouts");
+function withoutPay(list: unknown[]): unknown[] {
+  return list.map((item) => {
+    if (!item || typeof item !== "object") return item;
+    const copy = { ...(item as Record<string, unknown>) };
+    for (const k of PAY_FIELDS) delete copy[k];
+    return copy;
+  });
+}
 
 async function ensureTable() {
   await db.execute(`
@@ -187,6 +223,7 @@ export async function GET(req: NextRequest) {
     const actor = await resolveActor(req, requestedLocationId);
     if (!actor) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const { userId, locationId } = actor;
+    if (!mayRead(actor, entity)) return Response.json({ error: "Forbidden" }, { status: 403 });
     await ensureTable();
     const key = storageKey(userId, locationId, entity);
     const result = await db.execute({
@@ -215,7 +252,7 @@ export async function GET(req: NextRequest) {
         args: [key, JSON.stringify(merged), new Date().toISOString()],
       });
     }
-    return Response.json(merged);
+    return Response.json(entity === "staff" && !seesPay(actor) ? withoutPay(merged) : merged);
   } catch (err) {
     console.error("[db] GET error:", err);
     return Response.json([]);
@@ -247,6 +284,7 @@ export async function POST(req: NextRequest) {
     const actor = await resolveActor(req, requestedLocationId);
     if (!actor) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const { userId, locationId } = actor;
+    if (!mayWrite(actor, entity)) return Response.json({ error: "Forbidden" }, { status: 403 });
     await ensureTable();
     const key = storageKey(userId, locationId, entity);
     await backupExistingSalonData(key, userId);
@@ -258,8 +296,14 @@ export async function POST(req: NextRequest) {
       // the other one's deletions — letting those records come back.
       const existing = await db.execute({ sql: "SELECT data FROM salon_data WHERE entity = ?", args: [key] });
       const stored = existing.rows.length === 0 ? [] : JSON.parse(existing.rows[0].data as string) as unknown[];
+      // A staff login can't hide records it isn't allowed to change by "deleting" them.
+      // Deleting needs the page itself: Attendance can't remove staff, Invoices can't remove expenses.
+      const incoming = payload.filter((t) => {
+        const target = String((t as { entity?: unknown })?.entity ?? "");
+        return target === "staff" ? can(actor, "staff") : mayRead(actor, target);
+      });
       const byId = new Map<string, unknown>();
-      for (const item of [...(Array.isArray(stored) ? stored : []), ...payload]) {
+      for (const item of [...(Array.isArray(stored) ? stored : []), ...incoming]) {
         const id = itemId(item);
         if (id) byId.set(id, item);
       }
@@ -283,6 +327,18 @@ export async function POST(req: NextRequest) {
         } catch { /* unreadable row — the incoming payload replaces it */ }
       }
       payload = mergeById(stored, payload, new Date().toISOString());
+      // Someone who never saw the pay fields can't have meant to change them: keep the stored ones.
+      // Without the Staff or Payouts page they can't add people either (Attendance only edits leave).
+      if (entity === "staff" && !seesPay(actor)) {
+        const before = new Map(stored.map((item) => [itemId(item), item as Record<string, unknown>]));
+        payload = payload.filter((item) => before.has(itemId(item))).map((item) => {
+          const old = before.get(itemId(item));
+          if (!old || !item || typeof item !== "object") return item;
+          const kept = { ...(item as Record<string, unknown>) };
+          for (const k of PAY_FIELDS) { if (k in old) kept[k] = old[k]; else delete kept[k]; }
+          return kept;
+        });
+      }
     }
 
     await db.execute({
@@ -323,7 +379,8 @@ export async function POST(req: NextRequest) {
                   notes        = excluded.notes,
                   total_visits = excluded.total_visits,
                   total_spent  = excluded.total_spent,
-                  last_visit   = excluded.last_visit`,
+                  last_visit   = excluded.last_visit
+                WHERE clients.user_id = excluded.user_id`,
           args: [
             String(c.id),
             userId,

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
 import { db } from "@/lib/db";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { getTier, nextTierThreshold, pointsToRupees, type LoyaltySettings } from "@/lib/loyalty";
 import type { Client } from "@/lib/types";
 import {
@@ -265,6 +266,9 @@ export async function GET(req: NextRequest) {
   if (!platform || !salonId || !clientId) {
     return Response.json({ ok: false, error: "Missing platform, salonId, or clientId" }, { status: 400 });
   }
+  // Public, like the loyalty card page: cap guesses at client ids.
+  const limit = await rateLimit("wallet-loyalty", clientIp(req), { maxAttempts: 10, windowMs: 10 * 60 * 1000, blockMs: 30 * 60 * 1000 });
+  if (limit.blocked) return Response.json({ ok: false, error: "Too many tries. Please wait a few minutes and try again." }, { status: 429 });
   if (platform === "apple") {
     return Response.json({ ok: false, error: "Apple Wallet is not configured yet." }, { status: 501 });
   }

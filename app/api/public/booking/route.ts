@@ -5,11 +5,15 @@
  * Called from the public online-booking page — no auth required.
  *
  * Body: { salonId, appointment, client? }
+ *
+ * Nothing in the body is stored as sent: cleanPublicBooking() (lib/booking.ts) rebuilds the booking from the
+ * salon's own menu and staff list, so a hand-edited request can't set prices, mark a
+ * booking completed, or give a new client loyalty points.
  */
 
 import { NextRequest } from "next/server";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
-import { createBooking } from "@/lib/booking";
+import { cleanPublicBooking, createBooking } from "@/lib/booking";
 import { db } from "@/lib/db";
 import { busySlots, isSlotFree } from "@/lib/availability";
 import { appointmentStaffIds } from "@/lib/appointment-staff";
@@ -54,19 +58,22 @@ export async function POST(req: NextRequest) {
 
   // checkAvailability is sent by the client app, which shows the error. The
   // older online-booking page ignores the response, so it isn't refused there.
-  let body: { salonId: string; appointment: Appointment; client?: Client; clientPhone?: string; checkAvailability?: boolean };
+  let body: { salonId: string; appointment?: Partial<Appointment>; client?: Partial<Client>; clientPhone?: string; checkAvailability?: boolean };
   try {
     body = await req.json();
   } catch {
     return Response.json({ ok: false, error: "Invalid body" }, { status: 400 });
   }
 
-  const { salonId, appointment, client } = body;
-  if (!salonId || !appointment) {
+  const salonId = typeof body.salonId === "string" ? body.salonId : "";
+  if (!salonId || !body.appointment) {
     return Response.json({ ok: false, error: "Missing salonId or appointment" }, { status: 400 });
   }
 
   try {
+    const clean = await cleanPublicBooking(salonId, body);
+    if (!clean) return Response.json({ ok: false, error: "Please choose a service, a date and a time, and enter your name and phone number." }, { status: 400 });
+    const { appointment, client } = clean;
     if (body.checkAvailability && !(await slotStillFree(salonId, appointment))) {
       return Response.json(
         { ok: false, taken: true, error: "Sorry, that time was just booked. Please pick another time." },
@@ -75,7 +82,7 @@ export async function POST(req: NextRequest) {
     }
     // clientPhone is always sent from the booking form (covers both new and
     // returning clients).
-    const result = await createBooking(salonId, appointment, client, body.clientPhone);
+    const result = await createBooking(salonId, appointment, client, clean.phone);
     return Response.json(result.ok ? { ok: true } : { ok: false, error: result.error || "Failed to save booking" }, { status: result.ok ? 200 : 409 });
   } catch (err) {
     console.error("[public/booking] error:", err);

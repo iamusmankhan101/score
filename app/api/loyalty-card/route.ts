@@ -4,6 +4,7 @@ import { ensureAllTables } from "@/lib/db-schema";
 import { backupExistingSalonData } from "@/lib/data-backup";
 import { getTier, nextTierThreshold, pointsToRupees, type LoyaltySettings } from "@/lib/loyalty";
 import type { Client } from "@/lib/types";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 interface SalonSettings {
   salon?: {
@@ -162,6 +163,22 @@ async function readSalonSettings(salonId: string): Promise<SalonSettings> {
   return settings;
 }
 
+// Public page, no login: whoever types a phone number sees only what the card shows — a first
+// name and points. Never the stored record (spend, notes, birthday, medical details…).
+function publicClient(client: Client) {
+  return {
+    id: client.id,
+    name: (client.name || "").trim().split(/\s+/)[0] || "Loyalty Member",
+    loyaltyPoints: client.loyaltyPoints ?? 0,
+    loyaltyPointsEarned: client.loyaltyPointsEarned ?? 0,
+  };
+}
+
+// Lookups by phone number are capped per visitor so nobody can try number after number.
+const tooMany = async (req: NextRequest, action: string, max: number) =>
+  (await rateLimit(`loyalty-card-${action}`, clientIp(req), { maxAttempts: max, windowMs: 10 * 60 * 1000, blockMs: 30 * 60 * 1000 })).blocked;
+const slowDown = () => Response.json({ ok: false, error: "Too many tries. Please wait a few minutes and try again." }, { status: 429 });
+
 function cardPayload(client: Client, settings: LoyaltySettings, salon: SalonSettings["salon"]) {
   const earned = client.loyaltyPointsEarned ?? 0;
   const balance = client.loyaltyPoints ?? 0;
@@ -174,7 +191,7 @@ function cardPayload(client: Client, settings: LoyaltySettings, salon: SalonSett
       email: salon?.email || "",
       logo: salon?.logo || "",
     },
-    client,
+    client: publicClient(client),
     card: {
       number: formatCardNumber(client.id),
       tier,
@@ -200,6 +217,7 @@ export async function GET(req: NextRequest) {
 
     const noCache = { headers: { "Cache-Control": "no-store" } };
 
+    if (phone && await tooMany(req, "lookup", 15)) return slowDown();
     if (!phone) {
       return Response.json({
         ok: true,
@@ -237,6 +255,7 @@ export async function POST(req: NextRequest) {
   const salonId = body.salonId;
   const phone = body.phone?.trim();
   if (!salonId || !phone) return Response.json({ ok: false, error: "Missing salonId or phone" }, { status: 400 });
+  if (await tooMany(req, "claim", 8)) return slowDown();
 
   try {
     await ensureTable();

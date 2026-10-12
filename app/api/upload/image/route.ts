@@ -11,37 +11,24 @@
  *
  * Callers send an already-downscaled data URL (see lib/image.ts), so the payload
  * is tens of KB and stays well inside the serverless request body limit.
+ *
+ * Clinic photos ("patients") are uploaded as private: Cloudinary refuses a plain link
+ * to them, and the app shows them through /api/clinic/photo, which checks the viewer.
  */
 
 import { NextRequest } from "next/server";
-import { createHash } from "crypto";
 import { resolveActor } from "@/lib/api-auth";
-
-const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME ?? "";
-const API_KEY    = process.env.CLOUDINARY_API_KEY ?? "";
-const API_SECRET = process.env.CLOUDINARY_API_SECRET ?? "";
+import { API_KEY, CLOUD_NAME, cloudinaryConfigured, sign } from "@/lib/cloudinary";
 
 /** Refuse anything that isn't a small inline image, before it reaches Cloudinary. */
 const MAX_DATA_URL_BYTES = 3 * 1024 * 1024;
 const ALLOWED_FOLDERS = new Set(["clients", "staff", "salon", "patients"]);
 
-/**
- * Cloudinary signs the alphabetically-sorted params that are actually sent,
- * excluding `file`, `api_key` and `resource_type`, with the secret appended.
- */
-function sign(params: Record<string, string>): string {
-  const toSign = Object.keys(params)
-    .sort()
-    .map((k) => `${k}=${params[k]}`)
-    .join("&");
-  return createHash("sha1").update(toSign + API_SECRET).digest("hex");
-}
-
 export async function POST(req: NextRequest) {
   const actor = await resolveActor(req);
   if (!actor) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-  if (!CLOUD_NAME || !API_KEY || !API_SECRET) {
+  if (!cloudinaryConfigured()) {
     return Response.json(
       { ok: false, error: "Image hosting is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET." },
       { status: 503 },
@@ -68,12 +55,12 @@ export async function POST(req: NextRequest) {
   const folder = `salon-central/${actor.userId}/${sub}`;
   const timestamp = String(Math.floor(Date.now() / 1000));
 
-  const signed = { folder, timestamp };
+  const isPrivate = sub === "patients";
+  const signed: Record<string, string> = { folder, timestamp, ...(isPrivate ? { type: "authenticated" } : {}) };
   const form = new FormData();
   form.set("file", dataUrl);
   form.set("api_key", API_KEY);
-  form.set("folder", folder);
-  form.set("timestamp", timestamp);
+  for (const [k, v] of Object.entries(signed)) form.set(k, v);
   form.set("signature", sign(signed));
 
   try {
@@ -82,7 +69,7 @@ export async function POST(req: NextRequest) {
       body: form,
     });
     const data = await res.json().catch(() => ({})) as {
-      secure_url?: string; public_id?: string; error?: { message?: string };
+      secure_url?: string; public_id?: string; format?: string; error?: { message?: string };
     };
     if (!res.ok || !data.secure_url) {
       return Response.json(
@@ -90,7 +77,10 @@ export async function POST(req: NextRequest) {
         { status: 502 },
       );
     }
-    return Response.json({ ok: true, url: data.secure_url, publicId: data.public_id });
+    const url = isPrivate && data.public_id
+      ? `/api/clinic/photo?id=${encodeURIComponent(data.public_id)}&f=${encodeURIComponent(data.format || "jpg")}`
+      : data.secure_url;
+    return Response.json({ ok: true, url, publicId: data.public_id });
   } catch (error) {
     console.error("[upload/image]", error);
     return Response.json({ ok: false, error: "Could not reach the image host." }, { status: 502 });

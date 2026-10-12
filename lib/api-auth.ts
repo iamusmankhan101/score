@@ -37,6 +37,8 @@ export interface ResolvedActor {
   actorId: string;
   locationId: string;
   role: "owner" | "manager" | "staff" | "admin";
+  /** A staff login's ticked pages ("*" = all). Unset for everyone else, who may do anything in their scope. */
+  permissions?: string[];
 }
 
 /**
@@ -67,6 +69,7 @@ export async function resolveActor(
       actorId: actor.id,
       locationId: actor.locationId || "main",
       role: actor.role,
+      permissions: actor.permissions ?? [],
     };
   }
   if (actor.role === "manager") {
@@ -81,6 +84,16 @@ export async function resolveActor(
     };
   }
   return { userId: actor.id, actorId: actor.id, locationId: requestedLocationId, role: actor.role };
+}
+
+/**
+ * Whether the caller may use any of these pages. Mirrors the sidebar's check, but on
+ * the server: hiding a menu item doesn't stop a staff login calling the API directly.
+ */
+export function can(actor: ResolvedActor, ...keys: string[]): boolean {
+  if (actor.role !== "staff") return true;
+  const granted = actor.permissions ?? [];
+  return granted.includes("*") || keys.some((k) => granted.includes(k));
 }
 
 /** The salon's own admins: the owner, or a manager (one branch's admin). Gates Salonflow. */

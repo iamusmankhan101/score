@@ -10,7 +10,7 @@
 
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { resolveActor } from "@/lib/api-auth";
+import { can, resolveActor, type ResolvedActor } from "@/lib/api-auth";
 import { mergeSalonSettingsSave, settingsForSalon } from "@/lib/whatsapp-credentials";
 import { backupExistingSalonData } from "@/lib/data-backup";
 import { invalidatePublicSalon } from "@/lib/public-salon-cache";
@@ -79,6 +79,26 @@ function protectOtherBranches(incoming: Json, stored: Json | null, ownBranch: st
   return { ...incoming, salon, locations, clinic: { ...incomingClinic, resources } };
 }
 
+/**
+ * A staff login's browser saves the whole settings object too, but staff only own the
+ * sections behind pages they were given. Everything else — salon details, payment
+ * accounts customers pay into, opening hours, branches, appearance — stays as stored.
+ */
+const STAFF_SECTIONS: [permission: string, sections: string[]][] = [
+  ["messages", ["whatsapp", "wasender", "birthday", "winback", "notifications"]],
+  ["loyalty", ["loyalty", "cashback"]],
+  ["rooms", ["clinic"]],
+];
+const ALWAYS_OWN = ["activeSection", "printer"];
+function keepOwnerSections(incoming: Json, stored: Json | null, actor: ResolvedActor): Json {
+  if (!stored) return incoming;
+  const allowed = new Set(ALWAYS_OWN);
+  for (const [permission, sections] of STAFF_SECTIONS) if (can(actor, permission)) sections.forEach((k) => allowed.add(k));
+  const out: Json = { ...stored };
+  for (const k of allowed) if (k in incoming) out[k] = incoming[k];
+  return out;
+}
+
 export async function POST(req: NextRequest) {
   const actor = await resolveActor(req);
   if (!actor) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -102,6 +122,7 @@ export async function POST(req: NextRequest) {
     let stored: Record<string, unknown> | null = null;
     try { stored = existing.rows.length ? JSON.parse(existing.rows[0].data as string) : null; } catch { stored = null; }
     let toSave = mergeSalonSettingsSave(data as Record<string, unknown>, stored);
+    if (actor.role === "staff" && !can(actor, "*")) toSave = keepOwnerSections(toSave, stored, actor);
     if (actor.role !== "owner" && actor.role !== "admin") toSave = protectOtherBranches(toSave, stored, actor.locationId);
     await db.execute({
       sql: "INSERT OR REPLACE INTO salon_data (entity, data, updated_at) VALUES (?, ?, ?)",
