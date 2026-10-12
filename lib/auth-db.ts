@@ -16,21 +16,17 @@ function hashPassword(plain: string): string {
   return `pbkdf2:${salt}:${hash}`;
 }
 
+// Only hashed passwords are accepted. The old plain-text form was upgraded on login and
+// no account had one left by 2026-10-12, so anything else is simply a wrong password.
 function verifyPassword(plain: string, stored: string): boolean {
-  if (stored.startsWith("pbkdf2:")) {
-    const parts = stored.split(":");
-    if (parts.length !== 3) return false;
-    const [, salt, expectedHash] = parts;
-    const derived = pbkdf2Sync(plain, salt, 120_000, 64, "sha512").toString("hex");
-    // Constant-time comparison to prevent timing attacks
-    try {
-      return timingSafeEqual(Buffer.from(derived, "hex"), Buffer.from(expectedHash, "hex"));
-    } catch { return false; }
-  }
-  // Legacy plaintext — accept and caller upgrades on next login
-  const a = Buffer.from(plain);
-  const b = Buffer.from(stored);
-  return a.length === b.length && timingSafeEqual(a, b);
+  const parts = stored.split(":");
+  if (parts.length !== 3 || parts[0] !== "pbkdf2") return false;
+  const [, salt, expectedHash] = parts;
+  const derived = pbkdf2Sync(plain, salt, 120_000, 64, "sha512").toString("hex");
+  // Constant-time comparison to prevent timing attacks
+  try {
+    return timingSafeEqual(Buffer.from(derived, "hex"), Buffer.from(expectedHash, "hex"));
+  } catch { return false; }
 }
 
 export { hashPassword, verifyPassword };
@@ -670,13 +666,6 @@ export async function validateCredentials(
       ? ` Reason given: ${user.freezeReason}.`
       : "";
     throw new Error(`Your account has been frozen by Salon Central.${reason} Please contact support to resolve this.`);
-  }
-  // Upgrade legacy plaintext password to hashed format on first successful login
-  if (!user.password.startsWith("pbkdf2:")) {
-    await db.execute({
-      sql: "UPDATE users SET password = ? WHERE id = ?",
-      args: [hashPassword(password), user.id],
-    });
   }
   return withoutPassword(user);
 }
