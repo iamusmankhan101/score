@@ -6,6 +6,7 @@
  * It never carries a password: the owner signs in with the one they chose (or Google).
  */
 import { Resend } from "resend";
+import { brandLogo } from "@/lib/email-logo";
 
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://app.saloncentral.xyz").replace(/\/$/, "");
 const SUPPORT_WHATSAPP = "923029646928";
@@ -15,8 +16,8 @@ function escapeHtml(value: string): string {
 }
 
 /** Names are optional: without them it greets "Hi there" and leaves the salon name out. */
-export function buildWelcomeEmail({ ownerName = "", salonName = "", email, pending = false }: {
-  ownerName?: string; salonName?: string; email: string; pending?: boolean;
+export function buildWelcomeEmail({ ownerName = "", salonName = "", email, pending = false, logoImg }: {
+  ownerName?: string; salonName?: string; email: string; pending?: boolean; logoImg: string;
 }) {
   const h = { salon: escapeHtml(salonName.trim()), email: escapeHtml(email) };
   const signInUrl = `${APP_URL}/sign-in`;
@@ -44,7 +45,7 @@ export function buildWelcomeEmail({ ownerName = "", salonName = "", email, pendi
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid #ece9f5">
       <tr>
         <td style="padding:20px 36px">
-          <img src="${APP_URL}/report-logo.png" alt="Salon Central" width="74" height="36" style="display:block;border:0;color:#7C3AED;font-size:18px;font-weight:900">
+          ${logoImg}
         </td>
         <td style="padding:20px 36px;text-align:right">
           ${pending
@@ -131,12 +132,14 @@ export async function sendWelcomeEmail(user: { email: string; ownerName?: string
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return console.error("[welcome-email] RESEND_API_KEY not configured");
   try {
-    const { subject, html, text } = buildWelcomeEmail({ ...user, pending: opts.pending });
+    const logo = await brandLogo();
+    const { subject, html, text } = buildWelcomeEmail({ ...user, pending: opts.pending, logoImg: logo.img });
     const { error } = await new Resend(apiKey).emails.send({
       from: "Salon Central <noreply@saloncentral.xyz>",
       replyTo: "support@saloncentral.xyz",
       to: [user.email],
       subject, html, text,
+      attachments: logo.attachments,
     });
     if (error) console.error(`[welcome-email] ${user.email}:`, error.message);
   } catch (err) {

@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "crypto";
 import { Resend } from "resend";
+import { brandLogo } from "@/lib/email-logo";
 import { db } from "@/lib/db";
 import { createDbSession, ensureAuthTables, type AuthUser } from "@/lib/auth-db";
 import { createSessionToken, COOKIE_NAME, cookieOptions, tokenId, getSecret } from "@/lib/session";
@@ -215,14 +216,16 @@ function maskEmail(email: string): string {
 async function emailCode(email: string, code: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error("RESEND_API_KEY not configured.");
+  const logo = await brandLogo("display:block;border:0;color:#7C3AED;font-weight:900");
   const { error } = await new Resend(apiKey).emails.send({
     from: "Salon Central <noreply@saloncentral.xyz>",
     to: [email],
     subject: `${code} is your Salon Central sign-in code`,
+    attachments: logo.attachments,
     text: `Your Salon Central sign-in code is ${code}\n\nIt expires in 10 minutes. If you didn't try to sign in, change your password — someone may know it.`,
     html: `<!DOCTYPE html><html><body style="margin:0;padding:24px 0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif">
   <div style="max-width:460px;margin:0 auto;background:#fff;border-radius:16px;border:1px solid #e8e8f0;overflow:hidden">
-    <div style="padding:20px 32px;border-bottom:1px solid #ece9f5"><img src="${(process.env.NEXT_PUBLIC_APP_URL || "https://app.saloncentral.xyz").replace(/\/$/, "")}/report-logo.png" alt="Salon Central" width="74" height="36" style="display:block;border:0;color:#7C3AED;font-weight:900"></div>
+    <div style="padding:20px 32px;border-bottom:1px solid #ece9f5">${logo.img}</div>
     <div style="padding:28px 32px;text-align:center">
       <div style="font-size:15px;color:#1a1a2e;font-weight:700">Your sign-in code</div>
       <div style="font-size:36px;font-weight:900;letter-spacing:10px;color:#5B21B6;margin:16px 0;padding:14px 0;background:#F5F3FF;border-radius:12px">${code}</div>

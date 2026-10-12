@@ -13,6 +13,7 @@ import { Resend } from "resend";
 import { db } from "@/lib/db";
 import { getAllActiveBillingUsers } from "@/lib/billing-db";
 import { generateDailyReportPdf } from "@/lib/report-pdf";
+import { brandLogo } from "@/lib/email-logo";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -225,8 +226,6 @@ const METHOD_LABELS: Record<string, string> = {
 
 // ─── Email builder ────────────────────────────────────────────────────────────
 
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://app.saloncentral.xyz").replace(/\/$/, "");
-
 function buildReportEmail(
   ownerName: string,
   salonName: string,
@@ -234,6 +233,7 @@ function buildReportEmail(
   invoices: SalonInvoice[],
   ledger: Ledger,
   hasSalonLogo = false,
+  logoImg = "",
 ): { subject: string; html: string; text: string } {
   const paid   = invoices.filter((i) => i.status === "paid");
   const unpaid = invoices.filter((i) => i.status === "unpaid");
@@ -362,7 +362,7 @@ function buildReportEmail(
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid #ece9f5">
       <tr>
         <td style="padding:20px 36px">
-          <img src="${APP_URL}/report-logo.png" alt="Salon Central" width="74" height="36" style="display:block;border:0;color:#7C3AED;font-size:18px;font-weight:900">
+          ${logoImg}
         </td>
         <td style="padding:20px 36px;text-align:right">
           <span style="display:inline-block;background:#F5F3FF;color:#6D28D9;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;padding:5px 10px;border-radius:999px">Daily Sales Report</span>
@@ -516,7 +516,8 @@ export async function GET(req: NextRequest) {
     const toEmail = settings?.salon?.email || user.email;
 
     const salonLogo = await loadSalonLogo(settings?.salon?.logo);
-    const { subject, html, text } = buildReportEmail(user.ownerName, salonName, today, invoices, ledger, !!salonLogo);
+    const brand = await brandLogo();
+    const { subject, html, text } = buildReportEmail(user.ownerName, salonName, today, invoices, ledger, !!salonLogo, brand.img);
 
     // Generate PDF attachment
     let pdfBuffer: Buffer | undefined;
@@ -540,6 +541,7 @@ export async function GET(req: NextRequest) {
         attachments: [
           ...(pdfBuffer ? [{ filename, content: pdfBuffer }] : []),
           ...(salonLogo ? [{ filename: "salon-logo.png", content: salonLogo, contentId: "salon-logo" }] : []),
+          ...brand.attachments,
         ],
       });
 
