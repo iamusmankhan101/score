@@ -35,6 +35,10 @@ import { TimeSelect } from "@/components/time-select";
 import { returnToStock, settleServiceConsumption, settledConsumption } from "@/lib/inventory-consumption";
 import { assignResources, resourcesAt, type ClinicResource } from "@/lib/clinic-resources";
 import { getActiveLocationFilter } from "@/lib/locations";
+import { WaitlistOffer, waitlistMatches } from "@/components/waitlist-offer";
+import { canAccessHref } from "@/components/sidebar";
+import { getCurrentUser } from "@/lib/auth";
+import type { WaitlistEntry } from "@/lib/clinic";
 
 function fmtDate(s: string) {
   const [y, m, d] = s.split("-").map(Number);
@@ -1961,6 +1965,7 @@ export default function AppointmentsPage() {
   const [dateFilter, setDateFilter] = useState<string>("");
   const [sortBy, setSortBy] = useState<"apptDateDesc" | "apptDateAsc" | "createdDesc" | "createdAsc">("apptDateDesc");
   const [selected, setSelected] = useState<Appointment | null>(null);
+  const [freedSlot, setFreedSlot] = useState<{ appt: Appointment; matches: WaitlistEntry[] } | null>(null);
   const paymentProofs = usePaymentProofs();
   const [showFilters, setShowFilters] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -2158,6 +2163,10 @@ export default function AppointmentsPage() {
 
             if (newStatus === "cancelled" || newStatus === "no-show") {
               enqueueWhatsAppCancellation(apptId);
+              // Offer the freed slot to the first people on the waiting list.
+              const appt = appointments.find((a) => a.id === apptId);
+              const matches = appt && canAccessHref(getCurrentUser(), "/dashboard/waitlist") ? waitlistMatches(appt.date) : [];
+              if (appt && matches.length) setFreedSlot({ appt, matches });
             }
             if (newStatus === "completed") {
               enqueueWhatsAppFollowup(apptId);
@@ -2178,6 +2187,7 @@ export default function AppointmentsPage() {
           }}
         />
       )}
+      {freedSlot && <WaitlistOffer appt={freedSlot.appt} matches={freedSlot.matches} onClose={() => setFreedSlot(null)} />}
       {showCreate && (
         <CreateModal
           onClose={() => setShowCreate(false)}

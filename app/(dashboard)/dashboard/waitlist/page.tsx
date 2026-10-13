@@ -10,14 +10,11 @@ import { useEffect, useState } from "react";
 import { Check, Hourglass, Plus, Send, Trash2, X } from "lucide-react";
 import PageTitle from "@/components/page-title";
 import { getStoredClients, subscribeToStoredData } from "@/lib/storage";
-import { settingsStore } from "@/lib/settings-store";
-import { getCurrentPlan } from "@/lib/plan-limits";
-import { normalizePhone, whatsAppConnected } from "@/lib/whatsapp-scheduler";
+import { canAutoSend, fmtWaitDate as fmtDate, sendWaitlistMessage, waitlistMessage as message, waLink } from "@/components/waitlist-offer";
 import { getWaitlist, newId, removeRecord, saveWaitlist, todayKey, upsertRecord, type WaitlistEntry } from "@/lib/clinic";
 import type { Client } from "@/lib/types";
 
 const INP: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: 9, border: "1px solid #e4e4ee", fontSize: 13, color: "#1a1a2e", outline: "none", background: "#fff" };
-const fmtDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-PK", { weekday: "short", day: "numeric", month: "short" });
 
 export default function WaitlistPage() {
   const [list, setList] = useState<WaitlistEntry[]>([]);
@@ -31,21 +28,16 @@ export default function WaitlistPage() {
   useEffect(() => {
     const load = () => { setList(getWaitlist()); setClients(getStoredClients()); };
     load();
-    setAuto(getCurrentPlan().whatsapp && whatsAppConnected(settingsStore.wasender as Parameters<typeof whatsAppConnected>[0]));
+    setAuto(canAutoSend());
     return subscribeToStoredData(load);
   }, []);
 
-  const salonName = (settingsStore.salon as { name?: string }).name || "us";
-  const message = (e: WaitlistEntry) =>
-    `Hi ${e.name.split(" ")[0]}, a slot has opened up at ${salonName}${e.preferredDate ? ` on ${fmtDate(e.preferredDate)}` : ""} for ${e.wants}. Reply to book it — first come, first served!`;
   const save = (e: WaitlistEntry) => setList(upsertRecord(getWaitlist, saveWaitlist, e));
 
   async function notify(e: WaitlistEntry) {
     setSent((s) => ({ ...s, [e.id]: "sending" }));
     try {
-      const res = await fetch("/api/clinic/whatsapp-send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "text", phone: e.phone, text: message(e) }) });
-      const d = await res.json() as { ok?: boolean; error?: string };
-      if (!d.ok) throw new Error(d.error || "Send failed");
+      await sendWaitlistMessage(e, message(e));
       setSent((s) => ({ ...s, [e.id]: "sent" }));
     } catch (err) {
       setSent((s) => ({ ...s, [e.id]: err instanceof Error ? err.message : "Send failed" }));
@@ -85,7 +77,7 @@ export default function WaitlistPage() {
                 <Send size={13} /> {sent[e.id] === "sent" ? "Sent ✓" : sent[e.id] === "sending" ? "Sending…" : "Slot opened — notify"}
               </button>
             ) : (
-              <a href={`https://wa.me/${normalizePhone(e.phone)}?text=${encodeURIComponent(message(e))}`} target="_blank" rel="noopener noreferrer"
+              <a href={waLink(e, message(e))} target="_blank" rel="noopener noreferrer"
                 style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 11px", borderRadius: 8, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#15803d", fontSize: 12, fontWeight: 800, textDecoration: "none" }}>
                 <Send size={13} /> Slot opened — notify
               </a>
