@@ -615,75 +615,83 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   // Auth guard
   useEffect(() => {
     const timer = window.setTimeout(async () => {
-      const user = getCurrentUser();
-      if (!user) {
-        router.replace("/sign-in");
-        return;
-      }
-      // A platform admin is not a salon account — no salon features exist for
-      // them. Any salon route (including the salon dashboard) bounces to the
-      // admin panel, and only /dashboard/admin is reachable.
-      if (user.role === "admin" && !pathname.startsWith("/dashboard/admin")) {
-        router.replace("/dashboard/admin");
-        return;
-      }
-      if (user.role === "staff") {
-        if (user.locationId) setActiveLocationFilter(user.locationId);
-        const key = pathname === "/dashboard"
-          ? "dashboard"
-          : pathname.replace("/dashboard/", "").split("/")[0];
-        
-        // Check owner-only routes
-        const ownerOnlyRoutes = ["account", "billing", "admin", "migrate", "settings"];
-        if (ownerOnlyRoutes.includes(key)) {
-          router.replace("/dashboard");
-          return;
-        }
-        
-        const permissions = user.permissions || [];
-        if (!permissions.includes("*") && !permissions.includes(key)) {
-          router.replace("/dashboard");
-          return;
-        }
-      }
-      
-      // Manager can access most pages, but not owner-only pages
-      if (user.role === "manager") {
-        // Pinned to their assigned branch client-side too, matching the
-        // server-side pin in resolveActor() — otherwise the branch switcher
-        // (or a stale local selection) could point local reads/writes at a
-        // different branch than what the server actually scopes their data to.
-        if (user.locationId) setActiveLocationFilter(user.locationId);
-        const key = pathname === "/dashboard"
-          ? "dashboard"
-          : pathname.replace("/dashboard/", "").split("/")[0];
-        const ownerOnlyRoutes = ["admin", "billing", "migrate"];
-        if (ownerOnlyRoutes.includes(key)) {
-          router.replace("/dashboard");
-          return;
-        }
-      }
-
-      // Staff and managers inherit the salon owner's subscription. Fetch the
-      // authoritative plan before rendering so limits never fall back to Free
-      // on a different browser/device with an empty local cache.
-      const dataOwnerId = user.salonOwnerId || user.id;
-      let resolvedPlanId: PlanId = getCurrentPlanId();
+      // Anything thrown below used to leave "Loading workspace..." up forever.
       try {
-        const response = await fetch(`/api/billing/user?userId=${encodeURIComponent(dataOwnerId)}`);
-        const data = await response.json() as { ok?: boolean; planId?: string };
-        if (data.ok && data.planId) {
-          setActivePlan(data.planId);
-          resolvedPlanId = data.planId as PlanId;
+        const user = getCurrentUser();
+        if (!user) {
+          router.replace("/sign-in");
+          return;
         }
-      } catch {
-        // Keep the last cached plan when offline.
+        // A platform admin is not a salon account — no salon features exist for
+        // them. Any salon route (including the salon dashboard) bounces to the
+        // admin panel, and only /dashboard/admin is reachable.
+        if (user.role === "admin" && !pathname.startsWith("/dashboard/admin")) {
+          router.replace("/dashboard/admin");
+          return;
+        }
+        if (user.role === "staff") {
+          if (user.locationId) setActiveLocationFilter(user.locationId);
+          const key = pathname === "/dashboard"
+            ? "dashboard"
+            : pathname.replace("/dashboard/", "").split("/")[0];
+          
+          // Check owner-only routes
+          const ownerOnlyRoutes = ["account", "billing", "admin", "migrate", "settings"];
+          if (ownerOnlyRoutes.includes(key)) {
+            router.replace("/dashboard");
+            return;
+          }
+          
+          // Never bounce /dashboard to itself — the path wouldn't change, so this effect
+          // wouldn't run again and the loading screen would never clear.
+          const permissions = user.permissions || [];
+          if (key !== "dashboard" && !permissions.includes("*") && !permissions.includes(key)) {
+            router.replace("/dashboard");
+            return;
+          }
+        }
+        
+        // Manager can access most pages, but not owner-only pages
+        if (user.role === "manager") {
+          // Pinned to their assigned branch client-side too, matching the
+          // server-side pin in resolveActor() — otherwise the branch switcher
+          // (or a stale local selection) could point local reads/writes at a
+          // different branch than what the server actually scopes their data to.
+          if (user.locationId) setActiveLocationFilter(user.locationId);
+          const key = pathname === "/dashboard"
+            ? "dashboard"
+            : pathname.replace("/dashboard/", "").split("/")[0];
+          const ownerOnlyRoutes = ["admin", "billing", "migrate"];
+          if (ownerOnlyRoutes.includes(key)) {
+            router.replace("/dashboard");
+            return;
+          }
+        }
+
+        // Staff and managers inherit the salon owner's subscription. Fetch the
+        // authoritative plan before rendering so limits never fall back to Free
+        // on a different browser/device with an empty local cache.
+        const dataOwnerId = user.salonOwnerId || user.id;
+        let resolvedPlanId: PlanId = getCurrentPlanId();
+        try {
+          const response = await fetch(`/api/billing/user?userId=${encodeURIComponent(dataOwnerId)}`, { signal: AbortSignal.timeout(8000) });
+          const data = await response.json() as { ok?: boolean; planId?: string };
+          if (data.ok && data.planId) {
+            setActivePlan(data.planId);
+            resolvedPlanId = data.planId as PlanId;
+          }
+        } catch {
+          // Keep the last cached plan when offline or the server is slow.
+        }
+        if (resolvedPlanId !== "premium") {
+          const mainLocationId = getSalonLocations()[0]?.id ?? "main";
+          if (getActiveLocationFilter() !== mainLocationId) setActiveLocationFilter(mainLocationId);
+        }
+        setIsReady(true);
+      } catch (err) {
+        console.error("[dashboard] start-up failed:", err);
+        setIsReady(true);
       }
-      if (resolvedPlanId !== "premium") {
-        const mainLocationId = getSalonLocations()[0]?.id ?? "main";
-        if (getActiveLocationFilter() !== mainLocationId) setActiveLocationFilter(mainLocationId);
-      }
-      setIsReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [router, pathname]);
