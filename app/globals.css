@@ -641,7 +641,9 @@ input, textarea, select { font-family: inherit; }
     bottom: 0;
     left: 0;
     right: 0;
-    height: 64px;
+    /* 64px of tabs plus the home-indicator strip. Everything is border-box, so a plain
+       64px with the inset as padding squeezed the icons and labels into ~30px on iPhone. */
+    height: calc(64px + env(safe-area-inset-bottom, 0px));
     background: rgba(19, 19, 26, 0.94);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);

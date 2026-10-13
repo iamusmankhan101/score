@@ -1154,7 +1154,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       <OfflineStatus />
 
       {/* Bottom-right persistent alert badges (stacked) */}
-      <div style={{ position: "fixed", bottom: 90, right: 16, zIndex: 90, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+      <div style={{ position: "fixed", bottom: "calc(90px + env(safe-area-inset-bottom, 0px))", right: 16, zIndex: 90, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
 
         {/* Salon Central subscription invoice reminder */}
         {unpaidInvoice && !invoiceBadgeDismissed && (
