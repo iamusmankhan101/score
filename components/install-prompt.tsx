@@ -35,7 +35,10 @@ function isStandalone(): boolean {
   );
 }
 
-export default function InstallPrompt({ accent = "#7C3AED" }: { accent?: string }) {
+export default function InstallPrompt({
+  accent = "#7C3AED",
+  iosNote = "On iPhone, offers and appointment reminders can only be delivered from the installed app.",
+}: { accent?: string; iosNote?: string }) {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(true);   // assume installed until mounted
   const [isIos, setIsIos] = useState(false);
@@ -137,7 +140,7 @@ export default function InstallPrompt({ accent = "#7C3AED" }: { accent?: string 
               <li>Tap <strong>Add</strong> — then open the app from your Home Screen</li>
             </ol>
             <p style={{ margin: "14px 0 0", fontSize: 12.5, lineHeight: 1.6, color: "#9898b0" }}>
-              On iPhone, offers and appointment reminders can only be delivered from the installed app.
+              {iosNote}
             </p>
           </div>
         </div>
