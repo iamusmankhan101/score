@@ -2216,6 +2216,8 @@ const PERMISSION_OPTIONS = [
   { key: "aftercare", label: "Aftercare (clinic)" },
   { key: "waitlist", label: "Waiting List" },
   { key: "clinic-reports", label: "Clinic Reports (clinic)" },
+  // Not a page: lets this login delete invoices/sales, clients, staff and services.
+  { key: "delete", label: "Can delete records" },
 ];
 
 /** One-tap starting points for common clinic and salon jobs; ticks can still be changed after. */
@@ -2480,6 +2482,9 @@ function RolesPermissionsSection() {
                         </button>
                       );
                     })}
+                  </div>
+                  <div style={{ color: "#77728a", fontSize: 11.5, marginTop: 10 }}>
+                    &ldquo;Can delete records&rdquo; lets them delete invoices, sales, clients, staff and services. Without it they can still add and edit.
                   </div>
                 </div>
 

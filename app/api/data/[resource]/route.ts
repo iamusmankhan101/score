@@ -13,7 +13,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { ensureAllTables } from "@/lib/db-schema";
-import { resolveActor } from "@/lib/api-auth";
+import { can, resolveActor } from "@/lib/api-auth";
 
 const VALID_RESOURCES = [
   "appointments",
@@ -193,6 +193,10 @@ export async function DELETE(
 
   const actor = await resolveActor(req);
   if (!actor) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+
+  if (["clients", "staff", "services", "invoices"].includes(resource) && !can(actor, "delete")) {
+    return Response.json({ ok: false, error: "You don't have permission to delete." }, { status: 403 });
+  }
 
   const id = req.nextUrl.searchParams.get("id");
   if (!id) {

@@ -11,6 +11,7 @@ const ALL_PERMISSION_KEYS = new Set([
   "revenue", "cash-flow", "inventory", "services", "staff", "attendance", "payouts", "messages", "try-on",
   "account", "billing",
   "medical", "consent-forms", "leads", "rooms", "aftercare", "waitlist", "clinic-reports",
+  "delete",
 ]);
 
 /** The branch a manager administers; owners aren't limited to one. */

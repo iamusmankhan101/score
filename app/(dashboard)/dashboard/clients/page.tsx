@@ -34,6 +34,7 @@ const TAG_COLORS: Record<string, { color: string; bg: string }> = {
 };
 
 import { fmtCurrency as fmt } from "@/lib/format";
+import { useCanDelete } from "@/lib/auth";
 
 function fmtDate(s?: string) {
   if (!s) return "—";
@@ -172,6 +173,7 @@ function DeleteConfirmModal({ clientName, onConfirm, onCancel }: { clientName: s
 // ── Client Detail Panel ───────────────────────────────────────────────────────
 function ClientPanel({ client, onClose, appointments, locations, onUpdate, onDelete }: { client: Client; onClose: () => void; appointments: Appointment[]; locations: SalonLocation[]; onUpdate?: (c: Client) => void; onDelete?: (id: string) => void }) {
   const panelRouter = useRouter();
+  const canDelete = useCanDelete();
   const allClientAppts   = appointments.filter((a) => a.clientId === client.id);
   const completedAppts   = allClientAppts.filter((a) => a.status === "completed").sort((a, b) => b.date.localeCompare(a.date));
   const posInvoices      = getSalonInvoices().filter((inv) => inv.clientId === client.id && inv.source === "pos");
@@ -270,9 +272,11 @@ function ClientPanel({ client, onClose, appointments, locations, onUpdate, onDel
                 Edit
               </button>
             )}
+            {canDelete && (
             <button onClick={() => setShowDeleteConfirm(true)} title="Delete client" style={{ display: "flex", alignItems: "center", padding: "5px 8px", borderRadius: 7, border: "1px solid #fecaca", background: "#fef2f2", cursor: "pointer" }}>
               <Trash2 size={13} color="#dc2626" />
             </button>
+            )}
             <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", display: "flex" }}>
               <X size={18} color="#6b6b8a" />
             </button>
@@ -1010,6 +1014,7 @@ function ImportModal({ existing, onClose, onImport }: {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ClientsPage() {
+  const canDelete = useCanDelete();
   const clinic = useIsClinic();
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
@@ -1247,7 +1252,7 @@ export default function ClientsPage() {
           }
         />
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {clients.length > 0 && (
+          {canDelete && clients.length > 0 && (
             <button
               onClick={() => setShowDeleteAll(true)}
               style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 16px", borderRadius: 12, border: "1px solid #fecaca", background: "#fef2f2", fontSize: 13, fontWeight: 750, color: "#dc2626", cursor: "pointer", transition: "all 0.15s" }}
@@ -1396,11 +1401,13 @@ export default function ClientsPage() {
       {someFilteredSelected && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderRadius: 12, background: "#1a1a2e", color: "#fff", boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
           <span style={{ fontSize: 13, fontWeight: 700 }}>{selectedIds.size} client{selectedIds.size !== 1 ? "s" : ""} selected</span>
+          {canDelete && (
           <button
             onClick={() => setShowDeleteSelected(true)}
             style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, border: "none", background: "#dc2626", fontSize: 12, fontWeight: 800, color: "#fff", cursor: "pointer" }}>
             <Trash2 size={13} /> Delete Selected
           </button>
+          )}
           <button
             onClick={() => setSelectedIds(new Set())}
             style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: "#ccc", fontSize: 12, fontWeight: 750, cursor: "pointer" }}>
@@ -1507,6 +1514,7 @@ export default function ClientsPage() {
                 >
                   <ExternalLink size={11} /> View
                 </button>
+                {canDelete && (
                 <button
                   type="button"
                   aria-label={`Delete ${client.name}`}
@@ -1520,6 +1528,7 @@ export default function ClientsPage() {
                 >
                   <Trash2 size={12} color="#dc2626" />
                 </button>
+                )}
               </div>
             </div>
           );
@@ -1573,6 +1582,7 @@ export default function ClientsPage() {
                     >
                       <ExternalLink size={12} color="#6b6b8a" />
                     </button>
+                    {canDelete && (
                     <button
                       type="button"
                       aria-label={`Delete ${client.name}`}
@@ -1581,6 +1591,7 @@ export default function ClientsPage() {
                     >
                       <Trash2 size={12} color="#dc2626" />
                     </button>
+                    )}
                   </div>
                 </div>
               </div>

@@ -26,6 +26,7 @@ const PRESET_CATEGORIES = ["hair", "skin", "nails", "bridal", "piercing", "packa
 const catLabel = (cat: string) => CATEGORY_LABELS[cat]?.label ?? (cat.charAt(0).toUpperCase() + cat.slice(1));
 
 import { fmtCurrency as fmt } from "@/lib/format";
+import { useCanDelete } from "@/lib/auth";
 
 const SERVICE_EXPORT_COLS = [
   "Service ID", "Name", "Description", "Category", "Sub-category", "Section", "Duration (Min)",
@@ -940,6 +941,7 @@ function DeleteConfirmModal({ name, onConfirm, onCancel }: { name: string; onCon
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ServicesPage() {
+  const canDelete = useCanDelete();
   const clinic = useIsClinic();
   const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -1296,10 +1298,12 @@ export default function ServicesPage() {
                       className="hover-bg-light">
                       <Pencil size={14} color="#7C3AED" />
                     </button>
+                    {canDelete && (
                     <button type="button" onClick={() => setDeleteTarget(sv)} aria-label={`Delete ${sv.name}`}
                       style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #fee2e2", background: "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.15s" }}>
                       <Trash2 size={14} color="#dc2626" />
                     </button>
+                    )}
                     <button type="button" onClick={() => toggleServiceStatus(sv.id)} aria-label={`${sv.isActive ? "Deactivate" : "Activate"} ${sv.name}`} aria-pressed={sv.isActive} style={{ width: 40, height: 20, padding: 0, border: "none", borderRadius: 10, background: sv.isActive ? "#059669" : "#e0e0ec", cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
                       <div style={{ position: "absolute", top: 2, left: sv.isActive ? 22 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
                     </button>

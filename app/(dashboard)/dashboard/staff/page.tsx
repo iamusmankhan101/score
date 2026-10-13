@@ -28,6 +28,7 @@ import { upsellInPeriod, upsellIncentive } from "@/lib/upsell";
 import { getSalonInvoices, type SalonInvoice } from "@/lib/salon-invoices";
 import ShiftFields from "@/components/shift-fields";
 import WeeklyOffFields from "@/components/weekly-off-fields";
+import { useCanDelete } from "@/lib/auth";
 
 /**
  * Appointment count and revenue for one staff member's card.
@@ -614,6 +615,7 @@ function DeleteConfirmModal({ name, onConfirm, onCancel }: { name: string; onCon
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function StaffPage() {
+  const canDelete = useCanDelete();
   const router = useRouter();
   const [showAdd, setShowAdd]       = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
@@ -912,6 +914,7 @@ export default function StaffPage() {
                   >
                     <Pencil size={13} color="#7C3AED" />
                   </button>
+                  {canDelete && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setDeleteTarget(s); }}
                     aria-label={`Delete ${s.name}`}
@@ -919,6 +922,7 @@ export default function StaffPage() {
                   >
                     <Trash2 size={13} color="#dc2626" />
                   </button>
+                  )}
                 </div>
               </div>
 

@@ -33,6 +33,8 @@ const mayRead = (actor: ResolvedActor, entity: string) => !ENTITY_PERMISSIONS[en
 const EXTRA_WRITERS: Record<string, string[]> = { staff: ["staff", "attendance"], expenses: ["invoices"] };
 const mayWrite = (actor: ResolvedActor, entity: string) =>
   entity === "staff" ? can(actor, ...EXTRA_WRITERS.staff) : mayRead(actor, entity) || can(actor, ...(EXTRA_WRITERS[entity] ?? []));
+// Removing these needs the "Delete records" tick (owners and managers always may).
+const DELETE_GATED = new Set(["salon_invoices", "clients", "staff", "services"]);
 const PAY_FIELDS = ["payType", "commissionRate", "baseSalary", "upsellCommissionRate"];
 const seesPay = (actor: ResolvedActor) => can(actor, "staff", "payouts");
 function withoutPay(list: unknown[]): unknown[] {
@@ -300,6 +302,7 @@ export async function POST(req: NextRequest) {
       // Deleting needs the page itself: Attendance can't remove staff, Invoices can't remove expenses.
       const incoming = payload.filter((t) => {
         const target = String((t as { entity?: unknown })?.entity ?? "");
+        if (DELETE_GATED.has(target) && !can(actor, "delete")) return false;
         return target === "staff" ? can(actor, "staff") : mayRead(actor, target);
       });
       const byId = new Map<string, unknown>();

@@ -6,7 +6,7 @@ import {
   ReceiptText, ShoppingCart, TrendingUp, Users, MessageSquare, RotateCcw, X,
 } from "lucide-react";
 import { addExpense } from "@/lib/expenses";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, useCanDelete } from "@/lib/auth";
 import {
   getSalonInvoices, deleteSalonInvoice, cancelInvoiceOnFbr, markSalonInvoicePaid, updateSalonInvoice, localDateKey, balanceDue, advancePercent,
   paymentMethodLabel, refundedTotal, revenueAmount, type SalonInvoice,
@@ -79,6 +79,7 @@ function StatCard({ label, value, sub, color = "var(--accent)", bg = "rgba(124, 
 }
 
 export default function InvoicesPage() {
+  const canDelete = useCanDelete();
   const [invoices, setInvoices]         = useState<SalonInvoice[]>([]);
   const [search, setSearch]             = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "paid" | "unpaid">("all");
@@ -702,6 +703,7 @@ export default function InvoicesPage() {
                           <RotateCcw size={14} color="#b45309" />
                         </button>
                       )}
+                      {canDelete && (
                       <button
                         onClick={() => setDeleteConfirm(inv.id)}
                         title="Delete"
@@ -710,6 +712,7 @@ export default function InvoicesPage() {
                       >
                         <Trash2 size={14} color="#dc2626" />
                       </button>
+                      )}
                     </div>
                   </div>
                 );
