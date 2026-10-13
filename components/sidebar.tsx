@@ -13,6 +13,7 @@ import {
 import { businessTypeOf, term, useIsClinic } from "@/lib/clinic";
 import { AuthUser, getCurrentUser, signOut } from "@/lib/auth";
 import InstallPrompt from "@/components/install-prompt";
+import BookingAlertsToggle from "@/components/booking-alerts-toggle";
 import { SETTINGS_CHANGED_EVENT, settingsStore, reloadSettings } from "@/lib/settings-store";
 import { getCurrentPlan } from "@/lib/plan-limits";
 import { getActiveLocationFilter, getSalonLocations, setActiveLocationFilter, type SalonLocation } from "@/lib/locations";
@@ -521,6 +522,8 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
           <div style={{ margin: "0 0 8px" }}>
             <InstallPrompt iosNote="Once installed, Salon Central opens full-screen from your Home Screen, like a normal app." />
           </div>
+          {/* Alerts carry client names: only for logins that can see bookings. */}
+          {user && (canAccessHref(user, "/dashboard/appointments") || canAccessHref(user, "/dashboard/calendar")) && <BookingAlertsToggle />}
           <button onClick={handleSignOut} className="sb-signout">
             <LogOut size={13} />
             Sign out

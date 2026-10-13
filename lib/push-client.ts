@@ -81,8 +81,10 @@ async function fetchVapidPublicKey(): Promise<string> {
  * and an extra prompt would just confuse the customer.
  */
 export async function subscribeToPush(params: {
-  salonId: string;
+  salonId?: string;
   clientId?: string | null;
+  /** A signed-in staff phone: saved for new-booking alerts instead of customer offers. */
+  staff?: boolean;
 }): Promise<SubscribeResult> {
   const support = checkPushSupport();
   if (!support.supported) return { ok: false, error: support.reason };
@@ -112,7 +114,7 @@ export async function subscribeToPush(params: {
       });
     }
 
-    const res = await fetch("/api/subscribe", {
+    const res = await fetch(params.staff ? "/api/push/staff" : "/api/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

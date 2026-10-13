@@ -615,7 +615,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   // Auth guard
   useEffect(() => {
     const timer = window.setTimeout(async () => {
-      // Anything thrown below used to leave "Loading workspace..." up forever.
+      // Anything thrown below used to leave the loading screen up forever.
       try {
         const user = getCurrentUser();
         if (!user) {
@@ -982,8 +982,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   if (!isReady) {
     return (
-      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#f7f7fb", color: "#7C3AED", fontSize: 13, fontWeight: 700 }}>
-        Loading workspace...
+      // White to match the logo and the installed app's launch screen (manifest background_color).
+      <div role="status" aria-label="Loading Salon Central" style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#fff" }}>
+        <img src="/salon-central-logo.png" alt="Salon Central" width={180} height={180} style={{ animation: "splashBreath 1.8s ease-in-out infinite" }} />
       </div>
     );
   }

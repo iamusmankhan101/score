@@ -307,3 +307,33 @@ export async function broadcastToSalon(
   const subs = await listSubscriptions(userId, clientId);
   return sendPushToSubscriptions(subs, payload);
 }
+
+// ─── Staff booking alerts ─────────────────────────────────────────────────────
+
+/**
+ * Staff phones share the table but sit under "staff:<ownerId>", so a customer
+ * broadcast (listSubscriptions(ownerId)) can never reach them. client_id holds the
+ * branch the login works at, or "all" for the owner.
+ */
+export const staffPushKey = (ownerId: string) => `staff:${ownerId}`;
+
+/** "New booking" on the phones of everyone at that branch who turned alerts on. */
+export async function notifyStaffOfBooking(
+  ownerId: string,
+  appt: { id: string; clientName: string; serviceNames: string[]; date: string; startTime: string },
+  locationId = "main",
+): Promise<void> {
+  if (!isPushConfigured()) return;
+  const subs = (await listSubscriptions(staffPushKey(ownerId)))
+    .filter((s) => s.clientId === "all" || s.clientId === locationId);
+  if (subs.length === 0) return;
+  const [h, m] = appt.startTime.split(":").map(Number);
+  const time = `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+  const date = new Date(`${appt.date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  await sendPushToSubscriptions(subs, {
+    title: "New booking",
+    body: `${appt.clientName} · ${appt.serviceNames.join(", ")} · ${date}, ${time}`,
+    url: "/dashboard/appointments",
+    tag: `booking-${appt.id}`,
+  }, { urgency: "high" });
+}

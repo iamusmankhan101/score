@@ -12,6 +12,7 @@
 
 import { assignResources, resourcesAt, type ClinicResource } from "./clinic-resources";
 import { db } from "./db";
+import { notifyStaffOfBooking } from "./push";
 import { backupExistingSalonData } from "./data-backup";
 import { activeWhatsAppCredential, isFakePlaceholderPhone, type WhatsAppProviderConfig, ycloudConfigOf } from "./whatsapp-provider";
 import { appointmentStartHasPassed, timezoneFromSettings } from "./appointment-time";
@@ -142,6 +143,10 @@ export async function createBooking(
     console.log(`[booking] Duplicate submission for appointment ${appointment.id} — skipping WhatsApp sends`);
     return { ok: true, duplicate: true };
   }
+
+  // Phone alert for staff who turned it on. Online bookings land in the main branch.
+  await notifyStaffOfBooking(salonId, appointment, "main")
+    .catch((err) => console.error("[booking] staff push failed:", err));
 
   try {
     const settingsRow = await db.execute({ sql: "SELECT data FROM salon_data WHERE entity = ?", args: [`${salonId}_settings`] });

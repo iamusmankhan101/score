@@ -1148,6 +1148,12 @@ input, textarea, select { font-family: inherit; }
   50%       { transform: scale(1.04); box-shadow: 0 6px 28px rgba(220,38,38,0.55), 0 0 0 6px rgba(220,38,38,0.08); }
 }
 
+/* Startup logo on the dashboard loading screen */
+@keyframes splashBreath {
+  0%, 100% { opacity: 0.75; transform: scale(0.97); }
+  50%      { opacity: 1;    transform: scale(1); }
+}
+
 /* ── Custom Dashboard UI Enhancements ── */
 @keyframes pulse {
   0% { transform: scale(0.92); opacity: 0.8; }

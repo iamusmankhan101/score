@@ -1,3 +1,5 @@
+import { unsubscribeFromPush } from "@/lib/push-client";
+
 export interface AuthUser {
   id: string;
   ownerName: string;
@@ -256,6 +258,14 @@ export async function signOut() {
   } catch {
     /* no worker registered, or messaging blocked — nothing cached to clear */
   }
+
+  // A shared salon phone shouldn't keep getting the last login's booking alerts.
+  try {
+    if (localStorage.getItem("sc_staff_push_endpoint")) {
+      localStorage.removeItem("sc_staff_push_endpoint");
+      await unsubscribeFromPush();
+    }
+  } catch { /* best effort */ }
 
   try {
     await fetch("/api/auth/signout", {
