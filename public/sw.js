@@ -39,7 +39,7 @@
  * Bump SW_VERSION whenever this file changes so clients drop the old caches.
  */
 
-const SW_VERSION    = "v2";
+const SW_VERSION    = "v3";
 const OFFLINE_CACHE = `salon-central-offline-${SW_VERSION}`;
 const SHELL_CACHE   = `salon-central-shell-${SW_VERSION}`;
 const ASSET_CACHE   = `salon-central-assets-${SW_VERSION}`;

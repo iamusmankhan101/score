@@ -259,14 +259,6 @@ export async function signOut() {
     /* no worker registered, or messaging blocked — nothing cached to clear */
   }
 
-  // A shared salon phone shouldn't keep getting the last login's booking alerts.
-  try {
-    if (localStorage.getItem("sc_staff_push_endpoint")) {
-      localStorage.removeItem("sc_staff_push_endpoint");
-      await unsubscribeFromPush();
-    }
-  } catch { /* best effort */ }
-
   try {
     await fetch("/api/auth/signout", {
       method: "POST",
@@ -277,6 +269,15 @@ export async function signOut() {
     // The local session is already cleared. A later server request will still
     // enforce the remaining cookie until connectivity is restored.
   }
+
+  // A shared salon phone shouldn't keep getting the last login's booking alerts.
+  // After the cookie is cleared, and time-boxed: a stalled worker must never hold up sign-out.
+  try {
+    if (localStorage.getItem("sc_staff_push_endpoint")) {
+      localStorage.removeItem("sc_staff_push_endpoint");
+      await Promise.race([unsubscribeFromPush(), new Promise((r) => setTimeout(r, 3000))]);
+    }
+  } catch { /* best effort */ }
 }
 
 /**

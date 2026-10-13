@@ -8,7 +8,7 @@ import type { WaLogEntry } from "@/lib/whatsapp-scheduler";
 import Sidebar from "@/components/sidebar";
 import FloorTopBar from "@/components/floor-top-bar";
 import OfflineStatus from "@/components/offline-status";
-import { getCurrentUser, checkServerSession, signOut } from "@/lib/auth";
+import { getCurrentUser, checkServerSession, signOut, type AuthUser } from "@/lib/auth";
 import { applyAppearanceSettings, SETTINGS_CHANGED_EVENT, reloadSettings, settingsStore } from "@/lib/settings-store";
 import { runWhatsAppScheduler } from "@/lib/whatsapp-scheduler";
 import { startOfflineFlush, syncFromDB, syncLocalDataToDB } from "@/lib/turso-sync";
@@ -617,9 +617,23 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     const timer = window.setTimeout(async () => {
       // Anything thrown below used to leave the loading screen up forever.
       try {
-        const user = getCurrentUser();
+        let user = getCurrentUser();
+        // Cookie still valid but this browser lost its saved login (storage cleared, a sign-out
+        // cut short). /sign-in would bounce straight back here and the loading screen would never
+        // clear, so rebuild the saved login from the cookie — same as the Google sign-in bridge.
         if (!user) {
-          router.replace("/sign-in");
+          const data = await fetch("/api/auth/user", { signal: AbortSignal.timeout(8000) })
+            .then((r) => r.json()).catch(() => null) as { ok?: boolean; user?: AuthUser } | null;
+          if (data?.ok && data.user) {
+            localStorage.setItem("werzio_auth_session", data.user.id);
+            localStorage.setItem(`werzio_user_cache_${data.user.id}`, JSON.stringify(data.user));
+            user = data.user;
+          }
+        }
+        if (!user) {
+          // Clear the cookie first, or the sign-in page sends us straight back here.
+          await fetch("/api/auth/signout", { method: "POST" }).catch(() => {});
+          window.location.replace("/sign-in");
           return;
         }
         // A platform admin is not a salon account — no salon features exist for
