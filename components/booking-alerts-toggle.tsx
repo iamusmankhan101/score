@@ -2,8 +2,8 @@
 
 /**
  * "Booking alerts on this phone" — sidebar switch for staff phone notifications
- * (new online bookings). Hidden where the browser can't do push: on iPhone that
- * means until the app is added to the Home Screen.
+ * (new online bookings). Phones and tablets only, and hidden where the browser
+ * can't do push: on iPhone that means until the app is added to the Home Screen.
  */
 
 import { useEffect, useState } from "react";
@@ -18,6 +18,8 @@ export default function BookingAlertsToggle() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    // Phones and tablets only (touch, no mouse) — the alert is meant for the phone in a stylist's pocket.
+    if (!window.matchMedia("(hover: none) and (pointer: coarse)").matches) return;
     if (!checkPushSupport().supported) return;
     getExistingSubscription().then((sub) => {
       let saved: string | null = null;
