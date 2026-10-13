@@ -28,7 +28,7 @@ import { upsellInPeriod, upsellIncentive } from "@/lib/upsell";
 import { getSalonInvoices, type SalonInvoice } from "@/lib/salon-invoices";
 import ShiftFields from "@/components/shift-fields";
 import WeeklyOffFields from "@/components/weekly-off-fields";
-import { useCanDelete } from "@/lib/auth";
+import { useCanDelete } from "@/lib/use-can-delete";
 
 /**
  * Appointment count and revenue for one staff member's card.

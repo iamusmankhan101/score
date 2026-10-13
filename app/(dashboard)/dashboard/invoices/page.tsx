@@ -6,7 +6,8 @@ import {
   ReceiptText, ShoppingCart, TrendingUp, Users, MessageSquare, RotateCcw, X,
 } from "lucide-react";
 import { addExpense } from "@/lib/expenses";
-import { getCurrentUser, useCanDelete } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
+import { useCanDelete } from "@/lib/use-can-delete";
 import {
   getSalonInvoices, deleteSalonInvoice, cancelInvoiceOnFbr, markSalonInvoicePaid, updateSalonInvoice, localDateKey, balanceDue, advancePercent,
   paymentMethodLabel, refundedTotal, revenueAmount, type SalonInvoice,

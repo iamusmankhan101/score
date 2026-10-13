@@ -26,7 +26,7 @@ const PRESET_CATEGORIES = ["hair", "skin", "nails", "bridal", "piercing", "packa
 const catLabel = (cat: string) => CATEGORY_LABELS[cat]?.label ?? (cat.charAt(0).toUpperCase() + cat.slice(1));
 
 import { fmtCurrency as fmt } from "@/lib/format";
-import { useCanDelete } from "@/lib/auth";
+import { useCanDelete } from "@/lib/use-can-delete";
 
 const SERVICE_EXPORT_COLS = [
   "Service ID", "Name", "Description", "Category", "Sub-category", "Section", "Duration (Min)",

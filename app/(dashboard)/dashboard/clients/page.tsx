@@ -34,7 +34,7 @@ const TAG_COLORS: Record<string, { color: string; bg: string }> = {
 };
 
 import { fmtCurrency as fmt } from "@/lib/format";
-import { useCanDelete } from "@/lib/auth";
+import { useCanDelete } from "@/lib/use-can-delete";
 
 function fmtDate(s?: string) {
   if (!s) return "—";
