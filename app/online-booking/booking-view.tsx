@@ -23,6 +23,7 @@ import { getDefaultLocationId } from "@/lib/locations";
 import { busySlots, isSlotFree, resourcesFree, type BusySlot } from "@/lib/availability";
 import { buildTheme, resolveSalonTheme, type SalonTheme } from "@/lib/salon-theme";
 import { categoryLabel, groupByCategory, groupBySubcategory } from "@/lib/service-groups";
+import { newClientId } from "@/lib/ids";
 
 /** How far ahead the date row reaches. */
 const DAYS_AHEAD = 21;
@@ -268,7 +269,7 @@ function OnlineBookingInner({ salonIdOverride }: { salonIdOverride?: string }) {
     const existing = clients.find(
       (c) => normalizePhone(c.phone) === normalizedPhone
     );
-    let finalClientId = existing ? existing.id : createId("c");
+    let finalClientId = existing ? existing.id : newClientId();
     const newClientObj: Client | undefined = existing ? undefined : {
       id: finalClientId, name, phone: normalizedPhone, gender: "female",
       locationId: getDefaultLocationId(),

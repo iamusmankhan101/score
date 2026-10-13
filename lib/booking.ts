@@ -12,6 +12,7 @@
 
 import { assignResources, resourcesAt, type ClinicResource } from "./clinic-resources";
 import { db } from "./db";
+import { newClientId } from "./ids";
 import { notifyStaffOfBooking } from "./push";
 import { backupExistingSalonData } from "./data-backup";
 import { activeWhatsAppCredential, isFakePlaceholderPhone, type WhatsAppProviderConfig, ycloudConfigOf } from "./whatsapp-provider";
@@ -87,6 +88,12 @@ export async function createBooking(
   // alert even when the row itself collapses to one on write.
   const isDuplicateSubmission = existingAppts.some((a) => a.id === appointment.id);
   if (!isDuplicateSubmission) {
+    // A returning client (same phone) keeps their own record: book under their id, not a fresh one.
+    if (client) {
+      const digits = client.phone.replace(/\D/g, "");
+      const returning = (await loadList<Client>(`${salonId}_clients`)).find((c) => c.phone.replace(/\D/g, "") === digits);
+      if (returning) appointment = { ...appointment, clientId: returning.id };
+    }
     // Clinics: book the room/machine the treatment needs, or refuse the slot
     // when it's taken — the booking page offers slots by stylist only.
     const [settingsRow, servicesRow] = await Promise.all([
@@ -309,7 +316,9 @@ export async function cleanPublicBooking(salonId: string, body: { appointment?: 
   const named = [...new Set([a.staffId, ...(Array.isArray(a.staffIds) ? a.staffIds : [])].map(String))].filter((id) => team.has(id));
   const total = chosen.reduce((t, sv) => t + (Number(sv.price) || 0), 0);
   const minutes = chosen.reduce((t, sv) => t + (Number(sv.durationMin) || 0), 0) || 60;
-  const clientId = ID.test(String(a.clientId ?? "")) ? String(a.clientId) : newId("c");
+  // Never the browser's: a public request could otherwise pin its booking on someone else's
+  // client record. createBooking() points it at the existing record when the phone matches.
+  const clientId = newClientId();
 
   const appointment: Appointment = {
     id: ID.test(String(a.id ?? "")) ? String(a.id) : newId("a"),

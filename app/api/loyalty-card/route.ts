@@ -5,6 +5,7 @@ import { backupExistingSalonData } from "@/lib/data-backup";
 import { getTier, nextTierThreshold, pointsToRupees, type LoyaltySettings } from "@/lib/loyalty";
 import type { Client } from "@/lib/types";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { newClientId } from "@/lib/ids";
 
 interface SalonSettings {
   salon?: {
@@ -268,7 +269,7 @@ export async function POST(req: NextRequest) {
 
     if (!client) {
       client = {
-        id: `lc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        id: newClientId(),
         name: body.name?.trim() || "Loyalty Member",
         phone,
         email: body.email?.trim() || undefined,

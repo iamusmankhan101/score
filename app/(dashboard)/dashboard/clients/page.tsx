@@ -35,6 +35,7 @@ const TAG_COLORS: Record<string, { color: string; bg: string }> = {
 
 import { fmtCurrency as fmt } from "@/lib/format";
 import { useCanDelete } from "@/lib/use-can-delete";
+import { newClientId } from "@/lib/ids";
 
 function fmtDate(s?: string) {
   if (!s) return "—";
@@ -657,7 +658,7 @@ function AddClientModal({ onClose, onAdd, locations, allowLocationSelection, cli
   const handleAdd = () => {
     if (!canSubmit) return;
     const newClient: Client = {
-      id: "c_" + Date.now(),
+      id: newClientId(),
       name: form.name.trim(),
       phone: normalizePhone(form.phone),
       locationId: allowLocationSelection ? form.locationId : getDefaultLocationId(),
@@ -842,7 +843,7 @@ function ImportModal({ existing, onClose, onImport }: {
         const importedLocation = String(row["Location"] ?? row["location"] ?? row["Branch"] ?? "").trim();
         const matchedLocation = locations.find((location) => location.name.toLowerCase() === importedLocation.toLowerCase() || location.id === importedLocation);
         newClients.push({
-          id:          `imp_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+          id:          newClientId(),
           name,
           phone,
           locationId:   matchedLocation?.id ?? getDefaultLocationId(),

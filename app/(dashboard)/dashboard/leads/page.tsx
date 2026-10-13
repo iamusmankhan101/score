@@ -21,6 +21,7 @@ import {
   type Consultation, type Lead, type LeadStage,
 } from "@/lib/clinic";
 import type { Client } from "@/lib/types";
+import { newClientId } from "@/lib/ids";
 
 const INP: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: 9, border: "1px solid #e4e4ee", fontSize: 13, color: "#1a1a2e", outline: "none", background: "#fff" };
 const STAGE_COLOR: Record<LeadStage, string> = {
@@ -64,7 +65,7 @@ export default function LeadsPage() {
     let client = all.find((c) => phone && normalizePhone(c.phone) === phone);
     if (!client) {
       client = {
-        id: newId("c"), name: lead.name.trim(), phone, tags: ["New", lead.source], source: clientSourceFor(lead.source),
+        id: newClientId(), name: lead.name.trim(), phone, tags: ["New", lead.source], source: clientSourceFor(lead.source),
         createdAt: todayKey(), totalVisits: 0, totalSpend: 0, ...(lead.referredBy ? { referredBy: lead.referredBy } : {}),
       };
       saveClients([client, ...all]);

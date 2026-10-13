@@ -35,6 +35,7 @@ import { getSectionOptions, getActiveSection, inSection } from "@/lib/sections";
 import type { Service, Client, InventoryItem, Staff, PaymentMethod } from "@/lib/types";
 import { settleServiceConsumption } from "@/lib/inventory-consumption";
 import { activeMembership, addDays, getConsents, membershipAllowanceLeft, membershipUntil, missingConsents, term, usablePackages, useIsClinic } from "@/lib/clinic";
+import { newClientId } from "@/lib/ids";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -649,7 +650,7 @@ export default function POSPage() {
   function quickAddClient() {
     if (!newName.trim()) return;
     const c: Client = {
-      id: "c_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      id: newClientId(),
       name: newName.trim(), phone: normalizePhone(newPhone),
       dob: newDob || undefined,
       locationId: getDefaultLocationId(),

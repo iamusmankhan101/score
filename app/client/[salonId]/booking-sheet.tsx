@@ -25,6 +25,7 @@ import ServiceGroups from "./service-groups";
 import {
   availableMethods, MethodDetails, MethodIcon, PaymentStyles, type PayMethod, type PublicPayments,
 } from "./payment-options";
+import { newClientId } from "@/lib/ids";
 
 export interface BusinessHour { day: string; open: boolean; from: string; to: string }
 export interface PublicStaff { id: string; name: string; photo?: string }
@@ -214,7 +215,7 @@ export default function BookingSheet({
 
     const normalizedPhone = normalizePhone(phone);
     const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
-    const clientId = `c_${uid()}`;
+    const clientId = newClientId();
 
     const appointment: Appointment = {
       id: `a_${uid()}`,

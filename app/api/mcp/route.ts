@@ -7,6 +7,7 @@ import { appointmentStartMs, appointmentStartHasPassed, timezoneFromSettings, ty
 import { createBooking } from "@/lib/booking";
 import type { Client, Appointment, Staff, Service, InventoryItem } from "@/lib/types";
 import type { SalonInvoice } from "@/lib/salon-invoices";
+import { newClientId } from "@/lib/ids";
 
 const MAX_BOOKING_HORIZON_DAYS = 90;
 const MAX_AGENT_BOOKINGS_PER_DAY = 20;
@@ -585,7 +586,7 @@ const baseHandler = createMcpHandler(
         } else {
           if (!clientName) return errorContent("Provide either clientId or clientName for a new client.");
           resolvedClient = {
-            id: "c_agent_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+            id: newClientId(),
             name: clientName,
             phone: clientPhone || "",
             tags: [],

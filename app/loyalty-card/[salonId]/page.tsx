@@ -89,7 +89,7 @@ export default function PublicLoyaltyCardPage({ params }: { params: Promise<{ sa
   async function addToWallet(platform: "apple" | "google") {
     if (!data?.client?.id) return;
     setWalletMsg("");
-    const res = await fetch(`/api/wallet/loyalty?platform=${platform}&salonId=${encodeURIComponent(salonId)}&clientId=${encodeURIComponent(data.client.id)}`);
+    const res = await fetch(`/api/wallet/loyalty?platform=${platform}&salonId=${encodeURIComponent(salonId)}&clientId=${encodeURIComponent(data.client.id)}&phone=${encodeURIComponent(phone)}`);
     const json = await res.json() as { ok: boolean; url?: string; error?: string };
     if (json.ok && json.url) {
       window.location.href = json.url;

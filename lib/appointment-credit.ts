@@ -1,6 +1,7 @@
 import type { Appointment, Client } from "@/lib/types";
 import { getDefaultLocationId } from "@/lib/locations";
 import { normalizePhone } from "@/lib/whatsapp-scheduler";
+import { newClientId } from "@/lib/ids";
 
 /**
  * A client record for a guest typed by name only, with nothing already in the
@@ -10,7 +11,7 @@ import { normalizePhone } from "@/lib/whatsapp-scheduler";
  */
 export function newGuestClient(name: string, createdAt: string, phone?: string): Client {
   return {
-    id: "c_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    id: newClientId(),
     name: name.trim(),
     phone: phone?.trim() ? normalizePhone(phone) : "",
     locationId: getDefaultLocationId(),

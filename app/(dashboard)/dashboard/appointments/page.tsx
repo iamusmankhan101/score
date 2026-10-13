@@ -39,6 +39,7 @@ import { WaitlistOffer, waitlistMatches } from "@/components/waitlist-offer";
 import { canAccessHref } from "@/components/sidebar";
 import { getCurrentUser } from "@/lib/auth";
 import type { WaitlistEntry } from "@/lib/clinic";
+import { newClientId } from "@/lib/ids";
 
 function fmtDate(s: string) {
   const [y, m, d] = s.split("-").map(Number);
@@ -1187,7 +1188,7 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
     let newClientObj: Client | undefined = undefined;
 
     if (newClient) {
-      const newId = "c_" + Date.now();
+      const newId = newClientId();
       // Zero-initialized — credited below through the same map that credits an
       // existing main client and every guest, so nothing is counted twice.
       newClientObj = {

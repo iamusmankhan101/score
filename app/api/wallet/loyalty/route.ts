@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
 import { db } from "@/lib/db";
+import { resolveActor } from "@/lib/api-auth";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { getTier, nextTierThreshold, pointsToRupees, type LoyaltySettings } from "@/lib/loyalty";
 import type { Client } from "@/lib/types";
@@ -63,6 +64,19 @@ async function getSalonInfo(salonId: string): Promise<{ name: string; settings: 
     name: name || "Salon Central",
     settings: { ...defaultLoyalty, ...(settings.loyalty || {}) },
   };
+}
+
+/**
+ * POST and PATCH write the pass itself, so: a signed-in salon login, and a client from its
+ * own salon (the salon comes from the session, never the body). The page's fresh copy is
+ * used — it can be a beat ahead of storage — but pinned to the stored record's id.
+ */
+async function ownClient(req: NextRequest, clientId?: string, fresh?: Client): Promise<{ salonId: string; client: Client } | null> {
+  const actor = await resolveActor(req);
+  if (!actor || !clientId) return null;
+  const stored = await getClient(actor.userId, clientId);
+  if (!stored) return null;
+  return { salonId: actor.userId, client: fresh ? { ...fresh, id: stored.id } : stored };
 }
 
 function safeId(str: string) {
@@ -193,17 +207,11 @@ export async function PATCH(req: NextRequest) {
     return Response.json({ ok: false, error: "Google Wallet credentials are not configured." }, { status: 501 });
   }
   try {
-    const body = await req.json() as { salonId?: string; clientId?: string; client?: Client };
-    const { salonId, clientId } = body;
-    if (!salonId || !clientId) return Response.json({ ok: false, error: "Missing salonId or clientId." }, { status: 400 });
-
-    // Use the fresh client from the request body when available — this avoids a
-    // race condition where Turso hasn't persisted the latest points/phone yet.
-    const [client, { name: salonName, settings }] = await Promise.all([
-      body.client ? Promise.resolve(body.client) : getClient(salonId, clientId),
-      getSalonInfo(salonId),
-    ]);
-    if (!client) return Response.json({ ok: false, error: "Client not found." }, { status: 404 });
+    const body = await req.json() as { clientId?: string; client?: Client };
+    const own = await ownClient(req, body.clientId, body.client);
+    if (!own) return Response.json({ ok: false, error: "Client not found." }, { status: 404 });
+    const { client } = own;
+    const { name: salonName, settings } = await getSalonInfo(own.salonId);
 
     const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.saloncentral.xyz";
     await upsertObject(client, salonName, settings, appBaseUrl);
@@ -228,18 +236,17 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as {
       platform?: string;
-      salonId?: string;
       client?: Client;
     };
-    const { platform, salonId, client } = body;
+    const { platform } = body;
     if (platform !== "google") {
       return Response.json({ ok: false, error: platform === "apple" ? "Apple Wallet is not configured yet." : "Unsupported wallet platform." }, { status: 501 });
     }
-    if (!salonId || !client?.id) {
-      return Response.json({ ok: false, error: "Missing salon or client details." }, { status: 400 });
-    }
+    const own = await ownClient(req, body.client?.id, body.client);
+    if (!own) return Response.json({ ok: false, error: "Client not found." }, { status: 404 });
+    const { client } = own;
 
-    const { name: salonName, settings } = await getSalonInfo(salonId);
+    const { name: salonName, settings } = await getSalonInfo(own.salonId);
     const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
     // The class must exist before Google will accept an object referencing it.
     await updateClass(appBaseUrl, salonName);
@@ -285,7 +292,11 @@ export async function GET(req: NextRequest) {
       getSalonInfo(salonId),
     ]);
 
-    if (!client) {
+    // The id alone isn't proof: older ids are time-based and guessable. The card page also
+    // sends the phone number it was looked up by, and it has to match this client's.
+    const lastDigits = (p: string) => p.replace(/\D/g, "").slice(-10);
+    const phone = req.nextUrl.searchParams.get("phone") ?? "";
+    if (!client || !phone || lastDigits(phone) !== lastDigits(client.phone)) {
       return Response.json({ ok: false, error: "Client not found." }, { status: 404 });
     }
 
