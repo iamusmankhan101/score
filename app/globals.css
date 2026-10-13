@@ -473,7 +473,12 @@ input, textarea, select { font-family: inherit; }
   .dashboard-polish .dash-page {
     padding: 12px 14px 28px !important;
   }
-  .dashboard-topbar { display: none !important; }
+  /* Title-only headers hide on phones (the mobile app bar has the title). Headers that
+     also hold buttons (Import, Export, Delete All…) stay, minus their title. */
+  .dashboard-topbar:not(.page-header) { display: none !important; }
+  .dashboard-topbar.page-header { flex-wrap: wrap; gap: 8px !important; min-height: 0 !important; margin: 4px 0 0 !important; }
+  .dashboard-topbar.page-header > :first-child { display: none !important; }
+  .dashboard-topbar.page-header > :not(:first-child) { flex-wrap: wrap; gap: 8px !important; }
   .dashboard-polish .page-header { min-height: auto; }
   .pos-topbar { height: 60px !important; padding: 0 14px !important; }
   .pos-polish .pos-panels { padding: 10px !important; }
@@ -830,6 +835,9 @@ input, textarea, select { font-family: inherit; }
 }
 .mobile-filter-row::-webkit-scrollbar { display: none; }
 .mobile-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   flex-shrink: 0;
   padding: 6px 14px;
   border-radius: 20px;

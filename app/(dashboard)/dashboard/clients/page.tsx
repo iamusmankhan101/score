@@ -1310,7 +1310,7 @@ export default function ClientsPage() {
             onClick={() => !clientLimited && setShowAdd(true)}
             title={clientLimited ? `Free plan: ${plan.clientLimit} client limit reached. Upgrade to Pro for unlimited.` : ""}
             style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", borderRadius: 12, border: "none", background: clientLimited ? "#e8e8f0" : "var(--accent-gradient)", fontSize: 13, fontWeight: 750, color: clientLimited ? "#aaaabc" : "#fff", boxShadow: clientLimited ? "none" : "0 4px 14px var(--accent-glow)", cursor: clientLimited ? "not-allowed" : "pointer", transition: "all 0.18s ease" }}
-            className={!clientLimited ? "page-header-btn" : ""}
+            className={`desktop-only ${!clientLimited ? "page-header-btn" : ""}`}
           >
             <Plus size={16} /> Add Client
             {clientLimited && <span style={{ fontSize: 10, background: "#dc2626", color: "#fff", borderRadius: 20, padding: "1px 7px" }}>Limit reached</span>}
@@ -1550,6 +1550,9 @@ export default function ClientsPage() {
                 style={{ padding: "14px 16px", borderBottom: isLast ? "none" : "1px solid #f8f8fc", display: "flex", flexDirection: "column", gap: 8, cursor: "pointer" }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input type="checkbox" aria-label={`Select ${client.name}`} checked={selectedIds.has(client.id)}
+                    onClick={(e) => e.stopPropagation()} onChange={(e) => setOneSelected(client.id, e.currentTarget.checked)}
+                    style={{ width: 18, height: 18, flexShrink: 0, accentColor: "#7C3AED" }} />
                   <ClientAvatar name={client.name} photo={client.photo} size={34} style={{
                     background: "linear-gradient(135deg, #9333EA15, #ec489915)", fontSize: 13, fontWeight: 700, color: "#9333EA",
                   }} />

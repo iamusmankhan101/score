@@ -2303,7 +2303,7 @@ export default function AppointmentsPage() {
               cursor: apptLimited ? "not-allowed" : "pointer",
               transition: "all 0.18s ease"
             }}
-            className={!apptLimited ? "page-header-btn" : ""}
+            className={`desktop-only ${!apptLimited ? "page-header-btn" : ""}`}
           >
             <Plus size={16} />
             New Appointment
@@ -2640,6 +2640,9 @@ export default function AppointmentsPage() {
                   style={{ padding: "14px 16px", borderBottom: isLast ? "none" : "1px solid #f8f8fc", display: "flex", flexDirection: "column", gap: 8, cursor: "pointer" }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <input type="checkbox" aria-label={`Select ${appt.clientName}`} checked={checkedIds.has(appt.id)}
+                      onClick={(e) => e.stopPropagation()} onChange={() => toggleCheck(appt.id)}
+                      style={{ width: 18, height: 18, flexShrink: 0, accentColor: "#7C3AED" }} />
                     <div style={{ width: 34, height: 34, borderRadius: "50%", background: (staff?.color ?? "#7C3AED") + "15", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: staff?.color ?? "#7C3AED", flexShrink: 0 }}>
                       {appt.clientName.charAt(0).toUpperCase()}
                     </div>

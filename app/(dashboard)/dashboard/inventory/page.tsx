@@ -1287,6 +1287,13 @@ export default function InventoryPage() {
             )}
           </div>
 
+          {/* Import / export — the desktop header's buttons */}
+          <div className="mobile-filter-row">
+            <button type="button" className="mobile-filter-chip" onClick={() => setShowImport(true)}><Upload size={12} /> Import</button>
+            <button type="button" className="mobile-filter-chip" onClick={() => exportInventory(filtered, "xlsx")}><Download size={12} /> Export Excel</button>
+            <button type="button" className="mobile-filter-chip" onClick={() => exportInventory(filtered, "csv")}><Download size={12} /> Export CSV</button>
+          </div>
+
           {/* Category filter chips */}
           <div className="mobile-filter-row">
             <button type="button" className={`mobile-filter-chip ${catFilter === "all" ? "active" : ""}`} onClick={() => setCatFilter("all")}>All</button>
@@ -1351,6 +1358,10 @@ export default function InventoryPage() {
                       </div>
                       <span className="mobile-badge" style={{ background: badge.bg, color: badge.color }}>{badge.label}</span>
                     </div>
+                    <button type="button" aria-label={`Delete ${item.name}`} onClick={(e) => { e.stopPropagation(); setDeleteItem(item); }}
+                      style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #fecaca", background: "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, marginLeft: 6 }}>
+                      <Trash2 size={12} color="#dc2626" />
+                    </button>
                   </div>
                 );
               })}

@@ -386,6 +386,24 @@ export default function InvoicesPage() {
               >
                 <Pencil size={12} color="#9898b0" />
               </button>
+              {inv.status !== "unpaid" && revenueAmount(inv) - refundedTotal(inv) > 0 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setRefunding(inv); }}
+                  title="Refund"
+                  style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #fde68a", background: "#fffbeb", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, marginLeft: 6 }}
+                >
+                  <RotateCcw size={12} color="#b45309" />
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setDeleteConfirm(inv.id); }}
+                  title="Delete"
+                  style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #fecaca", background: "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, marginLeft: 6 }}
+                >
+                  <Trash2 size={12} color="#dc2626" />
+                </button>
+              )}
             </div>
           );
         })}

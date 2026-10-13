@@ -803,7 +803,7 @@ export default function StaffPage() {
             onClick={() => !staffLimited && setShowAdd(true)}
             title={staffLimited ? `Free plan: ${plan.staffLimit} active staff limit reached. Upgrade to Pro for unlimited.` : ""}
             style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", borderRadius: 12, border: "none", background: staffLimited ? "#e8e8f0" : "var(--accent-gradient)", fontSize: 13, fontWeight: 750, color: staffLimited ? "#aaaabc" : "#fff", boxShadow: staffLimited ? "none" : "0 4px 14px var(--accent-glow)", cursor: staffLimited ? "not-allowed" : "pointer", transition: "all 0.18s ease" }}
-            className={!staffLimited ? "page-header-btn" : ""}
+            className={`desktop-only ${!staffLimited ? "page-header-btn" : ""}`}
           >
             <Plus size={16} /> Add Staff
             {staffLimited && <span style={{ fontSize: 10, background: "#dc2626", color: "#fff", borderRadius: 20, padding: "1px 7px" }}>Limit reached</span>}

@@ -783,6 +783,267 @@ function MessagesPageContent() {
     window.open(message ? `https://wa.me/${num}?text=${encodeURIComponent(message)}` : `https://wa.me/${num}`, "_blank");
   }
 
+  // Automations, birthday, win-back and queue — shown beside the log on desktop, under it on phones.
+  const rightColumn = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+      {/* Automation Status */}
+      <div style={{ background: "#fff", border: "1px solid #e8e8f0", borderRadius: 18, padding: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
+        <div style={{ fontSize: 14, fontWeight: 900, color: "#1d1d2f", marginBottom: 14 }}>Automation Status</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <AutoCard icon={Bell}         label="Appointment Reminder"  enabled={ws.autoReminder}     color="#7C3AED" />
+          <AutoCard icon={CheckCircle2} label="Booking Confirmation"  enabled={ws.autoConfirmation} color="#059669" />
+          <AutoCard icon={ThumbsUp}     label="Follow-up Message"     enabled={ws.autoFollowup}     color="#0284c7" />
+          <AutoCard icon={CalendarX}    label="Cancellation Win-back"    enabled={ws.autoCancellation} color="#dc2626" />
+          <AutoCard icon={Package}      label="Low Stock Alert"          enabled={ws.autoLowStock}     color="#ea580c" />
+          <AutoCard icon={Cake}         label="Birthday Reminder"     enabled={bdEnabled}           color="#db2777" />
+          <AutoCard icon={UserMinus}    label="Win-back (Lapsed)"     enabled={wbEnabled}           color="#0d9488" />
+        </div>
+
+        <div style={{ marginTop: 12, padding: "10px 13px", borderRadius: 10, background: totalQueue > 0 ? "#fffbeb" : "#f8f8fc", border: `1px solid ${totalQueue > 0 ? "#fde68a" : "#e8e8f0"}`, fontSize: 12, color: totalQueue > 0 ? "#92400e" : "#6b6b8a", fontWeight: 600, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <Clock size={13} style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1 }}>
+            {totalQueue > 0 ? (
+              <>
+                {totalQueue} message{totalQueue > 1 ? "s" : ""} queued
+                {queueCounts.pos > 0 ? ` · ${queueCounts.pos} POS receipt${queueCounts.pos > 1 ? "s" : ""}` : ""}
+                {queueCounts.booking > 0 ? ` · ${queueCounts.booking} booking message${queueCounts.booking > 1 ? "s" : ""}` : ""}
+                {queueCounts.due > 0 ? " · due now" : " · waiting for scheduled time"}
+              </>
+            ) : "No pending queue · view recent queue activity"}
+          </span>
+          <button type="button" onClick={openQueueDetails}
+            style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, border: `1px solid ${totalQueue > 0 ? "#fde68a" : "#e8e8f0"}`, background: "#fff", borderRadius: 7, padding: "4px 9px", fontSize: 11, fontWeight: 700, color: totalQueue > 0 ? "#92400e" : "#6b6b8a", cursor: "pointer" }}>
+            <ListChecks size={12} /> View details
+          </button>
+        </div>
+
+        {(pendingQueue.length > 0 || bdInstantResult) && (
+          <div style={{ marginTop: 12, borderTop: "1px solid #f0f0f5", paddingTop: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#7c7c9a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+              Queued on this device ({pendingQueue.length})
+            </div>
+            {bdInstantResult && (
+              <div style={{ marginBottom: 8, padding: "7px 10px", borderRadius: 8, fontSize: 11.5, fontWeight: 600, background: bdInstantResult.ok ? "#ecfdf5" : "#fef2f2", border: `1px solid ${bdInstantResult.ok ? "#a7f3d0" : "#fca5a5"}`, color: bdInstantResult.ok ? "#065f46" : "#991b1b" }}>
+                {bdInstantResult.message}
+              </div>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto" }}>
+              {pendingQueue.map((item, i) => {
+                const waitingUntil = item.sendAfter && item.sendAfter > Date.now() ? item.sendAfter : null;
+                return (
+                  <div key={`${item.type}_${item.apptId}_${i}`}
+                    style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 10px", borderRadius: 9, background: "#f8f8fc", border: "1px solid #e8e8f0", fontSize: 12 }}>
+                    <span style={{
+                      flexShrink: 0, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em",
+                      padding: "3px 7px", borderRadius: 6,
+                      color: item.type === "confirmation" ? "#059669" : item.type === "followup" ? "#0284c7" : item.type === "cancellation" ? "#dc2626" : "#db2777",
+                      background: item.type === "confirmation" ? "#ecfdf5" : item.type === "followup" ? "#eff6ff" : item.type === "cancellation" ? "#fef2f2" : "#fdf2f8",
+                    }}>
+                      {item.type}
+                    </span>
+                    <div style={{ flex: "1 1 120px", minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, color: "#1d1d2f", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {item.clientName || "Unknown client"}
+                      </div>
+                      {(item.date || item.serviceNames?.length) && (
+                        <div style={{ color: "#9999b0", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {item.serviceNames?.[0] ? `${item.serviceNames[0]} · ` : ""}{item.date}{item.startTime ? ` ${item.startTime}` : ""}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ flexShrink: 0, textAlign: "right", fontSize: 11, color: item.retries > 0 ? "#dc2626" : "#92400e", fontWeight: 600 }}>
+                      {item.retries > 0
+                        ? (waitingUntil ? `retry ${new Date(waitingUntil).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "retrying")
+                        : (waitingUntil ? new Date(waitingUntil).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "due now")}
+                    </div>
+                    {item.type === "birthday" && (
+                      <button type="button" onClick={() => void sendQueuedBirthdayInstant(item)} disabled={bdInstantSendingId !== null}
+                        title="Send this birthday message now instead of waiting for its scheduled time"
+                        style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 4, border: "1px solid #fbcfe8", background: "#fff", borderRadius: 7, padding: "4px 8px", fontSize: 11, fontWeight: 700, color: "#db2777", cursor: bdInstantSendingId !== null ? "wait" : "pointer", opacity: bdInstantSendingId !== null && bdInstantSendingId !== item.apptId ? 0.5 : 1 }}>
+                        <Send size={11} /> {bdInstantSendingId === item.apptId ? "Sending…" : "Send now"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {!isConnected && (
+          <div style={{ marginTop: 12, padding: "10px 13px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", fontSize: 12, color: "#991b1b", fontWeight: 600, display: "flex", alignItems: "flex-start", gap: 8 }}>
+            <AlertCircle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+            No API credentials configured — automation is paused.
+          </div>
+        )}
+      </div>
+
+      {/* Birthday Reminder Settings */}
+      <div style={{ background: "#fff", border: "1px solid #fce7f3", borderRadius: 18, padding: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(219,39,119,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Cake size={16} color="#db2777" />
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 900, color: "#1d1d2f" }}>Birthday Reminders</div>
+            <div style={{ fontSize: 11, color: "#9999b0", marginTop: 1 }}>1-5 birthdays go out early in the day, 35-55 min apart · 6+ are spread across ~6-8 hours</div>
+          </div>
+          {/* Toggle */}
+          <button type="button" onClick={() => setBdEnabled((v) => !v)}
+            style={{ marginLeft: "auto", width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer", background: bdEnabled ? "#db2777" : "#d1d5db", transition: "background 0.2s", position: "relative", flexShrink: 0 }}>
+            <span style={{ position: "absolute", top: 3, left: bdEnabled ? 20 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+          </button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* Today's birthday clients */}
+          <div style={{ padding: "10px 12px", borderRadius: 9, background: todayBirthdayClients.length > 0 ? "#fdf2f8" : "#f8f8fc", border: `1px solid ${todayBirthdayClients.length > 0 ? "#fce7f3" : "#e8e8f0"}`, fontSize: 11, color: todayBirthdayClients.length > 0 ? "#9d174d" : "#6b6b8a", lineHeight: 1.6 }}>
+            {todayBirthdayClients.length > 0
+              ? <><strong>🎂 {todayBirthdayClients.length} client{todayBirthdayClients.length > 1 ? "s have" : " has"} a birthday today:</strong> {todayBirthdayClients.map((c) => c.name).join(", ")}</>
+              : "No clients have a birthday today. Make sure clients have their Date of Birth saved in their profile."}
+          </div>
+
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 5 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "#7c7c9a", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Discount / Gift (optional)
+              </label>
+              <button
+                type="button"
+                onClick={() => setBdDiscountEnabled((v) => !v)}
+                aria-label={`${bdDiscountEnabled ? "Disable" : "Enable"} birthday discount`}
+                style={{ width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer", background: bdDiscountEnabled ? "#db2777" : "#d1d5db", transition: "background 0.2s", position: "relative", flexShrink: 0 }}
+              >
+                <span style={{ position: "absolute", top: 3, left: bdDiscountEnabled ? 20 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+              </button>
+            </div>
+            <input
+              value={bdDiscount}
+              onChange={(e) => setBdDiscount(e.target.value)}
+              disabled={!bdDiscountEnabled}
+              placeholder="e.g. 15% off or a free blow-dry"
+              style={{ width: "100%", height: 36, padding: "0 12px", borderRadius: 9, border: `1px solid ${bdDiscountEnabled ? "#e4e4ee" : "#e5e7eb"}`, fontSize: 13, color: bdDiscountEnabled ? "#29293d" : "#9ca3af", background: bdDiscountEnabled ? "#fff" : "#f9fafb", outline: "none", boxSizing: "border-box" }}
+            />
+            <div style={{ fontSize: 10, color: "#b0b0c8", marginTop: 4 }}>
+              {bdDiscountEnabled ? <>Inserted as {"{{discount}}"} in the birthday template</> : <>Discount is off — {"{{discount}}"} will be blank if used in the template</>}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" onClick={saveBirthdaySettings} disabled={bdSaving}
+              style={{ flex: 1, border: "none", borderRadius: 10, padding: "10px 0", fontSize: 12, fontWeight: 800, cursor: bdSaving ? "not-allowed" : "pointer", background: bdSaved ? "#ecfdf5" : "linear-gradient(135deg,#be185d,#db2777)", color: bdSaved ? "#059669" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, boxShadow: bdSaved ? "none" : "0 3px 10px rgba(219,39,119,0.3)" }}>
+              {bdSaved ? <><Check size={13} /> Saved</> : bdSaving ? "Saving…" : <><Save size={13} /> Save</>}
+            </button>
+            <button type="button" onClick={sendBirthdayNow} disabled={bdSending || todayBirthdayClients.length === 0}
+              title={todayBirthdayClients.length === 0 ? "No clients have a birthday today" : "Queue birthday messages across 4 hours"}
+              style={{ flex: 1, border: "1px solid #fce7f3", borderRadius: 10, padding: "10px 0", fontSize: 12, fontWeight: 800, cursor: (bdSending || todayBirthdayClients.length === 0) ? "not-allowed" : "pointer", background: bdSendDone ? "#ecfdf5" : "#fff3f8", color: bdSendDone ? "#059669" : "#db2777", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: todayBirthdayClients.length === 0 ? 0.5 : 1 }}>
+              {bdSendDone ? <><Check size={13} /> Queued!</> : bdSending ? "Queueing…" : <><Send size={13} /> Queue Now</>}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Win-back — clients who haven't visited in a long time */}
+      <div style={{ background: "#fff", border: "1px solid #ccfbf1", borderRadius: 18, padding: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(13,148,136,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <UserMinus size={16} color="#0d9488" />
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 900, color: "#1d1d2f" }}>Win-back Messages</div>
+            <div style={{ fontSize: 11, color: "#9999b0", marginTop: 1 }}>Reaches clients who haven&rsquo;t been in for a while &mdash; 15\u201320 a day, spread over 7\u20138 hours</div>
+          </div>
+          <button type="button" onClick={() => setWbEnabled((v) => !v)}
+            aria-label={`${wbEnabled ? "Disable" : "Enable"} win-back messages`}
+            style={{ marginLeft: "auto", width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer", background: wbEnabled ? "#0d9488" : "#d1d5db", transition: "background 0.2s", position: "relative", flexShrink: 0 }}>
+            <span style={{ position: "absolute", top: 3, left: wbEnabled ? 20 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+          </button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ padding: "10px 12px", borderRadius: 9, background: lapsedClients.length > 0 ? "#f0fdfa" : "#f8f8fc", border: `1px solid ${lapsedClients.length > 0 ? "#ccfbf1" : "#e8e8f0"}`, fontSize: 11, color: lapsedClients.length > 0 ? "#115e59" : "#6b6b8a", lineHeight: 1.6 }}>
+            {lapsedClients.length > 0
+              ? <>
+                  <strong>{lapsedClients.length} client{lapsedClients.length > 1 ? "s haven\u2019t" : " hasn\u2019t"} visited in {wbDays}+ days:</strong>{" "}
+                  {lapsedClients.slice(0, 6).map((entry) => entry.client.name).join(", ")}{lapsedClients.length > 6 ? ` +${lapsedClients.length - 6} more` : ""}
+                  {winbackTargetCount > WINBACK_DAILY_MIN && (
+                    <div style={{ marginTop: 5, opacity: 0.85 }}>
+                      The longest-absent {WINBACK_DAILY_MIN}&ndash;{WINBACK_DAILY_MAX} go out today; the rest follow on the days after.
+                    </div>
+                  )}
+                </>
+              : winbackEmptyReason}
+          </div>
+
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", borderRadius: 9, border: "1px solid #e8e8f0", fontSize: 12, color: "#29293d", cursor: "pointer", lineHeight: 1.5 }}>
+            <input type="checkbox" checked={wbNeverVisited} onChange={(e) => setWbNeverVisited(e.target.checked)} style={{ marginTop: 2, accentColor: "#0d9488" }} />
+            <span>
+              <strong>Also message clients who have never visited</strong>
+              <span style={{ display: "block", fontSize: 11, color: "#9999b0" }}>
+                {neverVisitedClients.length > 0
+                  ? `${neverVisitedClients.length} client${neverVisitedClients.length > 1 ? "s" : ""}: ${neverVisitedClients.slice(0, 4).map((c) => c.name).join(", ")}${neverVisitedClients.length > 4 ? ` +${neverVisitedClients.length - 4} more` : ""}. Sent after lapsed clients, same daily limit.`
+                  : "No clients without a visit right now."}
+              </span>
+            </span>
+          </label>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#7c7c9a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>
+                Inactive for
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input type="number" min={1} value={wbDays} onChange={(e) => setWbDays(e.target.value)}
+                  style={{ width: "100%", height: 36, padding: "0 12px", borderRadius: 9, border: "1px solid #e4e4ee", fontSize: 13, color: "#29293d", outline: "none", boxSizing: "border-box" }} />
+                <span style={{ fontSize: 11, color: "#9999b0", fontWeight: 700 }}>days</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#7c7c9a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>
+              Don&rsquo;t message the same client again for
+            </label>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <input type="number" min={1} value={wbCooldown} onChange={(e) => setWbCooldown(e.target.value)}
+                style={{ flex: 1, height: 36, padding: "0 12px", borderRadius: 9, border: "1px solid #e4e4ee", fontSize: 13, color: "#29293d", outline: "none", boxSizing: "border-box" }} />
+              <span style={{ fontSize: 11, color: "#9999b0", fontWeight: 700 }}>days</span>
+            </div>
+            <div style={{ fontSize: 10, color: "#b0b0c8", marginTop: 4 }}>
+              {WINBACK_DAILY_MIN}&ndash;{WINBACK_DAILY_MAX} messages a day (the exact number varies day to day), spread
+              over a random 7&ndash;8 hours with uneven gaps of at least 15 min &mdash; nothing goes out the moment it&rsquo;s queued.
+              Edit the wording and the discount on the Templates tab &rarr; Win-back (Lapsed Clients).
+            </div>
+          </div>
+
+          {wbResult && (
+            <div style={{ padding: "9px 12px", borderRadius: 9, fontSize: 11, fontWeight: 600, lineHeight: 1.55, background: wbResult.ok ? "#f0fdfa" : "#fef2f2", border: `1px solid ${wbResult.ok ? "#ccfbf1" : "#fecaca"}`, color: wbResult.ok ? "#115e59" : "#991b1b" }}>
+              {wbResult.message}
+            </div>
+          )}
+
+          <button type="button" onClick={() => setShowWbPicker(true)} disabled={winbackCandidates.length === 0}
+            style={{ border: "1px dashed #99f6e4", borderRadius: 10, padding: "9px 0", fontSize: 12, fontWeight: 800, cursor: winbackCandidates.length === 0 ? "not-allowed" : "pointer", background: "#fff", color: "#0d9488", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: winbackCandidates.length === 0 ? 0.5 : 1 }}>
+            <Users size={13} /> Choose clients to message
+          </button>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" onClick={saveWinbackSettings} disabled={wbSaving}
+              style={{ flex: 1, border: "none", borderRadius: 10, padding: "10px 0", fontSize: 12, fontWeight: 800, cursor: wbSaving ? "not-allowed" : "pointer", background: wbSaved ? "#ecfdf5" : "linear-gradient(135deg,#0f766e,#0d9488)", color: wbSaved ? "#059669" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, boxShadow: wbSaved ? "none" : "0 3px 10px rgba(13,148,136,0.3)" }}>
+              {wbSaved ? <><Check size={13} /> Saved</> : wbSaving ? "Saving…" : <><Save size={13} /> Save</>}
+            </button>
+            <button type="button" onClick={() => queueWinbackNow()} disabled={wbSending || winbackTargetCount === 0}
+              title={winbackTargetCount === 0 ? "No clients to message" : "Queue today\u2019s win-back messages, spread over 7\u20138 hours"}
+              style={{ flex: 1, border: "1px solid #ccfbf1", borderRadius: 10, padding: "10px 0", fontSize: 12, fontWeight: 800, cursor: (wbSending || winbackTargetCount === 0) ? "not-allowed" : "pointer", background: "#f0fdfa", color: "#0d9488", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: winbackTargetCount === 0 ? 0.5 : 1 }}>
+              {wbSending ? "Queueing…" : <><Send size={13} /> Queue Now</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="dashboard-polish" style={{ minHeight: "100vh", background: "#f5f6f9" }}>
       <div className="dashboard-topbar" style={{ paddingLeft: 25 }}>
@@ -806,6 +1067,12 @@ function MessagesPageContent() {
           <div style={{ fontSize: 10, opacity: 0.72, marginTop: 2 }}>{isConnected ? "WaSenderAPI connected" : "Tap Settings to connect"}</div>
         </div>
         {isConnected && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ade80", boxShadow: "0 0 8px #4ade80", flexShrink: 0 }} />}
+        {isConfigured && (
+          <button type="button" onClick={testConnection} disabled={testingConn}
+            style={{ background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.28)", borderRadius: 9, padding: "6px 10px", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
+            {testingConn ? "Testing…" : "Test"}
+          </button>
+        )}
       </div>
 
       {/* ── Mobile stats ── */}
@@ -845,13 +1112,16 @@ function MessagesPageContent() {
                 {FILTERS.map((f) => (
                   <button key={f.value} type="button" className={`mobile-filter-chip ${filter === f.value ? "active" : ""}`} onClick={() => setFilter(f.value)}>{f.label}</button>
                 ))}
+                <button type="button" className="mobile-filter-chip" onClick={resendFailed} disabled={resending}>
+                  <RotateCcw size={12} /> {resending ? "Requeueing…" : "Resend failed"}
+                </button>
               </div>
               <div className="mobile-list">
                 {filtered.map((log) => {
                   const m = TYPE_META[log.type as WaMsgType] ?? TYPE_META.manual;
                   const Icon = m.icon;
                   return (
-                    <div key={log.id} className="mobile-list-card">
+                    <div key={log.id} className="mobile-list-card" onClick={() => openWa(log.phone)} style={{ cursor: "pointer" }}>
                       <div className="mobile-list-icon" style={{ background: m.bg }}><Icon size={18} color={m.color} /></div>
                       <div className="mobile-list-body">
                         <div className="mobile-list-title">{log.clientName}</div>
@@ -869,6 +1139,8 @@ function MessagesPageContent() {
           )}
         </div>
       )}
+
+      {tab === "messages" && <div className="mobile-only" style={{ padding: "16px 16px 24px" }}>{rightColumn}</div>}
 
       {/* ── Mobile: Templates ── */}
       {tab === "templates" && (
@@ -1106,263 +1378,7 @@ function MessagesPageContent() {
             </div>
 
             {/* ── Right column ── */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-              {/* Automation Status */}
-              <div style={{ background: "#fff", border: "1px solid #e8e8f0", borderRadius: 18, padding: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
-                <div style={{ fontSize: 14, fontWeight: 900, color: "#1d1d2f", marginBottom: 14 }}>Automation Status</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <AutoCard icon={Bell}         label="Appointment Reminder"  enabled={ws.autoReminder}     color="#7C3AED" />
-                  <AutoCard icon={CheckCircle2} label="Booking Confirmation"  enabled={ws.autoConfirmation} color="#059669" />
-                  <AutoCard icon={ThumbsUp}     label="Follow-up Message"     enabled={ws.autoFollowup}     color="#0284c7" />
-                  <AutoCard icon={CalendarX}    label="Cancellation Win-back"    enabled={ws.autoCancellation} color="#dc2626" />
-                  <AutoCard icon={Package}      label="Low Stock Alert"          enabled={ws.autoLowStock}     color="#ea580c" />
-                  <AutoCard icon={Cake}         label="Birthday Reminder"     enabled={bdEnabled}           color="#db2777" />
-                  <AutoCard icon={UserMinus}    label="Win-back (Lapsed)"     enabled={wbEnabled}           color="#0d9488" />
-                </div>
-
-                <div style={{ marginTop: 12, padding: "10px 13px", borderRadius: 10, background: totalQueue > 0 ? "#fffbeb" : "#f8f8fc", border: `1px solid ${totalQueue > 0 ? "#fde68a" : "#e8e8f0"}`, fontSize: 12, color: totalQueue > 0 ? "#92400e" : "#6b6b8a", fontWeight: 600, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <Clock size={13} style={{ flexShrink: 0 }} />
-                  <span style={{ flex: 1 }}>
-                    {totalQueue > 0 ? (
-                      <>
-                        {totalQueue} message{totalQueue > 1 ? "s" : ""} queued
-                        {queueCounts.pos > 0 ? ` · ${queueCounts.pos} POS receipt${queueCounts.pos > 1 ? "s" : ""}` : ""}
-                        {queueCounts.booking > 0 ? ` · ${queueCounts.booking} booking message${queueCounts.booking > 1 ? "s" : ""}` : ""}
-                        {queueCounts.due > 0 ? " · due now" : " · waiting for scheduled time"}
-                      </>
-                    ) : "No pending queue · view recent queue activity"}
-                  </span>
-                  <button type="button" onClick={openQueueDetails}
-                    style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, border: `1px solid ${totalQueue > 0 ? "#fde68a" : "#e8e8f0"}`, background: "#fff", borderRadius: 7, padding: "4px 9px", fontSize: 11, fontWeight: 700, color: totalQueue > 0 ? "#92400e" : "#6b6b8a", cursor: "pointer" }}>
-                    <ListChecks size={12} /> View details
-                  </button>
-                </div>
-
-                {(pendingQueue.length > 0 || bdInstantResult) && (
-                  <div style={{ marginTop: 12, borderTop: "1px solid #f0f0f5", paddingTop: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: "#7c7c9a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
-                      Queued on this device ({pendingQueue.length})
-                    </div>
-                    {bdInstantResult && (
-                      <div style={{ marginBottom: 8, padding: "7px 10px", borderRadius: 8, fontSize: 11.5, fontWeight: 600, background: bdInstantResult.ok ? "#ecfdf5" : "#fef2f2", border: `1px solid ${bdInstantResult.ok ? "#a7f3d0" : "#fca5a5"}`, color: bdInstantResult.ok ? "#065f46" : "#991b1b" }}>
-                        {bdInstantResult.message}
-                      </div>
-                    )}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto" }}>
-                      {pendingQueue.map((item, i) => {
-                        const waitingUntil = item.sendAfter && item.sendAfter > Date.now() ? item.sendAfter : null;
-                        return (
-                          <div key={`${item.type}_${item.apptId}_${i}`}
-                            style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 10px", borderRadius: 9, background: "#f8f8fc", border: "1px solid #e8e8f0", fontSize: 12 }}>
-                            <span style={{
-                              flexShrink: 0, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em",
-                              padding: "3px 7px", borderRadius: 6,
-                              color: item.type === "confirmation" ? "#059669" : item.type === "followup" ? "#0284c7" : item.type === "cancellation" ? "#dc2626" : "#db2777",
-                              background: item.type === "confirmation" ? "#ecfdf5" : item.type === "followup" ? "#eff6ff" : item.type === "cancellation" ? "#fef2f2" : "#fdf2f8",
-                            }}>
-                              {item.type}
-                            </span>
-                            <div style={{ flex: "1 1 120px", minWidth: 0 }}>
-                              <div style={{ fontWeight: 700, color: "#1d1d2f", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {item.clientName || "Unknown client"}
-                              </div>
-                              {(item.date || item.serviceNames?.length) && (
-                                <div style={{ color: "#9999b0", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                  {item.serviceNames?.[0] ? `${item.serviceNames[0]} · ` : ""}{item.date}{item.startTime ? ` ${item.startTime}` : ""}
-                                </div>
-                              )}
-                            </div>
-                            <div style={{ flexShrink: 0, textAlign: "right", fontSize: 11, color: item.retries > 0 ? "#dc2626" : "#92400e", fontWeight: 600 }}>
-                              {item.retries > 0
-                                ? (waitingUntil ? `retry ${new Date(waitingUntil).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "retrying")
-                                : (waitingUntil ? new Date(waitingUntil).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "due now")}
-                            </div>
-                            {item.type === "birthday" && (
-                              <button type="button" onClick={() => void sendQueuedBirthdayInstant(item)} disabled={bdInstantSendingId !== null}
-                                title="Send this birthday message now instead of waiting for its scheduled time"
-                                style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 4, border: "1px solid #fbcfe8", background: "#fff", borderRadius: 7, padding: "4px 8px", fontSize: 11, fontWeight: 700, color: "#db2777", cursor: bdInstantSendingId !== null ? "wait" : "pointer", opacity: bdInstantSendingId !== null && bdInstantSendingId !== item.apptId ? 0.5 : 1 }}>
-                                <Send size={11} /> {bdInstantSendingId === item.apptId ? "Sending…" : "Send now"}
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {!isConnected && (
-                  <div style={{ marginTop: 12, padding: "10px 13px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", fontSize: 12, color: "#991b1b", fontWeight: 600, display: "flex", alignItems: "flex-start", gap: 8 }}>
-                    <AlertCircle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
-                    No API credentials configured — automation is paused.
-                  </div>
-                )}
-              </div>
-
-              {/* Birthday Reminder Settings */}
-              <div style={{ background: "#fff", border: "1px solid #fce7f3", borderRadius: 18, padding: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(219,39,119,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Cake size={16} color="#db2777" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 900, color: "#1d1d2f" }}>Birthday Reminders</div>
-                    <div style={{ fontSize: 11, color: "#9999b0", marginTop: 1 }}>1-5 birthdays go out early in the day, 35-55 min apart · 6+ are spread across ~6-8 hours</div>
-                  </div>
-                  {/* Toggle */}
-                  <button type="button" onClick={() => setBdEnabled((v) => !v)}
-                    style={{ marginLeft: "auto", width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer", background: bdEnabled ? "#db2777" : "#d1d5db", transition: "background 0.2s", position: "relative", flexShrink: 0 }}>
-                    <span style={{ position: "absolute", top: 3, left: bdEnabled ? 20 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
-                  </button>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {/* Today's birthday clients */}
-                  <div style={{ padding: "10px 12px", borderRadius: 9, background: todayBirthdayClients.length > 0 ? "#fdf2f8" : "#f8f8fc", border: `1px solid ${todayBirthdayClients.length > 0 ? "#fce7f3" : "#e8e8f0"}`, fontSize: 11, color: todayBirthdayClients.length > 0 ? "#9d174d" : "#6b6b8a", lineHeight: 1.6 }}>
-                    {todayBirthdayClients.length > 0
-                      ? <><strong>🎂 {todayBirthdayClients.length} client{todayBirthdayClients.length > 1 ? "s have" : " has"} a birthday today:</strong> {todayBirthdayClients.map((c) => c.name).join(", ")}</>
-                      : "No clients have a birthday today. Make sure clients have their Date of Birth saved in their profile."}
-                  </div>
-
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 5 }}>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: "#7c7c9a", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                        Discount / Gift (optional)
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setBdDiscountEnabled((v) => !v)}
-                        aria-label={`${bdDiscountEnabled ? "Disable" : "Enable"} birthday discount`}
-                        style={{ width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer", background: bdDiscountEnabled ? "#db2777" : "#d1d5db", transition: "background 0.2s", position: "relative", flexShrink: 0 }}
-                      >
-                        <span style={{ position: "absolute", top: 3, left: bdDiscountEnabled ? 20 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
-                      </button>
-                    </div>
-                    <input
-                      value={bdDiscount}
-                      onChange={(e) => setBdDiscount(e.target.value)}
-                      disabled={!bdDiscountEnabled}
-                      placeholder="e.g. 15% off or a free blow-dry"
-                      style={{ width: "100%", height: 36, padding: "0 12px", borderRadius: 9, border: `1px solid ${bdDiscountEnabled ? "#e4e4ee" : "#e5e7eb"}`, fontSize: 13, color: bdDiscountEnabled ? "#29293d" : "#9ca3af", background: bdDiscountEnabled ? "#fff" : "#f9fafb", outline: "none", boxSizing: "border-box" }}
-                    />
-                    <div style={{ fontSize: 10, color: "#b0b0c8", marginTop: 4 }}>
-                      {bdDiscountEnabled ? <>Inserted as {"{{discount}}"} in the birthday template</> : <>Discount is off — {"{{discount}}"} will be blank if used in the template</>}
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button type="button" onClick={saveBirthdaySettings} disabled={bdSaving}
-                      style={{ flex: 1, border: "none", borderRadius: 10, padding: "10px 0", fontSize: 12, fontWeight: 800, cursor: bdSaving ? "not-allowed" : "pointer", background: bdSaved ? "#ecfdf5" : "linear-gradient(135deg,#be185d,#db2777)", color: bdSaved ? "#059669" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, boxShadow: bdSaved ? "none" : "0 3px 10px rgba(219,39,119,0.3)" }}>
-                      {bdSaved ? <><Check size={13} /> Saved</> : bdSaving ? "Saving…" : <><Save size={13} /> Save</>}
-                    </button>
-                    <button type="button" onClick={sendBirthdayNow} disabled={bdSending || todayBirthdayClients.length === 0}
-                      title={todayBirthdayClients.length === 0 ? "No clients have a birthday today" : "Queue birthday messages across 4 hours"}
-                      style={{ flex: 1, border: "1px solid #fce7f3", borderRadius: 10, padding: "10px 0", fontSize: 12, fontWeight: 800, cursor: (bdSending || todayBirthdayClients.length === 0) ? "not-allowed" : "pointer", background: bdSendDone ? "#ecfdf5" : "#fff3f8", color: bdSendDone ? "#059669" : "#db2777", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: todayBirthdayClients.length === 0 ? 0.5 : 1 }}>
-                      {bdSendDone ? <><Check size={13} /> Queued!</> : bdSending ? "Queueing…" : <><Send size={13} /> Queue Now</>}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Win-back — clients who haven't visited in a long time */}
-              <div style={{ background: "#fff", border: "1px solid #ccfbf1", borderRadius: 18, padding: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(13,148,136,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <UserMinus size={16} color="#0d9488" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 900, color: "#1d1d2f" }}>Win-back Messages</div>
-                    <div style={{ fontSize: 11, color: "#9999b0", marginTop: 1 }}>Reaches clients who haven&rsquo;t been in for a while &mdash; 15\u201320 a day, spread over 7\u20138 hours</div>
-                  </div>
-                  <button type="button" onClick={() => setWbEnabled((v) => !v)}
-                    aria-label={`${wbEnabled ? "Disable" : "Enable"} win-back messages`}
-                    style={{ marginLeft: "auto", width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer", background: wbEnabled ? "#0d9488" : "#d1d5db", transition: "background 0.2s", position: "relative", flexShrink: 0 }}>
-                    <span style={{ position: "absolute", top: 3, left: wbEnabled ? 20 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
-                  </button>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ padding: "10px 12px", borderRadius: 9, background: lapsedClients.length > 0 ? "#f0fdfa" : "#f8f8fc", border: `1px solid ${lapsedClients.length > 0 ? "#ccfbf1" : "#e8e8f0"}`, fontSize: 11, color: lapsedClients.length > 0 ? "#115e59" : "#6b6b8a", lineHeight: 1.6 }}>
-                    {lapsedClients.length > 0
-                      ? <>
-                          <strong>{lapsedClients.length} client{lapsedClients.length > 1 ? "s haven\u2019t" : " hasn\u2019t"} visited in {wbDays}+ days:</strong>{" "}
-                          {lapsedClients.slice(0, 6).map((entry) => entry.client.name).join(", ")}{lapsedClients.length > 6 ? ` +${lapsedClients.length - 6} more` : ""}
-                          {winbackTargetCount > WINBACK_DAILY_MIN && (
-                            <div style={{ marginTop: 5, opacity: 0.85 }}>
-                              The longest-absent {WINBACK_DAILY_MIN}&ndash;{WINBACK_DAILY_MAX} go out today; the rest follow on the days after.
-                            </div>
-                          )}
-                        </>
-                      : winbackEmptyReason}
-                  </div>
-
-                  <label style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", borderRadius: 9, border: "1px solid #e8e8f0", fontSize: 12, color: "#29293d", cursor: "pointer", lineHeight: 1.5 }}>
-                    <input type="checkbox" checked={wbNeverVisited} onChange={(e) => setWbNeverVisited(e.target.checked)} style={{ marginTop: 2, accentColor: "#0d9488" }} />
-                    <span>
-                      <strong>Also message clients who have never visited</strong>
-                      <span style={{ display: "block", fontSize: 11, color: "#9999b0" }}>
-                        {neverVisitedClients.length > 0
-                          ? `${neverVisitedClients.length} client${neverVisitedClients.length > 1 ? "s" : ""}: ${neverVisitedClients.slice(0, 4).map((c) => c.name).join(", ")}${neverVisitedClients.length > 4 ? ` +${neverVisitedClients.length - 4} more` : ""}. Sent after lapsed clients, same daily limit.`
-                          : "No clients without a visit right now."}
-                      </span>
-                    </span>
-                  </label>
-
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#7c7c9a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>
-                        Inactive for
-                      </label>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <input type="number" min={1} value={wbDays} onChange={(e) => setWbDays(e.target.value)}
-                          style={{ width: "100%", height: 36, padding: "0 12px", borderRadius: 9, border: "1px solid #e4e4ee", fontSize: 13, color: "#29293d", outline: "none", boxSizing: "border-box" }} />
-                        <span style={{ fontSize: 11, color: "#9999b0", fontWeight: 700 }}>days</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#7c7c9a", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>
-                      Don&rsquo;t message the same client again for
-                    </label>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <input type="number" min={1} value={wbCooldown} onChange={(e) => setWbCooldown(e.target.value)}
-                        style={{ flex: 1, height: 36, padding: "0 12px", borderRadius: 9, border: "1px solid #e4e4ee", fontSize: 13, color: "#29293d", outline: "none", boxSizing: "border-box" }} />
-                      <span style={{ fontSize: 11, color: "#9999b0", fontWeight: 700 }}>days</span>
-                    </div>
-                    <div style={{ fontSize: 10, color: "#b0b0c8", marginTop: 4 }}>
-                      {WINBACK_DAILY_MIN}&ndash;{WINBACK_DAILY_MAX} messages a day (the exact number varies day to day), spread
-                      over a random 7&ndash;8 hours with uneven gaps of at least 15 min &mdash; nothing goes out the moment it&rsquo;s queued.
-                      Edit the wording and the discount on the Templates tab &rarr; Win-back (Lapsed Clients).
-                    </div>
-                  </div>
-
-                  {wbResult && (
-                    <div style={{ padding: "9px 12px", borderRadius: 9, fontSize: 11, fontWeight: 600, lineHeight: 1.55, background: wbResult.ok ? "#f0fdfa" : "#fef2f2", border: `1px solid ${wbResult.ok ? "#ccfbf1" : "#fecaca"}`, color: wbResult.ok ? "#115e59" : "#991b1b" }}>
-                      {wbResult.message}
-                    </div>
-                  )}
-
-                  <button type="button" onClick={() => setShowWbPicker(true)} disabled={winbackCandidates.length === 0}
-                    style={{ border: "1px dashed #99f6e4", borderRadius: 10, padding: "9px 0", fontSize: 12, fontWeight: 800, cursor: winbackCandidates.length === 0 ? "not-allowed" : "pointer", background: "#fff", color: "#0d9488", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: winbackCandidates.length === 0 ? 0.5 : 1 }}>
-                    <Users size={13} /> Choose clients to message
-                  </button>
-
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button type="button" onClick={saveWinbackSettings} disabled={wbSaving}
-                      style={{ flex: 1, border: "none", borderRadius: 10, padding: "10px 0", fontSize: 12, fontWeight: 800, cursor: wbSaving ? "not-allowed" : "pointer", background: wbSaved ? "#ecfdf5" : "linear-gradient(135deg,#0f766e,#0d9488)", color: wbSaved ? "#059669" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, boxShadow: wbSaved ? "none" : "0 3px 10px rgba(13,148,136,0.3)" }}>
-                      {wbSaved ? <><Check size={13} /> Saved</> : wbSaving ? "Saving…" : <><Save size={13} /> Save</>}
-                    </button>
-                    <button type="button" onClick={() => queueWinbackNow()} disabled={wbSending || winbackTargetCount === 0}
-                      title={winbackTargetCount === 0 ? "No clients to message" : "Queue today\u2019s win-back messages, spread over 7\u20138 hours"}
-                      style={{ flex: 1, border: "1px solid #ccfbf1", borderRadius: 10, padding: "10px 0", fontSize: 12, fontWeight: 800, cursor: (wbSending || winbackTargetCount === 0) ? "not-allowed" : "pointer", background: "#f0fdfa", color: "#0d9488", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, opacity: winbackTargetCount === 0 ? 0.5 : 1 }}>
-                      {wbSending ? "Queueing…" : <><Send size={13} /> Queue Now</>}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {rightColumn}
           </div>
         )}
       </div>

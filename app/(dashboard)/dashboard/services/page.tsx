@@ -1132,7 +1132,7 @@ export default function ServicesPage() {
               </>
             )}
           </div>
-          <button onClick={() => setShowAdd(true)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", borderRadius: 12, border: "none", background: "var(--accent-gradient)", fontSize: 13, fontWeight: 750, color: "#fff", boxShadow: "0 4px 14px var(--accent-glow)", cursor: "pointer", transition: "all 0.18s ease" }} className="page-header-btn">
+          <button onClick={() => setShowAdd(true)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", borderRadius: 12, border: "none", background: "var(--accent-gradient)", fontSize: 13, fontWeight: 750, color: "#fff", boxShadow: "0 4px 14px var(--accent-glow)", cursor: "pointer", transition: "all 0.18s ease" }} className="desktop-only page-header-btn">
             <Plus size={16} /> Add Service
           </button>
         </div>

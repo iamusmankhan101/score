@@ -857,6 +857,29 @@ export default function RevenuePage() {
   const tableCount   = selectedMonth ? drillCount   : totalCount;
   const tableAvg     = selectedMonth ? drillAvg     : avgTicket;
 
+  // Shared by the desktop tabs and the mobile ones.
+  const netProfitView = (
+    <NetProfitView
+          period={cfg.label} rangeStart={rangeStart} filterEnd={filterEnd}
+          totalRevenue={totalRevenue} totalExpenses={totalExpenses} netProfit={netProfit}
+          netMarginPct={netMarginPct} expenseByCategory={expenseByCategory}
+          revenueByChannel={revenueByChannel} expensesByChannel={expensesByChannel}
+          netProfitByChannel={netProfitByChannel}
+        />
+  );
+  const ledgerView = (
+    <LedgerView
+          rangeStart={rangeStart} filterEnd={filterEnd} today={today} outstandingInvoices={outstandingInvoices}
+          appointments={appointments} posLinkedAppointmentIds={posLinkedAppointmentIds}
+          posInvoices={posInvoices} manualIncome={manualIncome} expenses={expenses}
+        />
+  );
+  const REV_TABS: { key: RevTab; label: string }[] = [
+    { key: "overview", label: "Overview" },
+    { key: "net",      label: "Net Profit" },
+    { key: "ledger",   label: "Ledger" },
+  ];
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="dashboard-polish" style={{ background: "#ffffff", minHeight: "100vh" }}>
@@ -898,8 +921,20 @@ export default function RevenuePage() {
         </div>
       )}
 
+      {/* ── Mobile content tabs (same three as desktop) ── */}
+      <div className="mobile-filter-row mobile-only" style={{ marginTop: 10 }}>
+        {REV_TABS.map((t) => (
+          <button key={t.key} type="button" className={`mobile-filter-chip ${tab === t.key ? "active" : ""}`} onClick={() => setTab(t.key)}>{t.label}</button>
+        ))}
+      </div>
+      {tab !== "overview" && (
+        <div className="mobile-only" style={{ padding: "12px 16px 24px", overflowX: "auto" }}>
+          {tab === "net" ? netProfitView : ledgerView}
+        </div>
+      )}
+
       {/* ── Mobile hero revenue card ── */}
-      <div className="mobile-only">
+      {tab === "overview" && <div className="mobile-only">
         <div className="mobile-hero-card">
           <div className="mobile-hero-label">Total Revenue · {cfg.label}</div>
           <div className="mobile-hero-value">{fmt(totalRevenue)}</div>
@@ -944,7 +979,7 @@ export default function RevenuePage() {
           <>
             <div className="mobile-section-header">Daily Breakdown</div>
             <div className="mobile-list">
-              {dailyRows.slice(0, 10).map((row) => (
+              {dailyRows.map((row) => (
                 <div key={row.date} className="mobile-list-card">
                   <div className="mobile-list-icon" style={{ background: row.date === today ? "#ede9fe" : "#f4f4fb" }}>
                     <CalendarDays size={16} color={row.date === today ? "#7C3AED" : "#9898b0"} />
@@ -962,7 +997,7 @@ export default function RevenuePage() {
             </div>
           </>
         )}
-      </div>
+      </div>}
 
       {/* ── Desktop layout ── */}
       <div className="dash-page dashboard-polish desktop-only" style={{ background: "#ffffff", padding: "28px 32px 48px", display: "flex", flexDirection: "column", gap: 20 }}>
@@ -1019,11 +1054,7 @@ export default function RevenuePage() {
 
       {/* Content tabs */}
       <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #f0f0f8" }}>
-        {([
-          { key: "overview", label: "Overview" },
-          { key: "net",      label: "Net Profit" },
-          { key: "ledger",   label: "Ledger" },
-        ] as { key: RevTab; label: string }[]).map((t) => (
+        {REV_TABS.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             background: "none", border: "none", cursor: "pointer",
             padding: "10px 16px", fontSize: 13, fontWeight: 700,
@@ -1559,23 +1590,9 @@ export default function RevenuePage() {
       </>
       )}{/* /tab === "overview" */}
 
-      {tab === "net" && (
-        <NetProfitView
-          period={cfg.label} rangeStart={rangeStart} filterEnd={filterEnd}
-          totalRevenue={totalRevenue} totalExpenses={totalExpenses} netProfit={netProfit}
-          netMarginPct={netMarginPct} expenseByCategory={expenseByCategory}
-          revenueByChannel={revenueByChannel} expensesByChannel={expensesByChannel}
-          netProfitByChannel={netProfitByChannel}
-        />
-      )}
+      {tab === "net" && netProfitView}
 
-      {tab === "ledger" && (
-        <LedgerView
-          rangeStart={rangeStart} filterEnd={filterEnd} today={today} outstandingInvoices={outstandingInvoices}
-          appointments={appointments} posLinkedAppointmentIds={posLinkedAppointmentIds}
-          posInvoices={posInvoices} manualIncome={manualIncome} expenses={expenses}
-        />
-      )}
+      {tab === "ledger" && ledgerView}
 
       </div>{/* /desktop-only */}
     </div>

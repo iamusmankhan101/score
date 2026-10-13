@@ -328,7 +328,7 @@ export default function CalendarPage() {
   const mobileWeek     = weekOf(mobileDayDate);
   const mobileDayLabel = mobileDayDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
   const mobileDayAppts = appointments
-    .filter((a) => a.date === mobileDay)
+    .filter((a) => a.date === mobileDay && (staffFilter === "all" || appointmentHasStaff(a, staffFilter)))
     .sort((a, b) => toMin(a.startTime) - toMin(b.startTime));
   function shiftMobileDay(deltaDays: number) {
     const d = parseDate(mobileDay);
@@ -352,7 +352,8 @@ export default function CalendarPage() {
       <div className="dashboard-topbar page-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <PageTitle icon={<CalendarDays size={24} />} title="Calendar" subtitle={`${view === "day" ? dayLabel : `${weekStart} – ${weekEnd}`}${activeSection === "all" ? "" : ` · ${activeSection} only`}`} />
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap", gap: 10, marginLeft: "auto" }}>
+        {/* Desktop-only: phones have their own day strip and staff filter below. */}
+        <div className="desktop-only" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap", gap: 10, marginLeft: "auto" }}>
           {/* Staff filter — narrows the day view down to a single team member */}
           {view === "day" && (
             <select
@@ -639,6 +640,12 @@ export default function CalendarPage() {
             <ChevronRight size={16} />
           </button>
         </div>
+
+        <select value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)} aria-label="Filter by staff"
+          style={{ padding: "9px 12px", borderRadius: 10, border: "1.5px solid #e3e0eb", background: "#fff", fontSize: 13, fontWeight: 700, color: "#6b6b8a" }}>
+          <option value="all">All Staff</option>
+          {staffList.filter((s) => s.isActive !== false).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
 
         {/* Agenda list */}
         <div style={{ background: "#fff", borderRadius: 18, border: "1px solid rgba(226,223,235,.95)", boxShadow: "0 8px 28px rgba(38,25,75,.04)", overflow: "hidden" }}>
