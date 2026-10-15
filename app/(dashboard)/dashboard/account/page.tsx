@@ -74,12 +74,14 @@ const inputStyle: CSSProperties = {
   boxShadow: "0 1px 2px rgba(30,20,60,.02)",
 };
 
-function Field({ label, children, full = false, hint }: { label: string; children: ReactNode; full?: boolean; hint?: string }) {
+function Field({ label, children, full = false, hint, error }: { label: string; children: ReactNode; full?: boolean; hint?: string; error?: string }) {
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: 8, gridColumn: full ? "1 / -1" : undefined }}>
       <span style={{ color: "#29263d", fontSize: 12, fontWeight: 800, letterSpacing: ".01em" }}>{label}</span>
       {children}
-      {hint && <span style={{ color: "#9995ad", fontSize: 11, lineHeight: 1.5 }}>{hint}</span>}
+      {error
+        ? <span role="alert" style={{ color: "#dc2626", fontSize: 11, fontWeight: 700, lineHeight: 1.5 }}>{error}</span>
+        : hint && <span style={{ color: "#9995ad", fontSize: 11, lineHeight: 1.5 }}>{hint}</span>}
     </label>
   );
 }
@@ -2236,6 +2238,7 @@ function RolesPermissionsSection() {
   const [savingId, setSavingId] = useState("");
   const [savedId, setSavedId] = useState("");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, { email?: string; password?: string; save?: string }>>({});
 
   useEffect(() => {
     const staff = getStoredStaff();
@@ -2291,6 +2294,7 @@ function RolesPermissionsSection() {
       ...current,
       [staffId]: { ...current[staffId], ...patch },
     }));
+    setFieldErrors((current) => ({ ...current, [staffId]: {} }));
   }
 
   function togglePermission(staffId: string, permission: string) {
@@ -2305,19 +2309,18 @@ function RolesPermissionsSection() {
 
   async function saveAccess(member: Staff) {
     const draft = drafts[member.id];
-    if (!draft || !draft.email.trim()) {
-      setError("Staff login email is required.");
-      return;
-    }
+    if (!draft) return;
     const existing = loginUsers.find((user) => user.staffId === member.id);
-    if (!existing && draft.password.length < 8) {
-      setError("New staff login password must be at least 8 characters.");
-      return;
+    const errs: { email?: string; password?: string } = {};
+    if (!draft.email.trim()) errs.email = "Login email is required.";
+    if ((!existing || draft.password) && draft.password.length < 8) {
+      errs.password = draft.password ? `Too short — ${draft.password.length} of 8 characters.` : "Password is required (min 8 characters).";
     }
+    setFieldErrors((current) => ({ ...current, [member.id]: errs }));
+    if (errs.email || errs.password) return;
 
     setSavingId(member.id);
     setSavedId("");
-    setError("");
     try {
       const response = await fetch("/api/auth/staff", {
         method: "POST",
@@ -2343,7 +2346,8 @@ function RolesPermissionsSection() {
       updateDraft(member.id, { password: "" });
       setSavedId(member.id);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to save staff access.");
+      const message = saveError instanceof Error ? saveError.message : "Unable to save staff access.";
+      setFieldErrors((current) => ({ ...current, [member.id]: { save: message } }));
     } finally {
       setSavingId("");
     }
@@ -2404,6 +2408,7 @@ function RolesPermissionsSection() {
             if (!draft) return null;
             const existing = loginUsers.find((user) => user.staffId === member.id);
             const isManager = draft.role === "manager";
+            const errs = fieldErrors[member.id] || {};
             return (
               <div key={member.id} style={{ border: "1px solid #ece9f5", borderRadius: 18, padding: 18, background: "#fff", boxShadow: "0 8px 22px rgba(40,24,80,.04)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
@@ -2418,11 +2423,11 @@ function RolesPermissionsSection() {
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12, alignItems: "end", marginBottom: 16 }}>
-                  <Field label="Login Email">
-                    <input style={inputStyle} type="email" value={draft.email} onChange={(e) => updateDraft(member.id, { email: e.target.value })} placeholder="staff@salon.com" />
+                  <Field label="Login Email" error={errs.email}>
+                    <input style={{ ...inputStyle, ...(errs.email ? { border: "1.5px solid #dc2626" } : {}) }} type="email" value={draft.email} onChange={(e) => updateDraft(member.id, { email: e.target.value })} placeholder="staff@salon.com" />
                   </Field>
-                  <Field label={existing ? "New Password" : "Password"} hint={existing ? "Leave blank to keep current." : "Minimum 8 characters."}>
-                    <input style={inputStyle} type="password" value={draft.password} onChange={(e) => updateDraft(member.id, { password: e.target.value })} placeholder={existing ? "Optional" : "Required"} />
+                  <Field label={existing ? "New Password" : "Password"} hint={existing ? "Leave blank to keep current." : "Minimum 8 characters."} error={errs.password}>
+                    <input style={{ ...inputStyle, ...(errs.password ? { border: "1.5px solid #dc2626" } : {}) }} type="password" value={draft.password} onChange={(e) => updateDraft(member.id, { password: e.target.value })} placeholder={existing ? "Optional" : "Required"} />
                   </Field>
                   <Field label="Access Role">
                     <select style={inputStyle} value={draft.role} onChange={(e) => updateDraft(member.id, { role: e.target.value as AccessRole })}>
@@ -2488,6 +2493,7 @@ function RolesPermissionsSection() {
                   </div>
                 </div>
 
+                {errs.save && <div role="alert" style={{ marginTop: 14, padding: "10px 13px", borderRadius: 12, background: "#fef2f2", color: "#b91c1c", fontSize: 12, fontWeight: 700 }}>{errs.save}</div>}
                 <SaveButton label={savingId === member.id ? "Saving..." : "Save Access"} disabled={savingId === member.id} onClick={() => saveAccess(member)} />
               </div>
             );
