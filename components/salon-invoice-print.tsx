@@ -178,11 +178,8 @@ function receiptLayoutRules(scope: string): string {
        disc, which on thermal is ~24mm of pure burn for two initials the salon
        name repeats on the very next line. */
     ${scope} .sip-sheet .sip-logo-fallback { display: none !important; }
-    /* The wordmark's own image is sized in percentages of this wrapper, so
-       shrinking the wrapper scales the mark with it — but only while the 104:51
-       ratio holds, otherwise the crop inside slips. Sized in mm because what
-       matters is how much of the roll it takes: 14mm, and the height follows. */
-    ${scope} .sip-sheet .sip-foot [aria-label="Salon Central"] { width: 14mm !important; height: 6.87mm !important; }
+    /* The receipt carries the salon's branding only — no "Powered by" mark. */
+    ${scope} .sip-sheet .sip-powered { display: none !important; }
     /* Every side-by-side block becomes one stacked column. (.sip-head is stacked
        too, but by the flex rule above — it needs the logo lifted above the name,
        and a display:block here would silently win and put it back beside.) */
@@ -673,7 +670,7 @@ export default function SalonInvoicePrint({
                 <div style={{ fontSize: 12, color: "#555" }}>
                   Thank you for visiting <strong style={{ color: "#111" }}>{salonName}</strong>!
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div className="sip-powered" style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 10, color: "#aaa" }}>Powered by</span>
                   <SalonCentralWordmark compact />
                 </div>
