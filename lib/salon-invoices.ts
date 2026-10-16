@@ -265,7 +265,7 @@ export function invoiceTimeLabel(inv: Pick<SalonInvoice, "date" | "createdAt">):
 export const ADVANCE_NON_REFUNDABLE_NOTE = "Advance payment is non-refundable.";
 
 /** Printed on every invoice — A4, PDF and thermal receipt. */
-export const PAYMENT_NON_REFUNDABLE_NOTE = "Payment is non-refundable.";
+export const PAYMENT_NON_REFUNDABLE_NOTE = "Payment is non-refundable and non-adjustable.";
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
