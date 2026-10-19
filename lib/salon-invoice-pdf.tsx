@@ -187,6 +187,12 @@ function InvoiceDocument({ invoice, salon, fbrQr, fbrLogo }: {
               <Text style={styles.cellMuted}>-{money(invoice.discountAmount)}</Text>
             </View>
           )}
+          {(invoice.discount2Amount ?? 0) > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.cellMuted}>Discount 2</Text>
+              <Text style={styles.cellMuted}>-{money(invoice.discount2Amount!)}</Text>
+            </View>
+          )}
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
             <Text style={styles.totalValue}>{money(invoice.total)}</Text>
