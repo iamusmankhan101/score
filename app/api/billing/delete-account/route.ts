@@ -10,6 +10,7 @@ import { NextRequest } from "next/server";
 import { ensureBillingTables, getBillingUser } from "@/lib/billing-db";
 import { deleteSalonAccount } from "@/lib/account-deletion";
 import { requireAdmin } from "@/lib/api-auth";
+import { getUserById } from "@/lib/auth-db";
 
 export async function POST(req: NextRequest) {
   if (!(await requireAdmin(req))) {
@@ -31,7 +32,9 @@ export async function POST(req: NextRequest) {
   try {
     await ensureBillingTables();
 
-    const user = await getBillingUser(userId);
+    // Owners still pending approval may have no billing row yet — fall back to their login.
+    const login = await getUserById(userId);
+    const user = (await getBillingUser(userId)) ?? (login?.role === "owner" ? login : null);
     if (!user) {
       return Response.json({ ok: false, error: "Salon account not found." }, { status: 404 });
     }

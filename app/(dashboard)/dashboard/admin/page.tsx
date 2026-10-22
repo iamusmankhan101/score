@@ -414,7 +414,7 @@ function PriceCell({ row, onSaved }: { row: BillingUserRow; onSaved: (userId: st
   );
 }
 
-function DeleteAccountModal({ row, onClose, onDeleted }: { row: BillingUserRow; onClose: () => void; onDeleted: (userId: string) => void }) {
+function DeleteAccountModal({ row, onClose, onDeleted }: { row: Pick<BillingUserRow, "id" | "salonName" | "email">; onClose: () => void; onDeleted: (userId: string) => void }) {
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1594,6 +1594,7 @@ function UsersPanel() {
   const [resetTarget, setResetTarget] = useState<AccountUserRow | null>(null);
   const [devicesTarget, setDevicesTarget] = useState<AccountUserRow | null>(null);
   const [whatsAppTarget, setWhatsAppTarget] = useState<AccountUserRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AccountUserRow | null>(null);
   const [dueDrafts, setDueDrafts] = useState<Record<string, string>>({});
   const [savingDueId, setSavingDueId] = useState<string | null>(null);
   const [dueError, setDueError] = useState<string | null>(null);
@@ -1746,6 +1747,17 @@ function UsersPanel() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {resetTarget && <ResetPasswordModal row={resetTarget} onClose={() => setResetTarget(null)} />}
+      {deleteTarget && (
+        <DeleteAccountModal
+          row={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={(userId) => {
+            // Staff/manager logins under this salon are deleted with it.
+            setRows((prev) => prev.filter((r) => r.id !== userId && r.salonOwnerId !== userId));
+            setDeleteTarget(null);
+          }}
+        />
+      )}
       {freezeTarget && (
         <FreezeAccountModal
           row={freezeTarget}
@@ -1962,6 +1974,12 @@ function UsersPanel() {
                       title={row.freezeReason ? `Frozen: ${row.freezeReason}` : "Frozen account"}
                       style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#059669", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", gap: 4, cursor: updatingApproval === row.id ? "not-allowed" : "pointer" }}>
                       <LockOpen size={12} /> Unfreeze
+                    </button>
+                  )}
+                  {row.role === "owner" && (
+                    <button onClick={() => setDeleteTarget(row)} title="Permanently delete this salon and all its data"
+                      style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #fecaca", background: "#fef2f2", color: "#dc2626", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                      <Trash2 size={12} /> Delete
                     </button>
                   )}
                   {row.role === "admin" && <span style={{ fontSize: 11, color: "#c4c4d4" }}>—</span>}
