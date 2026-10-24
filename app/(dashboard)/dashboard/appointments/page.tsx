@@ -488,14 +488,18 @@ function FeedbackBadge({ feedback }: { feedback?: AppointmentFeedback }) {
 
 const FLOW_STEPS: AppointmentStatus[] = ["booked", "confirmed", "arrived", "in-progress", "completed"];
 
-function DetailModal({ appt, onClose, clients, staffList, allServices, onStatusChange, onSaveFeedback, proof }: {
+function DetailModal({ appt, onClose, clients, staffList, allServices, onStatusChange, onSaveFeedback, onReschedule, proof }: {
   appt: Appointment; onClose: () => void; clients: Client[]; staffList: Staff[];
   /** The customer's payment screenshot, when they sent one from the client app. */
   proof?: PaymentProofMeta;
   allServices: Service[]; onStatusChange: (apptId: string, status: AppointmentStatus) => void;
   onSaveFeedback: (apptId: string, feedback: AppointmentFeedback | undefined) => void;
+  onReschedule: (apptId: string, date: string, startTime: string) => void;
 }) {
   const [currentStatus, setCurrentStatus] = useState<AppointmentStatus>(appt.status);
+  const [editingTime, setEditingTime] = useState(false);
+  const [newDate, setNewDate] = useState(appt.date);
+  const [newTime, setNewTime] = useState(appt.startTime);
   const [confirmSendStatus, setConfirmSendStatus] = useState<"idle" | "sending" | "sent" | "info" | "error">("idle");
   const [confirmSendNote, setConfirmSendNote] = useState("");
   const [rating, setRating] = useState(appt.feedback?.rating ?? 0);
@@ -764,6 +768,29 @@ function DetailModal({ appt, onClose, clients, staffList, allServices, onStatusC
 
           <InfoRow icon={<Clock size={14} color="#9898b0" />} label="Duration">
             {fmtTime(appt.startTime)} – {fmtTime(appt.endTime)} <span style={{ color: "#9898b0", fontSize: 11 }}>({durationMin} min)</span>
+            {!isTerminal && !editingTime && (
+              <button type="button" onClick={() => { setNewDate(appt.date); setNewTime(appt.startTime); setEditingTime(true); }}
+                style={{ marginLeft: 10, padding: "3px 10px", borderRadius: 7, border: "1px solid #ddd6fe", background: "#f5f3ff", color: "#7C3AED", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                Change time
+              </button>
+            )}
+            {editingTime && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)}
+                  style={{ padding: "6px 9px", borderRadius: 8, border: "1px solid #e8e8f0", fontSize: 13 }} />
+                <input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)}
+                  style={{ padding: "6px 9px", borderRadius: 8, border: "1px solid #e8e8f0", fontSize: 13 }} />
+                <button type="button" disabled={!newDate || !newTime}
+                  onClick={() => { onReschedule(appt.id, newDate, newTime); setEditingTime(false); }}
+                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#7C3AED", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: !newDate || !newTime ? 0.5 : 1 }}>
+                  Save
+                </button>
+                <button type="button" onClick={() => setEditingTime(false)}
+                  style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  Cancel
+                </button>
+              </div>
+            )}
           </InfoRow>
 
           {appt.resourceIds && appt.resourceIds.length > 0 && (
@@ -2148,6 +2175,17 @@ export default function AppointmentsPage() {
               return updated;
             });
             setSelected((prev) => prev && prev.id === apptId ? { ...prev, feedback } : prev);
+          }}
+          onReschedule={(apptId, date, startTime) => {
+            // Keeps the booked length; the reminder cron picks up the new time on its next run.
+            const move = (a: Appointment) => ({ ...a, date, startTime, endTime: addMinutes(startTime, toMin(a.endTime) - toMin(a.startTime)) });
+            setAppointments((prev) => {
+              const updated = prev.map((a) => a.id === apptId ? move(a) : a);
+              saveAppointments(updated);
+              return updated;
+            });
+            setSelected((prev) => prev && prev.id === apptId ? move(prev) : prev);
+            purgeQueuedAppointmentMessages([apptId]);
           }}
           onStatusChange={(apptId, newStatus) => {
             setAppointments((prev) => {
