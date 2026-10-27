@@ -141,8 +141,8 @@ async function getSalonData<T>(userId: string, entity: string): Promise<T | null
 
 /** Ids tombstoned as deleted (lib/deleted-records.ts) — the raw rows still hold them until the next dashboard read. */
 async function getDeletedIds(userId: string): Promise<Set<string>> {
-  const rows = await getSalonData<{ id?: string; entity?: string }[]>(userId, "deleted_records");
-  return new Set((Array.isArray(rows) ? rows : []).map((r) => `${r.entity}:${r.id}`));
+  const rows = await getSalonData<{ id?: string; entity?: string; restoredAt?: string }[]>(userId, "deleted_records");
+  return new Set((Array.isArray(rows) ? rows : []).filter((r) => !r.restoredAt).map((r) => `${r.entity}:${r.id}`));
 }
 
 // ─── Ledger (day book) ────────────────────────────────────────────────────────

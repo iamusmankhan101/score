@@ -468,7 +468,145 @@ export async function pruneOldBackups(): Promise<BackupPruneResult> {
     salonBundlesDeleted += Number(bundleResult.rowsAffected ?? 0);
   }
 
+  await ensureDeletedCopiesTable();
+  await db.execute({
+    sql: "DELETE FROM deleted_record_copies WHERE deleted_at < ?",
+    args: [new Date(Date.now() - DELETED_COPY_DAYS * 24 * 60 * 60 * 1000).toISOString()],
+  });
+
   return { salonDataBackupsDeleted, databaseBackupsDeleted, salonBundlesDeleted };
+}
+
+// ─── Deleted records (Admin → Backups → Deleted Records) ─────────────────────
+// A tombstone (lib/deleted-records.ts) only holds an id, and the record itself
+// is stripped from salon_data on the next write. So when a tombstone first
+// arrives, a copy of the record is kept here, letting an admin put back one
+// accidentally deleted client or invoice without rolling the whole salon back.
+
+const DELETED_COPY_DAYS = 30;
+// Parked carts are "deleted" on every checkout — not something anyone restores.
+const NOT_RESTORABLE = new Set(["held_sales"]);
+
+function salonDataKey(userId: string, locationId: string, entity: string): string {
+  return locationId === "main" ? `${userId}_${entity}` : `${userId}_${locationId}_${entity}`;
+}
+
+export async function ensureDeletedCopiesTable(): Promise<void> {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS deleted_record_copies (
+      user_id     TEXT NOT NULL,
+      location_id TEXT NOT NULL,
+      entity      TEXT NOT NULL,
+      record_id   TEXT NOT NULL,
+      data        TEXT NOT NULL,
+      deleted_at  TEXT NOT NULL,
+      PRIMARY KEY (user_id, location_id, entity, record_id)
+    )
+  `);
+}
+
+/** Copies the just-tombstoned records out of salon_data before the next write strips them. */
+export async function saveDeletedCopies(userId: string, locationId: string, tombstones: { id: string; entity: string; deletedAt: string }[]): Promise<void> {
+  const byEntity = new Map<string, typeof tombstones>();
+  for (const t of tombstones) {
+    if (NOT_RESTORABLE.has(t.entity)) continue;
+    byEntity.set(t.entity, [...(byEntity.get(t.entity) ?? []), t]);
+  }
+  if (byEntity.size === 0) return;
+  await ensureDeletedCopiesTable();
+  for (const [entity, list] of byEntity) {
+    const row = await db.execute({ sql: "SELECT data FROM salon_data WHERE entity = ?", args: [salonDataKey(userId, locationId, entity)] });
+    if (row.rows.length === 0) continue;
+    const records = JSON.parse(row.rows[0].data as string) as { id?: unknown }[];
+    if (!Array.isArray(records)) continue;
+    const byId = new Map(records.map((r) => [String(r?.id ?? ""), r]));
+    for (const t of list) {
+      const record = byId.get(t.id);
+      if (!record) continue;
+      await db.execute({
+        sql: `INSERT OR REPLACE INTO deleted_record_copies (user_id, location_id, entity, record_id, data, deleted_at)
+              VALUES (?, ?, ?, ?, ?, ?)`,
+        args: [userId, locationId, entity, t.id, JSON.stringify(record), t.deletedAt],
+      });
+    }
+  }
+}
+
+export interface DeletedRecordSummary {
+  locationId: string;
+  entity: string;
+  recordId: string;
+  label: string;
+  detail: string;
+  deletedAt: string;
+}
+
+export async function listDeletedRecords(userId: string): Promise<DeletedRecordSummary[]> {
+  await ensureDeletedCopiesTable();
+  const result = await db.execute({
+    sql: `SELECT location_id, entity, record_id, data, deleted_at FROM deleted_record_copies
+          WHERE user_id = ? ORDER BY deleted_at DESC LIMIT 500`,
+    args: [userId],
+  });
+  return result.rows.map((row) => {
+    let r: Record<string, unknown> = {};
+    try { r = JSON.parse(row.data as string) as Record<string, unknown>; } catch { /* unreadable copy — still listed */ }
+    const text = (...keys: string[]) => keys.map((k) => r[k]).find((v) => typeof v === "string" && v.trim()) as string | undefined;
+    const amount = ["total", "totalAmount", "amount", "price"].map((k) => r[k]).find((v) => typeof v === "number");
+    return {
+      locationId: row.location_id as string,
+      entity: row.entity as string,
+      recordId: row.record_id as string,
+      label: text("name", "clientName", "description", "title", "category") ?? (row.record_id as string),
+      detail: [r.number ? `#${r.number}` : "", text("phone", "clientPhone") ?? "", amount != null ? `Rs ${amount.toLocaleString()}` : "", text("date") ?? ""]
+        .filter(Boolean).join(" · "),
+      deletedAt: row.deleted_at as string,
+    };
+  });
+}
+
+/**
+ * Puts one deleted record back and marks its tombstone restored. The tombstone
+ * stays (stamped newer) rather than being removed: devices union their
+ * tombstone lists, so a removed one would be pushed straight back by the next
+ * device to sync, while a newer restored copy wins that merge everywhere.
+ */
+export async function restoreDeletedRecord(userId: string, locationId: string, entity: string, recordId: string): Promise<boolean> {
+  await ensureDeletedCopiesTable();
+  const copy = await db.execute({
+    sql: "SELECT data FROM deleted_record_copies WHERE user_id = ? AND location_id = ? AND entity = ? AND record_id = ?",
+    args: [userId, locationId, entity, recordId],
+  });
+  if (copy.rows.length === 0) return false;
+  const now = new Date().toISOString();
+  const record = { ...(JSON.parse(copy.rows[0].data as string) as Record<string, unknown>), _updatedAt: now };
+
+  const listKey = salonDataKey(userId, locationId, entity);
+  await backupExistingSalonData(listKey, userId);
+  const current = await db.execute({ sql: "SELECT data FROM salon_data WHERE entity = ?", args: [listKey] });
+  const list = current.rows.length ? JSON.parse(current.rows[0].data as string) as { id?: unknown }[] : [];
+  const kept = Array.isArray(list) ? list.filter((r) => String(r?.id ?? "") !== recordId) : [];
+  await db.execute({
+    sql: "INSERT OR REPLACE INTO salon_data (entity, data, updated_at) VALUES (?, ?, ?)",
+    args: [listKey, JSON.stringify([record, ...kept]), now],
+  });
+
+  const tombKey = salonDataKey(userId, locationId, "deleted_records");
+  const tombRow = await db.execute({ sql: "SELECT data FROM salon_data WHERE entity = ?", args: [tombKey] });
+  if (tombRow.rows.length) {
+    const tombstones = JSON.parse(tombRow.rows[0].data as string) as { id?: string; entity?: string }[];
+    await db.execute({
+      sql: "INSERT OR REPLACE INTO salon_data (entity, data, updated_at) VALUES (?, ?, ?)",
+      args: [tombKey, JSON.stringify(tombstones.map((t) => (t.id === recordId && t.entity === entity ? { ...t, restoredAt: now, _updatedAt: now } : t))), now],
+    });
+  }
+
+  await db.execute({
+    sql: "DELETE FROM deleted_record_copies WHERE user_id = ? AND location_id = ? AND entity = ? AND record_id = ?",
+    args: [userId, locationId, entity, recordId],
+  });
+  invalidatePublicSalon(userId);
+  return true;
 }
 
 /**
@@ -485,6 +623,7 @@ export async function encryptPlaintextRows(): Promise<number> {
     ["salon_backup_bundles", "id", "data", 200],
     ["database_backups", "id", "data", 3],
     ["wa_pos_receipt_queue", "id", "invoice_json", 1000],
+    ["deleted_record_copies", "rowid", "data", 1000],
   ];
   let encrypted = 0;
   for (const [table, key, column, limit] of tables) {

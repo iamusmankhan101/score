@@ -32,6 +32,8 @@ const ENCRYPTED_COLUMNS: Record<string, string> = {
   database_backups: "data",
   // The WhatsApp receipt queue keeps a full copy of each POS invoice.
   wa_pos_receipt_queue: "invoice_json",
+  // Copies of deleted records, kept so an admin can restore them.
+  deleted_record_copies: "data",
 };
 export const ENCRYPTED_TABLES = Object.keys(ENCRYPTED_COLUMNS);
 

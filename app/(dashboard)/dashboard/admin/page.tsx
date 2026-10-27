@@ -2079,6 +2079,114 @@ function RestoreBundleModal({ bundle, userLabel, onClose, onRestored }: {
   );
 }
 
+interface DeletedRecordRow {
+  locationId: string;
+  entity: string;
+  recordId: string;
+  label: string;
+  detail: string;
+  deletedAt: string;
+}
+
+const DELETED_ENTITY_LABELS: Record<string, string> = {
+  clients: "Client", salon_invoices: "Invoice / Sale", appointments: "Appointment", expenses: "Expense",
+  staff: "Staff", services: "Service", inventory: "Product", payouts: "Payout", cash_flow_income: "Income",
+};
+
+function DeletedRecordsSection({ users }: { users: AccountUserRow[] }) {
+  const [userId, setUserId] = useState("");
+  const [records, setRecords] = useState<DeletedRecordRow[] | null>(null);
+  const [busy, setBusy] = useState("");
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  function load(id: string) {
+    setUserId(id);
+    setRecords(null);
+    setMessage(null);
+    if (!id) return;
+    fetch(`/api/admin/backups?kind=deleted&userId=${encodeURIComponent(id)}`)
+      .then((res) => res.json())
+      .then((data) => { if (data.ok) setRecords(data.records); else setMessage({ ok: false, text: data.error || "Could not load deleted records." }); });
+  }
+
+  async function restore(r: DeletedRecordRow) {
+    const what = `${DELETED_ENTITY_LABELS[r.entity] ?? r.entity} "${r.label}"`;
+    if (!window.confirm(`Restore ${what}? It will reappear in the salon on their next refresh.`)) return;
+    setBusy(r.recordId);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/admin/backups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restore-record", userId, locationId: r.locationId, entity: r.entity, recordId: r.recordId }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Restore failed.");
+      setRecords((list) => list?.filter((x) => !(x.recordId === r.recordId && x.entity === r.entity && x.locationId === r.locationId)) ?? null);
+      setMessage({ ok: true, text: `Restored ${what}.` });
+    } catch (err) {
+      setMessage({ ok: false, text: err instanceof Error ? err.message : "Restore failed." });
+    } finally {
+      setBusy("");
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Trash2 size={15} color="#7C3AED" />
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a2e" }}>Deleted Records</div>
+          <span style={{ fontSize: 11, color: "#9898b0" }}>— put back a single client, invoice or sale (kept 30 days)</span>
+        </div>
+        <select value={userId} onChange={(e) => load(e.target.value)}
+          style={{ padding: "7px 12px", borderRadius: 9, border: "1px solid #e4e4ee", fontSize: 12, color: "#1a1a2e", outline: "none", background: "#fff" }}>
+          <option value="">Choose a salon…</option>
+          {users.map((u) => <option key={u.id} value={u.id}>{u.salonName} ({u.email})</option>)}
+        </select>
+      </div>
+      {message && (
+        <div style={{ marginBottom: 10, padding: "10px 16px", background: message.ok ? "#f0fdf4" : "#fef2f2", border: `1px solid ${message.ok ? "#bbf7d0" : "#fecaca"}`, borderRadius: 10, fontSize: 12, color: message.ok ? "#059669" : "#dc2626", fontWeight: 600 }}>
+          {message.text}
+        </div>
+      )}
+      <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #ebebf0", overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "120px 1.6fr 140px 90px", padding: "10px 20px", background: "#fafafa", borderBottom: "1px solid #f0f0f8" }}>
+          {["TYPE", "RECORD", "DELETED", ""].map((h) => (
+            <div key={h} style={{ fontSize: 10, fontWeight: 800, color: "#b0b0c8", letterSpacing: "0.08em" }}>{h}</div>
+          ))}
+        </div>
+        {!userId ? (
+          <div style={{ padding: "32px", textAlign: "center", fontSize: 13, color: "#9898b0" }}>Choose a salon to see what it has deleted.</div>
+        ) : records === null ? (
+          <div style={{ padding: "32px", textAlign: "center", fontSize: 13, color: "#9898b0" }}>Loading…</div>
+        ) : records.length === 0 ? (
+          <div style={{ padding: "32px", textAlign: "center", fontSize: 13, color: "#9898b0" }}>Nothing deleted in the last 30 days.</div>
+        ) : (
+          records.map((r, i) => (
+            <div key={`${r.locationId}:${r.entity}:${r.recordId}`} style={{ display: "grid", gridTemplateColumns: "120px 1.6fr 140px 90px", padding: "12px 20px", alignItems: "center", borderBottom: i < records.length - 1 ? "1px solid #f4f4f8" : "none" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#6b6b8a" }}>{DELETED_ENTITY_LABELS[r.entity] ?? r.entity}</div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.label}</div>
+                {(r.detail || r.locationId !== "main") && (
+                  <div style={{ fontSize: 11, color: "#9898b0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {[r.detail, r.locationId !== "main" ? `Branch: ${r.locationId}` : ""].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: "#9898b0" }}>{fmtDate(r.deletedAt)}</div>
+              <button onClick={() => restore(r)} disabled={!!busy}
+                style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", borderRadius: 8, border: "1px solid #fde68a", background: "#fffbeb", fontSize: 11, fontWeight: 700, color: "#d97706", cursor: busy ? "not-allowed" : "pointer", justifySelf: "start" }}>
+                <RotateCcw size={12} /> {busy === r.recordId ? "…" : "Restore"}
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BackupsPanel() {
   const [dbBackups, setDbBackups] = useState<DatabaseBackupRow[]>([]);
   const [bundles, setBundles] = useState<SalonBundleRow[]>([]);
@@ -2248,6 +2356,8 @@ function BackupsPanel() {
           )}
         </div>
       </div>
+
+      <DeletedRecordsSection users={users} />
     </div>
   );
 }

@@ -5,8 +5,10 @@ import { requireAdmin } from "@/lib/api-auth";
 import {
   ensureDatabaseBackupTable,
   ensureSalonDataBackupTable,
+  listDeletedRecords,
   listSalonBackupBundles,
   pruneOldBackups,
+  restoreDeletedRecord,
   restoreSalonBackupBundle,
   restoreSalonDataBackup,
   snapshotAllSalonBundles,
@@ -46,6 +48,12 @@ export async function GET(req: NextRequest) {
           createdAt: row.created_at,
         })),
       });
+    }
+
+    // Single deleted records (clients, invoices…) that can be put back one at a time.
+    if (kind === "deleted") {
+      if (!userId) return Response.json({ ok: false, error: "Pick a salon." }, { status: 400 });
+      return Response.json({ ok: true, records: await listDeletedRecords(userId) });
     }
 
     // Deep-dive view: the raw one-row-per-entity-per-write history (not shown
@@ -105,7 +113,11 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 403 });
   }
 
-  let body: { action?: "snapshot-all" | "restore" | "restore-bundle"; backupId?: string; bundleId?: string };
+  let body: {
+    action?: "snapshot-all" | "restore" | "restore-bundle" | "restore-record";
+    backupId?: string; bundleId?: string;
+    userId?: string; locationId?: string; entity?: string; recordId?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -128,6 +140,15 @@ export async function POST(req: NextRequest) {
       const restored = await restoreSalonBackupBundle(body.bundleId);
       if (!restored) return Response.json({ ok: false, error: "Backup not found." }, { status: 404 });
       return Response.json({ ok: true, restored });
+    }
+
+    if (body.action === "restore-record") {
+      if (!body.userId || !body.locationId || !body.entity || !body.recordId) {
+        return Response.json({ ok: false, error: "Missing record." }, { status: 400 });
+      }
+      const restored = await restoreDeletedRecord(body.userId, body.locationId, body.entity, body.recordId);
+      if (!restored) return Response.json({ ok: false, error: "Deleted record not found." }, { status: 404 });
+      return Response.json({ ok: true });
     }
 
     // Deep-dive restore of a single entity from the "writes" view above.

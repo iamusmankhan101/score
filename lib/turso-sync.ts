@@ -1,6 +1,6 @@
 import { getCurrentUser, userKey } from "./auth";
 import { getActiveLocationFilter, locationUserKey } from "./locations";
-import { appendDeletions, getDeletedRecords, DELETED_RECORDS_ENTITY } from "./deleted-records";
+import { appendDeletions, getDeletedRecords, isActiveDeletion, DELETED_RECORDS_ENTITY } from "./deleted-records";
 import {
   entityStorageKey,
   noteSyncedArrivals,
@@ -233,7 +233,7 @@ export async function syncFromDB(): Promise<void> {
  */
 function applyDeletions(locationId: string): void {
   if (typeof window === "undefined") return;
-  const tombstones = getDeletedRecords(locationId);
+  const tombstones = getDeletedRecords(locationId).filter(isActiveDeletion);
   if (tombstones.length === 0) return;
 
   for (const entity of ENTITIES) {

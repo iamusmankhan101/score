@@ -22,7 +22,12 @@ export interface DeletedRecord {
   id: string;        // id of the deleted record
   entity: string;    // which entity it belonged to, e.g. "salon_invoices"
   deletedAt: string; // ISO timestamp
+  restoredAt?: string; // set when an admin restores the record (Admin → Backups)
+  _updatedAt?: string; // last change — devices keep the newest copy, so a restore beats a stale tombstone
 }
+
+/** A restored tombstone stays in the list (so stale devices adopt the restore) but no longer hides anything. */
+export const isActiveDeletion = (r: Pick<DeletedRecord, "restoredAt">) => !r.restoredAt;
 
 export const DELETED_RECORDS_ENTITY = "deleted_records";
 
@@ -48,7 +53,7 @@ export function getDeletedRecords(locationId?: string): DeletedRecord[] {
 export function getDeletedIds(entity?: string, locationId?: string): Set<string> {
   return new Set(
     getDeletedRecords(locationId)
-      .filter((r) => !entity || r.entity === entity)
+      .filter((r) => isActiveDeletion(r) && (!entity || r.entity === entity))
       .map((r) => r.id),
   );
 }
@@ -69,14 +74,16 @@ export function appendDeletions(entity: string, ids: string[]): DeletedRecord[] 
   const existing = getDeletedRecords();
   if (typeof window === "undefined") return existing;
 
-  const known = new Set(existing.map((r) => r.id));
+  const known = new Set(existing.filter(isActiveDeletion).map((r) => r.id));
   const deletedAt = new Date().toISOString();
   const added = ids
     .filter((id) => id && !known.has(id))
-    .map((id) => ({ id, entity, deletedAt }));
+    .map((id) => ({ id, entity, deletedAt, _updatedAt: deletedAt }));
   if (added.length === 0) return existing;
 
-  const list = [...added, ...existing].slice(0, MAX_TOMBSTONES);
+  // A fresh tombstone replaces a restored one for the same id (deleted again after a restore).
+  const addedIds = new Set(added.map((r) => r.id));
+  const list = [...added, ...existing.filter((r) => !addedIds.has(r.id))].slice(0, MAX_TOMBSTONES);
   localStorage.setItem(locationUserKey(BASE_KEY), JSON.stringify(list));
   return list;
 }

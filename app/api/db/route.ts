@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { can, resolveActor, type ResolvedActor } from "@/lib/api-auth";
-import { backupExistingSalonData } from "@/lib/data-backup";
+import { backupExistingSalonData, saveDeletedCopies } from "@/lib/data-backup";
 import { invalidatePublicSalon } from "@/lib/public-salon-cache";
 
 const DELETED_RECORDS_ENTITY = "deleted_records";
@@ -162,11 +162,11 @@ async function loadDeletedIds(userId: string, locationId: string, entity: string
       args: [storageKey(userId, locationId, DELETED_RECORDS_ENTITY)],
     });
     if (result.rows.length === 0) return new Set();
-    const rows = JSON.parse(result.rows[0].data as string) as { id?: unknown; entity?: unknown }[];
+    const rows = JSON.parse(result.rows[0].data as string) as { id?: unknown; entity?: unknown; restoredAt?: unknown }[];
     if (!Array.isArray(rows)) return new Set();
     return new Set(
       rows
-        .filter((r) => r && r.entity === entity && r.id)
+        .filter((r) => r && r.entity === entity && r.id && !r.restoredAt)
         .map((r) => String(r.id)),
     );
   } catch {
@@ -306,11 +306,22 @@ export async function POST(req: NextRequest) {
         return target === "staff" ? can(actor, "staff") : mayRead(actor, target);
       });
       const byId = new Map<string, unknown>();
-      for (const item of [...(Array.isArray(stored) ? stored : []), ...incoming]) {
+      for (const item of Array.isArray(stored) ? stored : []) {
         const id = itemId(item);
         if (id) byId.set(id, item);
       }
+      const storedById = new Map(byId);
+      for (const item of incoming) {
+        const id = itemId(item);
+        // Newest copy wins, so an admin restore (stamped newer) isn't undone by
+        // a device still holding the old tombstone.
+        if (id && !(stampOf(byId.get(id)) > stampOf(item))) byId.set(id, item);
+      }
       payload = Array.from(byId.values());
+      // Keep a copy of anything deleted just now, so an admin can restore it.
+      type Tomb = { id: string; entity: string; deletedAt: string; restoredAt?: string };
+      const fresh = (payload as Tomb[]).filter((t) => !t.restoredAt && (!storedById.has(t.id) || (storedById.get(t.id) as Tomb).restoredAt));
+      if (fresh.length > 0) await saveDeletedCopies(userId, locationId, fresh).catch((err) => console.error("[db] saveDeletedCopies:", err));
     } else {
       // Drop anything already tombstoned — an older device's sync builds a
       // union of DB + its own localStorage, so it re-uploads records that were
