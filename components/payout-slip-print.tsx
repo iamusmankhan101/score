@@ -76,7 +76,7 @@ export default function PayoutSlipPrint({
   }
 
   const content = (
-    <div id="payout-slip-portal">
+    <div id="payout-slip-portal" translate="no" dir="ltr">
       <style>{PRINT_STYLES}</style>
 
       <div

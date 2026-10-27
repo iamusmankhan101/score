@@ -2,16 +2,19 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   LayoutDashboard, CalendarDays, Users, ClipboardList, MessageSquare,
   UserCog, BarChart3, Package, Globe, Sparkles, CreditCard, Scissors,
-  CircleUserRound, LogOut, Shield, Wand2, ReceiptText, ShoppingCart,
+  CircleUserRound, Languages, LogOut, Shield, Wand2, ReceiptText, ShoppingCart,
   X, Gift, Banknote, ChevronRight, ChevronDown, MapPin, Check, Wallet, Star,
   ClipboardCheck, Store, Landmark, Archive, Smartphone, FileText, FileSignature, Megaphone, DoorOpen, HeartPulse, Hourglass,
 } from "lucide-react";
 import { businessTypeOf, term, useIsClinic } from "@/lib/clinic";
 import { AuthUser, getCurrentUser, signOut } from "@/lib/auth";
+import { getLang, setLang } from "@/lib/urdu";
+
+const noSubscribe = () => () => {};
 import InstallPrompt from "@/components/install-prompt";
 import BookingAlertsToggle from "@/components/booking-alerts-toggle";
 import { SETTINGS_CHANGED_EVENT, settingsStore, reloadSettings } from "@/lib/settings-store";
@@ -98,6 +101,8 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
   const [salonLogo, setSalonLogo] = useState("");
   const [planBadge, setPlanBadge] = useState({ badge: "FREE", color: "#6b7280", bg: "#f9fafb" });
   const [profileOpen, setProfileOpen] = useState(false);
+  // false during the server render (no localStorage there), the saved choice in the browser.
+  const urdu = useSyncExternalStore(noSubscribe, () => getLang() === "ur", () => false);
   const [locations, setLocations] = useState<SalonLocation[]>([]);
   const [activeLocationId, setActiveLocationId] = useState("main");
   const clinic = useIsClinic();
@@ -420,6 +425,11 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
                   ))}
                 </div>
               )}
+              {/* Each option is written in its own language so anyone can find their way back. */}
+              <button type="button" onClick={() => setLang(urdu ? "en" : "ur")} className="sb-profile-menu-item" translate="no"
+                style={{ borderTop: "1px solid #292940", borderRadius: 0, marginTop: 5, paddingTop: 10 }}>
+                <Languages size={13} /> {urdu ? "English" : "اردو (Urdu)"}
+              </button>
               <button type="button" onClick={handleSignOut} className="sb-profile-menu-item" style={{ borderTop: "1px solid #292940", borderRadius: 0, marginTop: 5, paddingTop: 10, color: "#fca5a5" }}>
                 <LogOut size={13} /> Sign Out
               </button>

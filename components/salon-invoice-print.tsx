@@ -392,7 +392,7 @@ export default function SalonInvoicePrint({
   }
 
   const content = (
-    <div id="salon-invoice-portal">
+    <div id="salon-invoice-portal" translate="no" dir="ltr">
       {/* The measure rules stay mounted in both modes — printReceipt80mm reads
           the 80mm height back before it can switch printMode. */}
       <style>{(printMode === "receipt" ? PRINT_STYLES + receiptPrintStyles(receiptPageMm) : PRINT_STYLES) + RECEIPT_MEASURE_STYLES}</style>

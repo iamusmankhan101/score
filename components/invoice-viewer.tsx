@@ -64,7 +64,7 @@ export default function InvoiceViewer({ invoice, onClose, bankDetails = DEFAULT_
   const billingContact = [billedFrom.email, billedFrom.phone].filter(Boolean).join(" or ");
 
   const content = (
-    <div id="werzio-invoice-portal">
+    <div id="werzio-invoice-portal" translate="no" dir="ltr">
       <style>{PRINT_STYLES}</style>
 
       <div

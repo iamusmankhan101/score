@@ -22,6 +22,7 @@ import { addSalonLocation, clearLocationLocalData, getActiveLocationFilter, getS
 import { whatsAppConnected } from "@/lib/whatsapp-scheduler";
 import { settleServiceConsumption } from "@/lib/inventory-consumption";
 import { businessTypeOf } from "@/lib/clinic-core";
+import { getLang, startUrdu } from "@/lib/urdu";
 
 // ─── Notification chime ───────────────────────────────────────────────────────
 
@@ -576,6 +577,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const router   = useRouter();
   const pathname = usePathname();
   const [isReady,    setIsReady]    = useState(false);
+
+  // Urdu mode (sidebar profile menu) — translates whatever renders from here on.
+  useEffect(() => {
+    if (getLang() !== "ur") return;
+    let stop: (() => void) | undefined;
+    let cancelled = false;
+    startUrdu().then((s) => { if (cancelled) s(); else stop = s; });
+    return () => { cancelled = true; stop?.(); };
+  }, []);
   const [suspended,  setSuspended]  = useState(false);
   const [suspReason, setSuspReason] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);

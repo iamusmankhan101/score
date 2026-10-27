@@ -57,7 +57,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* Propagate nonce so any manually-added scripts can use it */}
         {nonce && <meta name="csp-nonce" content={nonce} />}
       </head>
-      <body className={montserrat.className} suppressHydrationWarning>
+      <body className={`${montserrat.className} ${montserrat.variable}`} suppressHydrationWarning>
         {/* Registers /sw.js once for the whole app (scope "/") — push + offline. */}
         <PWARegister />
         {children}
