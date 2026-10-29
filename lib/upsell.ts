@@ -20,6 +20,7 @@
 
 import type { Appointment, Service } from "./types";
 import type { SalonInvoice, SalonInvoiceItem } from "./salon-invoices";
+import { appointmentStaffIds } from "./appointment-staff";
 
 export interface UpsellLine {
   invoiceNumber: string;
@@ -101,7 +102,7 @@ function paidRatio(invoice: SalonInvoice): number {
  */
 function creditShare(
   line: SalonInvoiceItem,
-  seller: string | undefined,
+  sellers: string[],
   staff: StaffRef,
   services: Service[],
 ): number {
@@ -112,7 +113,8 @@ function creditShare(
   if (service?.multiStylist && service.assignedStaffIds.length >= 2) {
     return service.assignedStaffIds.includes(staff.id) ? 1 / service.assignedStaffIds.length : 0;
   }
-  return seller === staff.id ? 1 : 0;
+  // Several staff on one sale share it evenly, like revenueInPeriod.
+  return sellers.includes(staff.id) ? 1 / sellers.length : 0;
 }
 
 export interface StaffRef {
@@ -121,19 +123,20 @@ export interface StaffRef {
 }
 
 /**
- * Who made a sale, as a staff id.
+ * Who made a sale, as staff ids — everyone on it when several worked it.
  *
- * Appointment-linked invoices name the stylist on the booking. A walk-in names
+ * Appointment-linked invoices name the stylists on the booking. A walk-in names
  * them only on the invoice, and older invoices carry just `staffName` — so the
  * name is matched against the roster when no id was recorded. Two staff sharing
  * a first name would collide, which is why the id is now stored at checkout.
  */
-function sellerOf(invoice: SalonInvoice, appt: Appointment | undefined, staff: StaffRef): string | undefined {
-  if (appt) return appt.staffId;
-  if (invoice.staffId) return invoice.staffId;
+function sellersOf(invoice: SalonInvoice, appt: Appointment | undefined, staff: StaffRef): string[] {
+  if (appt) return appointmentStaffIds(appt);
+  if (invoice.staffIds?.length) return invoice.staffIds;
+  if (invoice.staffId) return [invoice.staffId];
   const named = (invoice.staffName ?? "").trim().toLowerCase();
   const mine = (staff.name ?? "").trim().toLowerCase();
-  return named && mine && named === mine ? staff.id : undefined;
+  return named && mine && named === mine ? [staff.id] : [];
 }
 
 /**
@@ -156,7 +159,7 @@ export function upsellInPeriod(
   for (const invoice of invoices) {
     if (invoice.date < start || invoice.date > end) continue;
     const appt = invoice.appointmentId ? apptById.get(invoice.appointmentId) : undefined;
-    const seller = sellerOf(invoice, appt, staff);
+    const sellers = sellersOf(invoice, appt, staff);
     // Only a booking can be "gone beyond"; without one the explicit flag is the
     // only signal, and bookedCounts on an absent appointment would upsell
     // everything on the bill.
@@ -173,7 +176,7 @@ export function upsellInPeriod(
       const units = line.upsell ? Math.max(1, line.qty) : offBooking;
       if (units <= 0) continue;
 
-      const share = creditShare(line, seller, staff, services);
+      const share = creditShare(line, sellers, staff, services);
       if (share <= 0) continue;
 
       const amount = (line.unitPrice || 0) * units * ratio * share;
