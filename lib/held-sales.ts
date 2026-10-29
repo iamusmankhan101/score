@@ -16,6 +16,8 @@ export interface HeldSale<CartLine = unknown> {
   clientId?: string;
   clientName: string;       // "Walk-in Customer" when no client was picked
   staffId?: string;
+  /** Every staff member on the sale, lead first, when there is more than one. */
+  staffIds?: string[];
   cart: CartLine[];
   itemCount: number;
   total: number;            // PKR, as shown when held — for the list only

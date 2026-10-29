@@ -36,6 +36,7 @@ import type { Service, Client, InventoryItem, Staff, PaymentMethod } from "@/lib
 import { settleServiceConsumption } from "@/lib/inventory-consumption";
 import { activeMembership, addDays, getConsents, membershipAllowanceLeft, membershipUntil, missingConsents, term, usablePackages, useIsClinic } from "@/lib/clinic";
 import { newClientId } from "@/lib/ids";
+import { appointmentStaffIds } from "@/lib/appointment-staff";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -209,7 +210,7 @@ export default function POSPage() {
         if (client) setSelectedClient(client);
 
         // Set staff
-        if (appt.staffId) setSelectedStaffId(appt.staffId);
+        setSelectedStaffIds(appointmentStaffIds(appt).filter(id => allStaff.some(s => s.id === id)));
 
         // Build cart from appointment services
         // Each person booked on the appointment keeps their own lines on the bill.
@@ -299,7 +300,8 @@ export default function POSPage() {
   const [newName,         setNewName]           = useState("");
   const [newPhone,        setNewPhone]          = useState("");
   const [newDob,          setNewDob]            = useState("");
-  const [selectedStaffId, setSelectedStaffId]  = useState("");
+  // Everyone who worked on the sale, lead first. Empty = any available staff.
+  const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
   const [saleNotes,       setSaleNotes]         = useState("");
 
   // ── Catalog ───────────────────────────────────────────────────────────────
@@ -680,7 +682,7 @@ export default function POSPage() {
     setCart([]); setDiscount(0); setDiscount2(0); setLoyaltyRedeem(0); setAppliedRewards([]); setPointsOnLines([]); setSaleNotes(""); setPayMethod(null);
     setCardApproval(""); setCardLast4("");
     setIsAdvance(false); setAdvanceValue(50); setAdvanceType("pct");
-    setSelectedClient(null); setClientQ(""); setSelectedStaffId("");
+    setSelectedClient(null); setClientQ(""); setSelectedStaffIds([]);
     setCompleted(false); setLastInvoice(null); setWaStatus("idle"); setIsCredit(false);
     setSyncFailed(false);
     // Otherwise the next, unrelated sale would be linked to (and complete) the
@@ -698,7 +700,8 @@ export default function POSPage() {
       heldAt: existing?.heldAt ?? new Date().toISOString(),
       clientId: selectedClient?.id,
       clientName: selectedClient?.name || "Walk-in Customer",
-      staffId: selectedStaffId || undefined,
+      staffId: selectedStaffIds[0],
+      staffIds: selectedStaffIds.length > 1 ? selectedStaffIds : undefined,
       cart,
       itemCount: totalQty,
       total,
@@ -738,7 +741,7 @@ export default function POSPage() {
     resumeLoyaltyRef.current = client ? sale.loyaltyRedeem : 0;
     resumeRewardsRef.current = client ? (sale.loyaltyRewards ?? []) : [];
     setSelectedClient(client);
-    setSelectedStaffId(sale.staffId && staff.some(s => s.id === sale.staffId) ? sale.staffId : "");
+    setSelectedStaffIds((sale.staffIds ?? (sale.staffId ? [sale.staffId] : [])).filter(id => staff.some(s => s.id === id)));
     setCart(sale.cart);
     setDiscount(sale.discount); setDiscType(sale.discType);
     setDiscount2(sale.discount2); setDiscType2(sale.discType2);
@@ -774,7 +777,8 @@ export default function POSPage() {
     setCompleting(true);
     try {
       const today = localDateKey();
-      const staffMember = staff.find(s => s.id === selectedStaffId);
+      const staffMembers = selectedStaffIds.map(id => staff.find(s => s.id === id)).filter((s): s is Staff => !!s);
+      const staffMember = staffMembers[0];
       // Prefer the assigned staff member's section; with no staff chosen, fall
       // back to the cart's section only when every line item agrees — a mixed
       // cart (e.g. a men's haircut + a women's product) has no single section,
@@ -791,8 +795,9 @@ export default function POSPage() {
         clientName:    selectedClient?.name || "Walk-in Customer",
         clientPhone:   selectedClient?.phone ? normalizePhone(selectedClient.phone) : "",
         clientEmail:   selectedClient?.email,
-        staffName:     staffMember?.name || "",
+        staffName:     staffMembers.map(s => s.name).join(", "),
         staffId:       staffMember?.id,
+        ...(staffMembers.length > 1 ? { staffIds: staffMembers.map(s => s.id) } : {}),
         section:       saleSection,
         items:         cartLineItems,
         subtotal, discountAmount: wholePkr(discountAmount + loyaltyDiscount + rewardDiscount), discount2Amount: discountAmount2, taxAmount, total,
@@ -1496,11 +1501,21 @@ export default function POSPage() {
             {/* Staff selector */}
             <div>
               <label style={{ fontSize: 11, fontWeight: 700, color: "#9999b0", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 6 }}>Assigned Staff</label>
-              <select value={selectedStaffId} onChange={e => setSelectedStaffId(e.target.value)}
-                style={{ width: "100%", height: 38, padding: "0 12px", borderRadius: 10, border: "1.5px solid #e8e8f4", fontSize: 13, color: "#1d1d2f", outline: "none", background: "#fafafe", boxSizing: "border-box" }}>
-                <option value="">Any available staff</option>
-                {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {staff.map(s => {
+                  const on = selectedStaffIds.includes(s.id);
+                  return (
+                    <button key={s.id} type="button" aria-pressed={on}
+                      onClick={() => setSelectedStaffIds(ids => on ? ids.filter(id => id !== s.id) : [...ids, s.id])}
+                      style={{ padding: "7px 12px", borderRadius: 999, border: `1.5px solid ${on ? "#7C3AED" : "#e8e8f4"}`, background: on ? "#7C3AED" : "#fafafe", color: on ? "#fff" : "#1d1d2f", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+                      {on && selectedStaffIds.length > 1 && selectedStaffIds[0] === s.id ? "★ " : ""}{s.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: 10.5, color: "#b0b0c8", marginTop: 5, lineHeight: 1.5 }}>
+                {selectedStaffIds.length === 0 ? "Any available staff. Tap one or more names." : selectedStaffIds.length > 1 ? "★ first picked is the lead. Walk-in commission is split equally." : "Tap more names if several staff worked on this sale."}
+              </div>
             </div>
 
             {/* Notes */}

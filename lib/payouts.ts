@@ -129,6 +129,7 @@ export function staffRevenueFromAppointment(appt: Appointment, staffId: string, 
  * belongs to nobody rather than to everybody.
  */
 export function invoiceBelongsTo(invoice: SalonInvoice, staff: StaffRef): boolean {
+  if (invoice.staffIds?.length) return invoice.staffIds.includes(staff.id);
   if (invoice.staffId) return invoice.staffId === staff.id;
   const named = (invoice.staffName ?? "").trim().toLowerCase();
   const mine = (staff.name ?? "").trim().toLowerCase();
@@ -170,7 +171,8 @@ export function revenueInPeriod(
   const fromWalkIns = invoices
     .filter((inv) => !inv.appointmentId && inv.date >= start && inv.date <= end)
     .filter((inv) => invoiceBelongsTo(inv, staff))
-    .reduce((sum, inv) => sum + (inv.total || 0), 0);
+    // Shared walk-ins split evenly, like team-service appointments.
+    .reduce((sum, inv) => sum + (inv.total || 0) / (inv.staffIds?.length || 1), 0);
 
   return fromAppointments + fromWalkIns;
 }

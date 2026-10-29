@@ -90,6 +90,8 @@ export interface SalonInvoice {
   staffName: string;
   /** Who made the sale. Absent on invoices written before this was recorded, where staffName is the only clue. */
   staffId?: string;
+  /** Every staff member on the sale when there is more than one, lead (`staffId`) first. `staffName` lists them all. */
+  staffIds?: string[];
   items: SalonInvoiceItem[];
   subtotal: number;
   discountAmount: number;   // flat discount in PKR (primary discount + loyalty redemption combined)
