@@ -1,4 +1,5 @@
 import type { Client, Appointment, Staff } from "./types";
+import { appointmentHasStaff, appointmentStaffIds } from "./appointment-staff";
 import { getTier, TIER_META, pointsToRupees, nextTierThreshold, type LoyaltySettings } from "./loyalty";
 
 function fmtCur(n: number) {
@@ -522,13 +523,15 @@ export function exportStaffPdf(
   appointments: Appointment[],
   salonName: string,
 ) {
-  const allMine    = appointments.filter(a => a.staffId === staff.id);
+  const allMine    = appointments.filter(a => appointmentHasStaff(a, staff.id));
+  // A booking shared by several stylists counts for each, its money split evenly.
+  const myShare    = (a: Appointment) => (a.totalAmount ?? 0) / Math.max(1, appointmentStaffIds(a).length);
   const completed  = allMine.filter(a => a.status === "completed");
   const noShows    = allMine.filter(a => a.status === "no-show");
   const cancelled  = allMine.filter(a => a.status === "cancelled");
   const booked     = allMine.filter(a => ["booked","confirmed","arrived","in-progress"].includes(a.status));
 
-  const totalRev      = completed.reduce((s, a) => s + (a.totalAmount ?? 0), 0);
+  const totalRev      = completed.reduce((s, a) => s + myShare(a), 0);
   const avgTicket     = completed.length ? Math.round(totalRev / completed.length) : 0;
   const noShowRate    = allMine.length ? pct(noShows.length, allMine.length) : 0;
   const completionRate= allMine.length ? pct(completed.length, allMine.length) : 0;
@@ -539,7 +542,7 @@ export function exportStaffPdf(
   for (const appt of completed) {
     for (const name of appt.serviceNames) {
       serviceCount[name]   = (serviceCount[name]   ?? 0) + 1;
-      serviceRevenue[name] = (serviceRevenue[name] ?? 0) + (appt.totalAmount ?? 0) / appt.serviceNames.length;
+      serviceRevenue[name] = (serviceRevenue[name] ?? 0) + myShare(appt) / appt.serviceNames.length;
     }
   }
   const topServices = Object.entries(serviceCount)

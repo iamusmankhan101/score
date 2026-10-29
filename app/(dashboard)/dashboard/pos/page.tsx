@@ -840,6 +840,14 @@ export default function POSPage() {
       // An advance is taken before the visit, so that booking stays as it is.
       if (checkoutAppointmentId) {
         const advanceOnly = !isCredit && isAdvance;
+        // Commission on a booking is paid from the appointment, not the invoice,
+        // so staff picked at the counter must be written back onto it. Multi-day
+        // bookings keep each day's own stylist.
+        const staffPatch = staffMembers.length ? {
+          staffId: staffMembers[0].id, staffName: staffMembers[0].name,
+          staffIds: staffMembers.length > 1 ? staffMembers.map(s => s.id) : undefined,
+          staffNames: staffMembers.length > 1 ? staffMembers.map(s => s.name) : undefined,
+        } : {};
         const freshAppointments = getStoredAppointments();
         const updatedAppointments = checkoutGroupIds.length > 1
           // Multi-day: each day keeps its own amount (the invoice carries the
@@ -851,7 +859,7 @@ export default function POSPage() {
                 : a)
           : freshAppointments.map(a =>
               a.id === checkoutAppointmentId
-                ? advanceOnly ? { ...a, totalAmount: total } : { ...a, status: "completed" as const, completedAt: a.completedAt ?? new Date().toISOString(), totalAmount: total }
+                ? advanceOnly ? { ...a, ...staffPatch, totalAmount: total } : { ...a, ...staffPatch, status: "completed" as const, completedAt: a.completedAt ?? new Date().toISOString(), totalAmount: total }
                 : a
             );
         saveAppointments(updatedAppointments);
