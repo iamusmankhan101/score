@@ -12,6 +12,7 @@ const LOGOS: { src: string; alt: string; inset?: boolean; bg?: string }[] = [
   { src: "/prestige-salon-logo.jpg", alt: "Prestige Salon & Spa" },
   { src: "/the-velvet-chair-logo.jpg", alt: "The Velvet Chair" },
   { src: "/morning-glory-logo.webp", alt: "Morning Glory", inset: true, bg: "#eadacc" },
+  { src: "/kashish-signature-spa-logo.jpg", alt: "Kashish Signature Spa", inset: true, bg: "#f8f1df" },
 ];
 
 export default function TrustedBy() {
