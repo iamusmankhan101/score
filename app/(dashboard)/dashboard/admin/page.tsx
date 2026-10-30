@@ -16,7 +16,7 @@ import type { Invoice } from "@/lib/invoices";
 
 import { fmtCurrency as fmt } from "@/lib/format";
 import { PLAN_CONFIGS, ORDERED_PLANS, type PlanId } from "@/lib/plan-limits";
-import { DEFAULT_BANK_DETAILS, DEFAULT_BILLED_FROM, type BilledFrom } from "@/lib/billing-constants";
+import { DEFAULT_BANK_DETAILS, DEFAULT_BILLED_FROM, LIFETIME_TERM_MONTHS, isLifetimeTerm, termLabel, type BilledFrom } from "@/lib/billing-constants";
 import AdminWhatsAppModal from "@/components/admin-whatsapp-modal";
 
 interface BillingUserRow {
@@ -82,8 +82,10 @@ const USERS_GRID_COLUMNS = "minmax(240px,1.4fr) minmax(160px,1fr) minmax(140px,0
 const BILLING_TERMS = [1, 3, 6, 12] as const;
 type BillingTermMonths = number;
 
-function isPresetBillingTerm(months: number) {
-  return BILLING_TERMS.includes(months as (typeof BILLING_TERMS)[number]);
+/** Which entry the term dropdown shows for a saved term. */
+function termModeFor(months: number) {
+  if (isLifetimeTerm(months)) return "lifetime";
+  return BILLING_TERMS.includes(months as (typeof BILLING_TERMS)[number]) ? String(months) : "custom";
 }
 
 const ROLE_META: Record<AccountUserRow["role"], { label: string; color: string; bg: string }> = {
@@ -279,7 +281,7 @@ function PriceCell({ row, onSaved }: { row: BillingUserRow; onSaved: (userId: st
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(String(row.planPrice));
   const [termMonths, setTermMonths] = useState<BillingTermMonths>(row.billingTermMonths ?? 1);
-  const [termMode, setTermMode] = useState(isPresetBillingTerm(row.billingTermMonths ?? 1) ? String(row.billingTermMonths ?? 1) : "custom");
+  const [termMode, setTermMode] = useState(termModeFor(row.billingTermMonths ?? 1));
   const [discountPct, setDiscountPct] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -331,9 +333,9 @@ function PriceCell({ row, onSaved }: { row: BillingUserRow; onSaved: (userId: st
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a2e" }}>{fmt(row.planPrice)}</div>
-          <div style={{ fontSize: 11, color: "#9898b0", marginTop: 1 }}>{row.billingTermMonths ?? 1} month{(row.billingTermMonths ?? 1) > 1 ? "s" : ""}</div>
+          <div style={{ fontSize: 11, color: "#9898b0", marginTop: 1 }}>{termLabel(row.billingTermMonths ?? 1)}</div>
         </div>
-        <button onClick={() => { setValue(String(row.planPrice)); setTermMonths(row.billingTermMonths ?? 1); setTermMode(isPresetBillingTerm(row.billingTermMonths ?? 1) ? String(row.billingTermMonths ?? 1) : "custom"); setEditing(true); }}
+        <button onClick={() => { setValue(String(row.planPrice)); setTermMonths(row.billingTermMonths ?? 1); setTermMode(termModeFor(row.billingTermMonths ?? 1)); setEditing(true); }}
           style={{ background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 6, color: "#9898b0", display: "flex" }} title="Edit billing term and price">
           <Pencil size={13} />
         </button>
@@ -349,7 +351,9 @@ function PriceCell({ row, onSaved }: { row: BillingUserRow; onSaved: (userId: st
           onChange={(e) => {
             const nextMode = e.target.value;
             setTermMode(nextMode);
-            if (nextMode !== "custom") {
+            // Lifetime has no plan-based price to suggest — the admin types the deal price.
+            if (nextMode === "lifetime") setTermMonths(LIFETIME_TERM_MONTHS);
+            else if (nextMode !== "custom") {
               const next = Number(nextMode) as BillingTermMonths;
               setTermMonths(next);
               setValue(String(Math.round(monthlyBasePrice * next)));
@@ -360,6 +364,7 @@ function PriceCell({ row, onSaved }: { row: BillingUserRow; onSaved: (userId: st
         >
           {BILLING_TERMS.map((term) => <option key={term} value={term}>{term} month{term > 1 ? "s" : ""}</option>)}
           <option value="custom">Custom</option>
+          <option value="lifetime">Lifetime</option>
         </select>
         {termMode === "custom" && (
           <input
@@ -392,7 +397,7 @@ function PriceCell({ row, onSaved }: { row: BillingUserRow; onSaved: (userId: st
           <Ban size={13} />
         </button>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      {termMode !== "lifetime" && <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <input
           type="number"
           min={0}
@@ -408,7 +413,7 @@ function PriceCell({ row, onSaved }: { row: BillingUserRow; onSaved: (userId: st
           style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 8, padding: "6px 10px", cursor: saving ? "not-allowed" : "pointer", color: "#7C3AED", fontSize: 11, fontWeight: 700 }} title="Apply discount off base term price">
           Apply %
         </button>
-      </div>
+      </div>}
       {error && <div style={{ fontSize: 11, color: "#dc2626" }}>{error}</div>}
     </div>
   );
@@ -748,7 +753,7 @@ function SalonAccountsPanel() {
   }
 
   function handlePlanSaved(userId: string, planId: string, planName: string, planPrice: number) {
-    setRows((prev) => prev.map((r) => (r.id === userId ? { ...r, planId, planName, planPrice: planPrice * (r.billingTermMonths ?? 1) } : r)));
+    setRows((prev) => prev.map((r) => (r.id === userId ? { ...r, planId, planName, planPrice: isLifetimeTerm(r.billingTermMonths ?? 1) ? r.planPrice : planPrice * (r.billingTermMonths ?? 1) } : r)));
   }
 
   function handleDeleted(userId: string) {

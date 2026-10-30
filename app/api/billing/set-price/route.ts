@@ -14,9 +14,12 @@ import {
   ensureBillingTables,
   getBillingUser,
   getCurrentCycleInvoice,
+  invoiceDueDays,
+  resetBillingAnchor,
   setCustomPlanPrice,
   updateInvoiceAmount,
 } from "@/lib/billing-db";
+import { isLifetimeTerm } from "@/lib/billing-constants";
 import { requireAdmin } from "@/lib/api-auth";
 
 export async function POST(req: NextRequest) {
@@ -46,13 +49,26 @@ export async function POST(req: NextRequest) {
     }
 
     const rounded = Math.round(price);
+    // Moving onto a lifetime deal restarts the schedule, otherwise its single
+    // 100-year cycle would start back at the first (already paid) invoice.
+    // The lifetime invoice takes over the open cycle's unpaid invoice, or
+    // starts today when that one's already paid.
+    const switchingToLifetime = isLifetimeTerm(termMonths) && !isLifetimeTerm(user.billingTermMonths);
+    const openInvoice = switchingToLifetime ? await getCurrentCycleInvoice(userId) : null;
     await setCustomPlanPrice(userId, rounded, termMonths);
+    if (switchingToLifetime) {
+      const today = new Date().toISOString().slice(0, 10);
+      const anchor = openInvoice && openInvoice.status !== "paid"
+        ? openInvoice.periodStart
+        : openInvoice?.periodStart === today ? addDays(today, 1) : today;
+      await resetBillingAnchor(userId, anchor);
+    }
 
     // Re-price the current cycle's invoice too, if it's still unpaid — so the
     // change is visible immediately instead of waiting for the next cycle.
     const currentInvoice = await getCurrentCycleInvoice(userId);
     if (currentInvoice && currentInvoice.status !== "paid") {
-      await updateInvoiceAmount(currentInvoice.id, rounded, addDays(currentInvoice.periodStart, termMonths * 30));
+      await updateInvoiceAmount(currentInvoice.id, rounded, addDays(currentInvoice.periodStart, invoiceDueDays(termMonths)));
     }
 
     console.log(`[billing/set-price] Set ${termMonths}-month price for ${userId} (${user.email}) to ${rounded}`);

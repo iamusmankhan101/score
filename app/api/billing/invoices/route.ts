@@ -10,6 +10,7 @@ import { resolveActor } from "@/lib/api-auth";
 import { db } from "@/lib/db";
 import { addDays, BILLING_CYCLE_DAYS, ensureBillingTables, getBillingUser, getOrCreate30DayInvoice } from "@/lib/billing-db";
 import type { Invoice, InvoiceStatus } from "@/lib/invoices";
+import { isLifetimeTerm } from "@/lib/billing-constants";
 
 export async function GET(req: NextRequest) {
   const actor = await resolveActor(req);
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
         planId: user.planId,
         planName: user.planName,
         items: [{
-          description: `${user.planName} Plan — ${user.billingTermMonths === 1 ? "Monthly" : `${user.billingTermMonths} Months`} Subscription`,
+          description: `${user.planName} Plan — ${user.billingTermMonths === 1 ? "Monthly Subscription" : isLifetimeTerm(user.billingTermMonths) ? "Lifetime Access" : `${user.billingTermMonths} Months Subscription`}`,
           qty: 1,
           unitPrice: amount,
           total: amount,

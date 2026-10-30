@@ -17,7 +17,7 @@ import {
   PLAN_CONFIGS, ORDERED_PLANS, getCurrentPlanId,
   type PlanId, type PlanConfig,
 } from "@/lib/plan-limits";
-import { DEFAULT_BANK_DETAILS, DEFAULT_BILLED_FROM, type BilledFrom } from "@/lib/billing-constants";
+import { DEFAULT_BANK_DETAILS, DEFAULT_BILLED_FROM, isLifetimeTerm, termLabel, type BilledFrom } from "@/lib/billing-constants";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -48,10 +48,6 @@ function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
-}
-
-function termLabel(months: number) {
-  return `${months} month${months === 1 ? "" : "s"}`;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -95,7 +91,7 @@ function PlanCard({
 }) {
   const Icon = PLAN_ICONS[plan.id];
   const shownPrice = salonPrice && salonPrice > 0 ? salonPrice : plan.price;
-  const priceSuffix = salonPrice && salonPrice > 0 && salonTermMonths > 1 ? `/ ${termLabel(salonTermMonths)}` : "/ month";
+  const priceSuffix = salonPrice && salonPrice > 0 && salonTermMonths > 1 ? (isLifetimeTerm(salonTermMonths) ? "one-time" : `/ ${termLabel(salonTermMonths)}`) : "/ month";
 
   return (
     <div style={{
@@ -281,6 +277,8 @@ export default function BillingPage() {
       ? `7-day demo active until ${fmtDate(demoEndsAt)}`
       : displayPrice === 0
         ? "Free forever · no billing"
+        : isLifetimeTerm(billingTermMonths)
+          ? `PKR ${displayPrice.toLocaleString("en-PK")} · lifetime access`
         : billingTermMonths === 1
           ? `PKR ${displayPrice.toLocaleString("en-PK")} for 1 month`
           : `PKR ${displayPrice.toLocaleString("en-PK")} for ${billingTermText}`;
@@ -290,7 +288,9 @@ export default function BillingPage() {
     ? `7-day demo active until ${fmtDate(demoEndsAt)} · no pricing shown`
     : displayPrice === 0
       ? "Free forever · no billing"
-      : `PKR ${displayPrice.toLocaleString("en-PK")} for ${billingTermText} · billed every ${billingTermText}`;
+      : isLifetimeTerm(billingTermMonths)
+        ? `PKR ${displayPrice.toLocaleString("en-PK")} · lifetime access · one-time payment`
+        : `PKR ${displayPrice.toLocaleString("en-PK")} for ${billingTermText} · billed every ${billingTermText}`;
   const upgradePlan = showModal ? PLAN_CONFIGS[showModal] : null;
   const latestInvoice = invoices[0];
 

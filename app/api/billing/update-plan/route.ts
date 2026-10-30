@@ -6,7 +6,8 @@
 
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { addDays, ensureBillingTables, getBillingUser, getCurrentCycleInvoice, updateInvoiceAmount } from "@/lib/billing-db";
+import { addDays, ensureBillingTables, getBillingUser, getCurrentCycleInvoice, invoiceDueDays, updateInvoiceAmount } from "@/lib/billing-db";
+import { isLifetimeTerm } from "@/lib/billing-constants";
 import { PLAN_CONFIGS } from "@/lib/plan-limits";
 import { requireAdmin } from "@/lib/api-auth";
 
@@ -51,8 +52,9 @@ export async function POST(req: NextRequest) {
     await ensureBillingTables();
     const currentUser = await getBillingUser(userId);
     const billingTermMonths = currentUser?.billingTermMonths ?? 1;
-    const termPrice = planPrice * billingTermMonths;
-    
+    // A lifetime deal's price is whatever the admin set — a plan change keeps it.
+    const termPrice = currentUser && isLifetimeTerm(billingTermMonths) ? currentUser.planPrice : planPrice * billingTermMonths;
+
     // Update the plan in the database
     await db.execute({
       sql: `UPDATE billing_users 
@@ -63,7 +65,7 @@ export async function POST(req: NextRequest) {
 
     const currentInvoice = await getCurrentCycleInvoice(userId);
     if (currentInvoice && currentInvoice.status !== "paid") {
-      await updateInvoiceAmount(currentInvoice.id, termPrice, addDays(currentInvoice.periodStart, billingTermMonths * 30));
+      await updateInvoiceAmount(currentInvoice.id, termPrice, addDays(currentInvoice.periodStart, invoiceDueDays(billingTermMonths)));
     }
 
     console.log(`[billing/update-plan] Updated user ${userId} to ${planName} plan (${billingTermMonths} months)`);

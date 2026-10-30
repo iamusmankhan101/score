@@ -26,3 +26,14 @@ export const DEFAULT_BILLED_FROM: BilledFrom = {
   email: "",
   address: "Lahore, Pakistan",
 };
+
+/** billing_term_months value that means "Lifetime": one invoice, never renews (a 100-year term). */
+export const LIFETIME_TERM_MONTHS = 1200;
+
+export function isLifetimeTerm(months: number): boolean {
+  return months >= LIFETIME_TERM_MONTHS;
+}
+
+export function termLabel(months: number): string {
+  return isLifetimeTerm(months) ? "Lifetime" : `${months} month${months === 1 ? "" : "s"}`;
+}

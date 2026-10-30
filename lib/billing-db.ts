@@ -16,7 +16,7 @@
 
 import { db } from "@/lib/db";
 import type { InValue } from "@libsql/client";
-import { DEFAULT_BANK_DETAILS, DEFAULT_BILLED_FROM, type BilledFrom } from "@/lib/billing-constants";
+import { DEFAULT_BANK_DETAILS, DEFAULT_BILLED_FROM, isLifetimeTerm, type BilledFrom } from "@/lib/billing-constants";
 
 export { DEFAULT_BANK_DETAILS };
 
@@ -288,6 +288,12 @@ function billingCycleDays(termMonths: number): number {
   return Math.max(1, termMonths) * BILLING_CYCLE_DAYS;
 }
 
+/** Days from period start until an invoice is due — the whole term, except a
+ *  lifetime deal, which is paid up front within INVOICE_DUE_DAYS. */
+export function invoiceDueDays(termMonths: number): number {
+  return isLifetimeTerm(termMonths) ? INVOICE_DUE_DAYS : billingCycleDays(termMonths);
+}
+
 // ─── Billing Users ─────────────────────────────────────────────────────────────
 
 export async function upsertBillingUser(
@@ -368,7 +374,7 @@ export async function getBillingAdminSummaries(userIds: string[]): Promise<Map<s
     const trialStart = row.trial_start as string;
     const isDemoSignup = (row.is_demo_signup as number) === 1;
     const billingTermMonths = Math.max(1, Math.floor(Number(row.billing_term_months) || 1));
-    const invoiceDueDate = (row.invoice_due_date as string | null) ?? addDays(computeBillingAnchor(trialStart, isDemoSignup), billingCycleDays(billingTermMonths));
+    const invoiceDueDate = (row.invoice_due_date as string | null) ?? addDays(computeBillingAnchor(trialStart, isDemoSignup), invoiceDueDays(billingTermMonths));
     summaries.set(userId, {
       userId,
       planId: row.plan_id as string,
@@ -514,6 +520,11 @@ async function setBillingAnchor(userId: string, anchor: string): Promise<void> {
   });
 }
 
+/** Admin: restart the billing schedule from `anchor` (used when a salon moves onto a lifetime deal). */
+export async function resetBillingAnchor(userId: string, anchor: string): Promise<void> {
+  await db.execute({ sql: "UPDATE billing_users SET billing_anchor = ? WHERE id = ?", args: [anchor, userId] });
+}
+
 /**
  * Admin override: change the date a salon started. Until the salon has paid an
  * invoice, the billing schedule follows the new date: the anchor is recomputed,
@@ -554,7 +565,7 @@ export async function updateTrialStart(userId: string, startDate: string): Promi
     statements.push({ sql: "DELETE FROM billing_invoices WHERE id = ?", args: [inv.id as string] });
   }
   if (periodStart && latest) {
-    const dueDate = latest.due_date_overridden ? (latest.due_date as string) : addDays(periodStart, cycleDays);
+    const dueDate = latest.due_date_overridden ? (latest.due_date as string) : addDays(periodStart, invoiceDueDays(user.billingTermMonths));
     statements.push({
       sql: `UPDATE billing_invoices
               SET id = ?, number = ?, period_start = ?, issued_date = ?, due_date = ?,
@@ -601,7 +612,7 @@ export async function getOrCreate30DayInvoice(
   }
 
   // Create new invoice
-  const dueDate = addDays(periodStart, billingCycleDays(user.billingTermMonths));
+  const dueDate = addDays(periodStart, invoiceDueDays(user.billingTermMonths));
   const now     = new Date().toISOString();
 
   await db.execute({
