@@ -336,6 +336,12 @@ export default function SignInPage() {
               </div>
             </label>
 
+            <div style={{ textAlign: "right", margin: "-6px 0 14px" }}>
+              <Link href="/forgot-password" className={styles.footerLink} style={{ fontSize: 12 }}>
+                Forgot password?
+              </Link>
+            </div>
+
             {error && <div className={styles.error}>{error}</div>}
 
             <button type="button" onClick={handleSubmit} disabled={rateLocked || submitting} className={styles.primaryButton}

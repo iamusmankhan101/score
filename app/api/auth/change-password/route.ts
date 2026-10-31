@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createDbSession, getUserById, hashPassword, revokeAllSessionsForUser, verifyPassword } from "@/lib/auth-db";
 import { createSessionToken, COOKIE_NAME, cookieOptions, tokenId } from "@/lib/session";
-import { getSessionUserId, MAX_PASSWORD_LENGTH, sessionDeviceFromRequest } from "@/lib/api-auth";
+import { getSessionUserId, sessionDeviceFromRequest } from "@/lib/api-auth";
 import { rateLimit, rateLimitClear } from "@/lib/rate-limit";
+import { validatePasswordStrength } from "@/lib/password-policy";
 
 export async function POST(req: NextRequest) {
   const userId = await getSessionUserId(req);
@@ -31,8 +32,9 @@ export async function POST(req: NextRequest) {
   if (!currentPassword || !newPassword) {
     return Response.json({ ok: false, error: "Missing required fields." }, { status: 400 });
   }
-  if (typeof newPassword !== "string" || newPassword.length < 8 || newPassword.length > MAX_PASSWORD_LENGTH) {
-    return Response.json({ ok: false, error: `New password must be 8–${MAX_PASSWORD_LENGTH} characters.` }, { status: 400 });
+  const passwordError = validatePasswordStrength(newPassword);
+  if (passwordError) {
+    return Response.json({ ok: false, error: passwordError }, { status: 400 });
   }
 
   try {

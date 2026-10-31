@@ -8,7 +8,7 @@ import { timingSafeEqual } from "crypto";
 import { createUser } from "@/lib/auth-db";
 import { db } from "@/lib/db";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
-import { MAX_PASSWORD_LENGTH } from "@/lib/api-auth";
+import { validatePasswordStrength } from "@/lib/password-policy";
 import { ensureBillingTables, upsertBillingUser } from "@/lib/billing-db";
 import { PLAN_CONFIGS } from "@/lib/plan-limits";
 import { sendWelcomeEmail } from "@/lib/welcome-email";
@@ -71,8 +71,9 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: "Missing required fields." }, { status: 400 });
   }
 
-  if (typeof password !== "string" || password.length < 8 || password.length > MAX_PASSWORD_LENGTH) {
-    return Response.json({ ok: false, error: `Password must be 8–${MAX_PASSWORD_LENGTH} characters.` }, { status: 400 });
+  const passwordError = validatePasswordStrength(password);
+  if (passwordError) {
+    return Response.json({ ok: false, error: passwordError }, { status: 400 });
   }
 
   // Check admin code if provided

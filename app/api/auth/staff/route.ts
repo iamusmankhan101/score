@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getStaffUsersForOwner, getUserById, upsertStaffUser } from "@/lib/auth-db";
-import { getSessionUserId, MAX_PASSWORD_LENGTH } from "@/lib/api-auth";
+import { getSessionUserId } from "@/lib/api-auth";
+import { validatePasswordStrength } from "@/lib/password-policy";
 
 const STAFF_PERMISSIONS = ["dashboard", "calendar", "appointments", "clients", "pos", "invoices"];
 const MANAGER_PERMISSIONS = ["*"];
@@ -54,8 +55,11 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: "Staff name, email, ID and assigned location are required." }, { status: 400 });
   }
 
-  if (body.password && (body.password.length < 8 || body.password.length > MAX_PASSWORD_LENGTH)) {
-    return Response.json({ ok: false, error: `Password must be 8–${MAX_PASSWORD_LENGTH} characters.` }, { status: 400 });
+  if (body.password) {
+    const passwordError = validatePasswordStrength(body.password);
+    if (passwordError) {
+      return Response.json({ ok: false, error: passwordError }, { status: 400 });
+    }
   }
 
   // A branch admin can only add or change logins in their own branch — never

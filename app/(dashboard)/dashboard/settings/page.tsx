@@ -11,6 +11,7 @@ import { updateCurrentPassword } from "@/lib/auth";
 import TwoStepSignIn from "@/components/two-step-sign-in";
 import BookingPricesToggle from "@/components/booking-prices-toggle";
 import { whatsAppConnected } from "@/lib/whatsapp-scheduler";
+import { PASSWORD_HINT, validatePasswordStrength } from "@/lib/password-policy";
 
 const SECTIONS = [
   { id: "salon",         label: "Salon Profile",  icon: Store },
@@ -229,7 +230,7 @@ function Security() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const set = (k: string, v: string) => setForm((f: any) => ({ ...f, [k]: v }));
-  const canSave = !saving && form.current.length > 0 && form.newPass.length >= 8 && form.newPass === form.confirm;
+  const canSave = !saving && form.current.length > 0 && !validatePasswordStrength(form.newPass) && form.newPass === form.confirm;
 
   async function updatePassword() {
     if (!canSave) return;
@@ -252,7 +253,7 @@ function Security() {
       <div style={{ fontSize: 11, fontWeight: 700, color: "#b0b0c8", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 6 }}>Change password</div>
       {saved && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#ecfdf5", borderRadius: 12, fontSize: 13, color: "#059669", fontWeight: 500 }}><Check size={14} /> Password updated successfully.</div>}
       <Field label="Current Password"><input type="password" autoComplete="current-password" value={form.current} onChange={(e) => set("current", e.target.value)} placeholder="••••••••" style={inp} /></Field>
-      <Field label="New Password" hint="At least 8 characters"><input type="password" autoComplete="new-password" value={form.newPass} onChange={(e) => set("newPass", e.target.value)} placeholder="••••••••" style={inp} /></Field>
+      <Field label="New Password" hint={PASSWORD_HINT}><input type="password" autoComplete="new-password" value={form.newPass} onChange={(e) => set("newPass", e.target.value)} placeholder="••••••••" style={inp} /></Field>
       <Field label="Confirm New Password">
         <input type="password" autoComplete="new-password" value={form.confirm} onChange={(e) => set("confirm", e.target.value)} placeholder="••••••••" style={{ ...inp, borderColor: form.confirm && form.confirm !== form.newPass ? "#dc2626" : "#e3e0eb" }} />
         {form.confirm && form.confirm !== form.newPass && <div style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>Passwords do not match.</div>}

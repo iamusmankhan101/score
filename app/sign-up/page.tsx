@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRight, Building2, CalendarClock, Check, Clock, Crown, LockKeyhole, Mail, Phone, Shield, User } from "lucide-react";
 import styles from "../auth.module.css";
+import { validatePasswordStrength } from "@/lib/password-policy";
 
 const PLANS = [
   {
@@ -105,7 +106,8 @@ export default function SignUpPage() {
   async function handleSubmit(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    if (form.password.length < 8) { setError("Password must be at least 8 characters."); return; }
+    const passwordError = validatePasswordStrength(form.password);
+    if (passwordError) { setError(passwordError); return; }
     
     setSending(true);
     
@@ -300,7 +302,7 @@ export default function SignUpPage() {
                     { id: "ownerName", label: "Full name", icon: User, type: "text", placeholder: "Muhammad Usman" },
                     { id: "email", label: "Email", icon: Mail, type: "email", placeholder: "admin@example.com" },
                     { id: "phone", label: "Phone", icon: Phone, type: "tel", placeholder: "+92 300 0000000" },
-                    { id: "password", label: "Password", icon: LockKeyhole, type: "password", placeholder: "Minimum 8 characters" },
+                    { id: "password", label: "Password", icon: LockKeyhole, type: "password", placeholder: "Min. 10 chars, letter + number" },
                   ].map(({ id, label, icon: Icon, type, placeholder }) => (
                     <label key={id}>
                       <span className={styles.label}>{label}</span>
@@ -381,7 +383,7 @@ export default function SignUpPage() {
                     { id: "salonName", label: businessType === "clinic" ? "Clinic name" : "Salon name", icon: Building2, type: "text", placeholder: businessType === "clinic" ? "Glow Aesthetics" : "Amna's Salon" },
                     { id: "email", label: "Email", icon: Mail, type: "email", placeholder: "owner@example.com" },
                     { id: "phone", label: "Phone", icon: Phone, type: "tel", placeholder: "+92 300 1234567" },
-                    { id: "password", label: "Password", icon: LockKeyhole, type: "password", placeholder: "Minimum 8 characters" },
+                    { id: "password", label: "Password", icon: LockKeyhole, type: "password", placeholder: "Min. 10 chars, letter + number" },
                   ].map(({ id, label, icon: Icon, type, placeholder }) => (
                     <label key={id} className={id === "password" ? styles.fullField : undefined}>
                       <span className={styles.label}>{label}</span>

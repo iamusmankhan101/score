@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import type { InValue } from "@libsql/client";
 import { randomBytes, randomInt, pbkdf2Sync, timingSafeEqual } from "crypto";
 import { sendWelcomeEmail } from "@/lib/welcome-email";
+import { validatePasswordStrength } from "@/lib/password-policy";
 
 // ─── Password hashing ─────────────────────────────────────────────────────────
 
@@ -241,8 +242,12 @@ export async function upsertStaffUser(input: {
     return withoutPassword(updated);
   }
 
-  if (!input.password || input.password.length < 8) {
-    throw new Error("Staff password must be at least 8 characters.");
+  if (!input.password) {
+    throw new Error("Staff password is required.");
+  }
+  const passwordError = validatePasswordStrength(input.password);
+  if (passwordError) {
+    throw new Error(passwordError);
   }
 
   const id = `staff_user_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

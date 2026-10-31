@@ -18,6 +18,7 @@ import { normalizePhone } from "@/lib/whatsapp-scheduler";
 import { getActiveLocationFilter, getDefaultLocationId, getSalonLocations, updateActiveLocationDetails, type SalonLocation } from "@/lib/locations";
 import { businessType } from "@/lib/clinic";
 import { getCurrentPlan } from "@/lib/plan-limits";
+import { PASSWORD_HINT, validatePasswordStrength } from "@/lib/password-policy";
 import { whatsAppConnected } from "@/lib/whatsapp-scheduler";
 
 type SectionId = "profile" | "salon" | "hours" | "roles" | "security" | "whatsapp" | "mcp" | "decidr" | "tryon";
@@ -798,7 +799,7 @@ function Security() {
   const [form, setForm] = useState({ current: "", next: "", confirm: "" });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const canSave = form.current.length > 0 && form.next.length >= 8 && form.next === form.confirm;
+  const canSave = form.current.length > 0 && !validatePasswordStrength(form.next) && form.next === form.confirm;
 
   async function save() {
     if (!canSave) return;
@@ -820,7 +821,7 @@ function Security() {
       <h3 style={{ margin: "0 0 16px", color: "#1d1d2f", fontSize: 15, fontWeight: 800 }}>Change password</h3>
       <div style={{ display: "grid", gap: 18 }}>
         <Field label="Current Password"><input type="password" style={inputStyle} value={form.current} onChange={(event) => setForm((current) => ({ ...current, current: event.target.value }))} placeholder="••••••••" /></Field>
-        <Field label="New Password" hint="Use at least 8 characters."><input type="password" style={inputStyle} value={form.next} onChange={(event) => setForm((current) => ({ ...current, next: event.target.value }))} placeholder="••••••••" /></Field>
+        <Field label="New Password" hint={PASSWORD_HINT}><input type="password" style={inputStyle} value={form.next} onChange={(event) => setForm((current) => ({ ...current, next: event.target.value }))} placeholder="••••••••" /></Field>
         <Field label="Confirm New Password"><input type="password" style={{ ...inputStyle, borderColor: form.confirm && form.confirm !== form.next ? "#dc2626" : "#e4e4ee" }} value={form.confirm} onChange={(event) => setForm((current) => ({ ...current, confirm: event.target.value }))} placeholder="••••••••" /></Field>
       </div>
       {error && <div style={{ marginTop: 16, background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 14px", fontSize: 12, fontWeight: 700 }}>{error}</div>}
@@ -2313,8 +2314,9 @@ function RolesPermissionsSection() {
     const existing = loginUsers.find((user) => user.staffId === member.id);
     const errs: { email?: string; password?: string } = {};
     if (!draft.email.trim()) errs.email = "Login email is required.";
-    if ((!existing || draft.password) && draft.password.length < 8) {
-      errs.password = draft.password ? `Too short — ${draft.password.length} of 8 characters.` : "Password is required (min 8 characters).";
+    if (!existing || draft.password) {
+      const passwordError = draft.password ? validatePasswordStrength(draft.password) : "Password is required.";
+      if (passwordError) errs.password = passwordError;
     }
     setFieldErrors((current) => ({ ...current, [member.id]: errs }));
     if (errs.email || errs.password) return;
@@ -2426,7 +2428,7 @@ function RolesPermissionsSection() {
                   <Field label="Login Email" error={errs.email}>
                     <input style={{ ...inputStyle, ...(errs.email ? { border: "1.5px solid #dc2626" } : {}) }} type="email" value={draft.email} onChange={(e) => updateDraft(member.id, { email: e.target.value })} placeholder="staff@salon.com" />
                   </Field>
-                  <Field label={existing ? "New Password" : "Password"} hint={existing ? "Leave blank to keep current." : "Minimum 8 characters."} error={errs.password}>
+                  <Field label={existing ? "New Password" : "Password"} hint={existing ? `Leave blank to keep current. ${PASSWORD_HINT}` : PASSWORD_HINT} error={errs.password}>
                     <input style={{ ...inputStyle, ...(errs.password ? { border: "1.5px solid #dc2626" } : {}) }} type="password" value={draft.password} onChange={(e) => updateDraft(member.id, { password: e.target.value })} placeholder={existing ? "Optional" : "Required"} />
                   </Field>
                   <Field label="Access Role">
