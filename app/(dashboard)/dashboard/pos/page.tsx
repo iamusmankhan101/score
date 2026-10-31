@@ -997,14 +997,24 @@ export default function POSPage() {
     const thankYou = thankYouTpl
       ? fillTemplate(thankYouTpl, { name: client.name, salon_name: salon.name })
       : `Thank you so much for visiting ${salon.name} today, ${client.name}!`;
-    const itemLines = invoice.items.map(it => `• ${it.description}${it.qty > 1 ? ` x${it.qty}` : ""}`).join("\n");
+    const itemLines = invoice.items.map(it =>
+      `• ${it.description}${it.qty > 1 ? ` x${it.qty} @ ${pkr(it.unitPrice)}` : ""} - ${pkr(it.total)}`).join("\n");
     const dateLabel = new Date(invoice.date + "T00:00:00").toLocaleDateString("en-PK", { day: "numeric", month: "long", year: "numeric" });
+    const discount = (invoice.discountAmount || 0) + (invoice.discount2Amount || 0);
+    const pay = PAY_METHODS.find(p => p.value === invoice.paymentMethod)?.label;
     const rawMessage = [
       thankYou,
       "",
       `Invoice ${invoice.number} · ${dateLabel}`,
       itemLines,
+      "",
+      ...(discount > 0 || invoice.taxAmount > 0 ? [`Subtotal: ${pkr(invoice.subtotal)}`] : []),
+      ...(discount > 0 ? [`Discount: -${pkr(discount)}`] : []),
+      ...(invoice.taxAmount > 0 ? [`Tax: ${pkr(invoice.taxAmount)}`] : []),
       `Total: ${pkr(invoice.total)}`,
+      ...(pay && invoice.status === "paid" ? [`Paid by: ${pay}`] : []),
+      ...(invoice.status === "partial" && invoice.advanceAmount ? [`Advance paid: ${pkr(invoice.advanceAmount)}`, `Balance due: ${pkr(invoice.total - invoice.advanceAmount)}`] : []),
+      ...(invoice.status === "unpaid" ? [`Balance due: ${pkr(invoice.total)}`] : []),
     ].join("\n");
     // Emoji survive a JSON body fine (the automated WhatsApp Business API send
     // above), but a wa.me link passes the message through a URL query string
