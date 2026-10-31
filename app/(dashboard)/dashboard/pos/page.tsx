@@ -775,6 +775,10 @@ export default function POSPage() {
     if (cardNoTerminal) return;
     if (packageWithoutClient || packageOverdrawn || membershipOverdrawn) return;
     setCompleting(true);
+    // Starter: open the WhatsApp tab now, inside the click — after the awaits below
+    // the browser's popup blocker would kill it. Pointed at the chat once the invoice exists.
+    const waTab = posPlan.id === "starter" && selectedClient?.phone ? window.open("about:blank", "_blank") : null;
+    let waTabUsed = false;
     try {
       const today = localDateKey();
       const staffMembers = selectedStaffIds.map(id => staff.find(s => s.id === id)).filter((s): s is Staff => !!s);
@@ -952,12 +956,14 @@ export default function POSPage() {
         // "user activation" window, so the browser can silently block this —
         // the WhatsApp button in the success banner below is the guaranteed
         // fallback for that case.
-        openWhatsAppThankYou(invoice, selectedClient);
+        waTabUsed = true;
+        openWhatsAppThankYou(invoice, selectedClient, waTab);
       }
       setCompleted(true);
       // Products this sale's services use up (e.g. a fifth of a dye tube).
       settleServiceConsumption();
     } finally {
+      if (waTab && !waTab.closed && !waTabUsed) waTab.close(); // sale failed before the chat was opened
       setCompleting(false);
     }
   }
@@ -1010,11 +1016,13 @@ export default function POSPage() {
       .split("\n").map(line => line.trim()).join("\n");
   }
 
-  function openWhatsAppThankYou(invoice: SalonInvoice, client: Client | null) {
+  function openWhatsAppThankYou(invoice: SalonInvoice, client: Client | null, tab?: Window | null) {
     if (!client?.phone) return;
     const message = buildThankYouMessage(invoice, client);
     const normalizedPhone = normalizePhone(client.phone);
-    window.open(`https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`, "_blank");
+    const url = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`;
+    if (tab && !tab.closed) tab.location.href = url;
+    else window.open(url, "_blank");
   }
 
   // Manual, click-driven version: actually attaches the invoice PDF via the
