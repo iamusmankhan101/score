@@ -326,7 +326,7 @@ export default function AttendancePage() {
                           onChange={(value) => setTime(s.id, "checkIn", value)}
                           stepMin={15}
                           placeholder="Select time"
-                          style={{ border: "1px solid #e8e8f0", borderRadius: 7, padding: "4px 6px", fontSize: 11.5, fontWeight: 700, color: "#1a1a2e", background: "#fff" }}
+                          style={{ border: "1px solid #e8e8f0", borderRadius: 7, padding: "4px 6px", fontSize: 11.5, fontWeight: 700, color: "#1a1a2e", background: "#fff", minWidth: 78, flexShrink: 0 }}
                         />
                       </label>
                       {isToday && !record?.checkIn && (
@@ -342,7 +342,7 @@ export default function AttendancePage() {
                           onChange={(value) => setTime(s.id, "checkOut", value)}
                           stepMin={15}
                           placeholder="Select time"
-                          style={{ border: "1px solid #e8e8f0", borderRadius: 7, padding: "4px 6px", fontSize: 11.5, fontWeight: 700, color: "#1a1a2e", background: "#fff" }}
+                          style={{ border: "1px solid #e8e8f0", borderRadius: 7, padding: "4px 6px", fontSize: 11.5, fontWeight: 700, color: "#1a1a2e", background: "#fff", minWidth: 78, flexShrink: 0 }}
                         />
                       </label>
                       {isToday && record?.checkIn && !record?.checkOut && (
