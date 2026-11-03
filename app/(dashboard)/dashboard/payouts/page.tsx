@@ -33,7 +33,7 @@ function salaryAfterAttendance(salary: number, attendance: AttendanceSummary): {
   const dailyRate = salary / 30;
   const absenceUnits = attendance.absent + attendance.latesAsAbsent + attendance.unmarkedAbsent;
   const unpaidLeave = Math.max(0, attendance.leave - attendance.paidLeave);
-  const deduction = Math.round(dailyRate * (absenceUnits + attendance.halfDay * 0.5 + unpaidLeave));
+  const deduction = Math.round(dailyRate * (absenceUnits + unpaidLeave));
   return { salary: Math.max(0, salary - deduction), dailyRate, deduction, absenceUnits };
 }
 
