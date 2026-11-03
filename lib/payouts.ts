@@ -22,6 +22,8 @@ export interface Payout {
   fuelAllowance?: number;
   /** Computed pay before adjustments — commission/basic salary/fuel allowance plus any upsell incentive. */
   baseAmount: number;
+  /** Number of weekly-off days worked and used to offset attendance absences. */
+  weeklyOffAttendanceAdjustments?: number;
   /** Value of services sold beyond what clients booked, in the period. */
   upsellValue?: number;
   /** Upsell incentive % snapshot at the time this payout was processed. */

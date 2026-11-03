@@ -29,12 +29,14 @@ function fmtDate(s: string) {
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function salaryAfterAttendance(salary: number, attendance: AttendanceSummary): { salary: number; dailyRate: number; deduction: number; absenceUnits: number } {
+function salaryAfterAttendance(salary: number, attendance: AttendanceSummary, weeklyOffAdjustments = 0): { salary: number; dailyRate: number; deduction: number; absenceUnits: number; weeklyOffAdjustments: number } {
   const dailyRate = salary / 30;
-  const absenceUnits = attendance.absent + attendance.latesAsAbsent + attendance.unmarkedAbsent;
+  const rawAbsenceUnits = attendance.absent + attendance.latesAsAbsent + attendance.unmarkedAbsent;
+  const appliedWeeklyOffAdjustments = Math.min(rawAbsenceUnits, Math.max(0, Math.floor(weeklyOffAdjustments)));
+  const absenceUnits = rawAbsenceUnits - appliedWeeklyOffAdjustments;
   const unpaidLeave = Math.max(0, attendance.leave - attendance.paidLeave);
   const deduction = Math.round(dailyRate * (absenceUnits + unpaidLeave));
-  return { salary: Math.max(0, salary - deduction), dailyRate, deduction, absenceUnits };
+  return { salary: Math.max(0, salary - deduction), dailyRate, deduction, absenceUnits, weeklyOffAdjustments: appliedWeeklyOffAdjustments };
 }
 
 const inp: React.CSSProperties = { padding: "9px 12px", borderRadius: 8, border: "1px solid #e8e8f0", fontSize: 13, color: "#1a1a2e", outline: "none", width: "100%", boxSizing: "border-box" };
@@ -57,6 +59,7 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
     upsellRate: staff.upsellCommissionRate ? String(staff.upsellCommissionRate) : "",
     adjustment: "",
     adjustmentNote: "",
+    weeklyOffAdjustments: "0",
     paymentMethod: "cash",
     notes: "",
     markPaidNow: true,
@@ -106,7 +109,8 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
     ),
     [staff.id, form.periodStart, form.periodEnd, staff.paidLeavesPerMonth, staff.standardHoursPerDay, staff.weeklyOffDays],
   );
-  const salaryBreakdown = salaryAfterAttendance(salaryAmount, attendance);
+  const weeklyOffAdjustments = Number(form.weeklyOffAdjustments) || 0;
+  const salaryBreakdown = salaryAfterAttendance(salaryAmount, attendance, weeklyOffAdjustments);
   const proratedSalary = salaryBreakdown.salary;
 
   // The upsell incentive is added whatever the pay type: it rewards making the
@@ -135,6 +139,7 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
       upsellRate: upsellAmount > 0 ? upsellRate : undefined,
       upsellAmount: upsellAmount > 0 ? upsellAmount : undefined,
       baseAmount,
+      weeklyOffAttendanceAdjustments: salaryBreakdown.weeklyOffAdjustments || undefined,
       adjustment,
       adjustmentNote: form.adjustmentNote.trim() || undefined,
       totalAmount: total,
@@ -291,6 +296,22 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6b6b8a" }}>
                       <span>Attendance deduction ({salaryBreakdown.absenceUnits} absent × {fmt(salaryBreakdown.dailyRate)} per day)</span>
                       <span style={{ fontWeight: 700, color: "#1a1a2e" }}>{fmt(salaryAmount)} − {fmt(salaryBreakdown.deduction)} = {fmt(proratedSalary)}</span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 4 }}>
+                      <label style={{ ...label, color: "#6b6b8a" }}>Weekly Off Worked — Offset Absence</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={attendance.absent + attendance.latesAsAbsent + attendance.unmarkedAbsent}
+                        step="1"
+                        style={inp}
+                        value={form.weeklyOffAdjustments}
+                        onChange={(e) => set("weeklyOffAdjustments", e.target.value)}
+                        placeholder="0"
+                      />
+                      <div style={{ fontSize: 11, color: "#9898b0" }}>
+                        Each day worked on a weekly off cancels one absence deduction, up to {attendance.absent + attendance.latesAsAbsent + attendance.unmarkedAbsent} day{attendance.absent + attendance.latesAsAbsent + attendance.unmarkedAbsent === 1 ? "" : "s"}.
+                      </div>
                     </div>
                   </>
                 )}
