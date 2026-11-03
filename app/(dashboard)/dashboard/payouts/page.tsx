@@ -29,6 +29,14 @@ function fmtDate(s: string) {
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function salaryAfterAttendance(salary: number, attendance: AttendanceSummary): { salary: number; dailyRate: number; deduction: number; absenceUnits: number } {
+  const dailyRate = salary / 30;
+  const absenceUnits = attendance.absent + attendance.latesAsAbsent + attendance.unmarkedAbsent;
+  const unpaidLeave = Math.max(0, attendance.leave - attendance.paidLeave);
+  const deduction = Math.round(dailyRate * (absenceUnits + attendance.halfDay * 0.5 + unpaidLeave));
+  return { salary: Math.max(0, salary - deduction), dailyRate, deduction, absenceUnits };
+}
+
 const inp: React.CSSProperties = { padding: "9px 12px", borderRadius: 8, border: "1px solid #e8e8f0", fontSize: 13, color: "#1a1a2e", outline: "none", width: "100%", boxSizing: "border-box" };
 const label: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" };
 
@@ -85,10 +93,8 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
   const upsellRate = Number(form.upsellRate) || 0;
   const upsellAmount = upsellIncentive(upsell.value, upsellRate);
 
-  // Pro-rate the entered salary by attendance for this exact period — only
-  // when at least one day was actually marked, so a staff member with no
-  // attendance records at all still gets paid the full entered amount
-  // (no behavior change for salons that don't use attendance).
+  // Deduct attendance from the basic salary at one-thirtieth per absence.
+  // Fuel allowance remains fixed and is added separately below.
   const attendance: AttendanceSummary = useMemo(
     // Passed as a bare property rather than the whole `staff` object so the
     // dependency list stays property-specific and the memo is preserved.
@@ -100,7 +106,8 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
     ),
     [staff.id, form.periodStart, form.periodEnd, staff.paidLeavesPerMonth, staff.standardHoursPerDay, staff.weeklyOffDays],
   );
-  const proratedSalary = attendance.markedDays > 0 ? Math.round(salaryAmount * attendance.creditFactor) : salaryAmount;
+  const salaryBreakdown = salaryAfterAttendance(salaryAmount, attendance);
+  const proratedSalary = salaryBreakdown.salary;
 
   // The upsell incentive is added whatever the pay type: it rewards making the
   // sale, which a salaried stylist can do just as well as a commissioned one.
@@ -277,13 +284,13 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
                         {attendance.hoursWorked}h clocked of {attendance.expectedHours}h expected
                         <span style={{ color: "#b0b0c8" }}> over {attendance.daysWithTimes} day{attendance.daysWithTimes === 1 ? "" : "s"} with times</span>
                         {attendance.shortfallHours > 0 && (
-                          <span style={{ color: "#d97706", fontWeight: 700 }}> · {attendance.shortfallHours}h short</span>
+                          <span style={{ color: "#d97706", fontWeight: 700 }}> · {attendance.shortfallHours}h short (reference)</span>
                         )}
                       </div>
                     )}
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6b6b8a" }}>
-                      <span>Salary × attendance ({Math.round(attendance.creditFactor * 100)}%)</span>
-                      <span style={{ fontWeight: 700, color: "#1a1a2e" }}>{fmt(salaryAmount)} → {fmt(proratedSalary)}</span>
+                      <span>Attendance deduction ({salaryBreakdown.absenceUnits} absent × {fmt(salaryBreakdown.dailyRate)} per day)</span>
+                      <span style={{ fontWeight: 700, color: "#1a1a2e" }}>{fmt(salaryAmount)} − {fmt(salaryBreakdown.deduction)} = {fmt(proratedSalary)}</span>
                     </div>
                   </>
                 )}
@@ -293,6 +300,11 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
           {fuelAllowance > 0 && (
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6b6b8a", padding: "0 2px" }}>
               <span>Fixed fuel allowance (attendance not applied)</span><span style={{ fontWeight: 700, color: "#1a1a2e" }}>{fmt(fuelAllowance)}</span>
+            </div>
+          )}
+          {form.payType === "salary" && fuelAllowance > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6b6b8a", padding: "0 2px" }}>
+              <span>Basic Salary + Fuel</span><span style={{ fontWeight: 700, color: "#1a1a2e" }}>{fmt(proratedSalary)} + {fmt(fuelAllowance)} = {fmt(proratedSalary + fuelAllowance)}</span>
             </div>
           )}
           {form.payType === "both" && (
@@ -578,7 +590,7 @@ export default function PayoutsPage() {
             const periodStart = lastEnd ? addDays(lastEnd, 1) : startOfMonth();
             const revenue = revenueInPeriod(s, appointments, services, periodStart, todayStr(), invoices);
             const estAttendance = getAttendanceSummary(s.id, periodStart, todayStr(), undefined, leaveAllowanceFor(s), standardHoursFor(s), s);
-            const estSalary = estAttendance.markedDays > 0 ? Math.round((s.baseSalary ?? 0) * estAttendance.creditFactor) : (s.baseSalary ?? 0);
+            const estSalary = salaryAfterAttendance(s.baseSalary ?? 0, estAttendance).salary;
             const estFuel = s.fuelAllowance ?? 0;
             const estUpsell = upsellIncentive(
               upsellInPeriod(s, invoices, appointments, services, periodStart, todayStr()).value,

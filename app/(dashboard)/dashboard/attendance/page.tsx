@@ -18,6 +18,7 @@ import WeeklyOffFields from "@/components/weekly-off-fields";
 import { settingsStore } from "@/lib/settings-store";
 import { DEFAULT_LATE_AFTER_MINUTES, time12, toMinutes, type QrCheckinSettings } from "@/lib/attendance-checkin";
 import { subscribeToStoredData } from "@/lib/storage";
+import { TimeSelect } from "@/components/time-select";
 
 const STATUS_META: Record<AttendanceStatus, { label: string; color: string; bg: string }> = {
   present:    { label: "Present",  color: "#059669", bg: "#ecfdf5" },
@@ -320,10 +321,11 @@ export default function AttendancePage() {
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700, color: "#8e89a3" }}>
                         IN
-                        <input
-                          type="time"
+                        <TimeSelect
                           value={record?.checkIn ?? ""}
-                          onChange={(e) => setTime(s.id, "checkIn", e.target.value)}
+                          onChange={(value) => setTime(s.id, "checkIn", value)}
+                          stepMin={15}
+                          placeholder="Select time"
                           style={{ border: "1px solid #e8e8f0", borderRadius: 7, padding: "4px 6px", fontSize: 11.5, fontWeight: 700, color: "#1a1a2e", background: "#fff" }}
                         />
                       </label>
@@ -335,10 +337,11 @@ export default function AttendancePage() {
                       )}
                       <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, fontWeight: 700, color: "#8e89a3" }}>
                         OUT
-                        <input
-                          type="time"
+                        <TimeSelect
                           value={record?.checkOut ?? ""}
-                          onChange={(e) => setTime(s.id, "checkOut", e.target.value)}
+                          onChange={(value) => setTime(s.id, "checkOut", value)}
+                          stepMin={15}
+                          placeholder="Select time"
                           style={{ border: "1px solid #e8e8f0", borderRadius: 7, padding: "4px 6px", fontSize: 11.5, fontWeight: 700, color: "#1a1a2e", background: "#fff" }}
                         />
                       </label>
