@@ -24,6 +24,8 @@ export interface Payout {
   baseAmount: number;
   /** Number of weekly-off days worked and used to offset attendance absences. */
   weeklyOffAttendanceAdjustments?: number;
+  /** Dates on which those weekly-off days were worked. */
+  weeklyOffWorkedDates?: string[];
   /** Value of services sold beyond what clients booked, in the period. */
   upsellValue?: number;
   /** Upsell incentive % snapshot at the time this payout was processed. */

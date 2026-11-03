@@ -59,7 +59,8 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
     upsellRate: staff.upsellCommissionRate ? String(staff.upsellCommissionRate) : "",
     adjustment: "",
     adjustmentNote: "",
-    weeklyOffAdjustments: "0",
+    weeklyOffWorkedDate: "",
+    weeklyOffWorkedDates: [] as string[],
     paymentMethod: "cash",
     notes: "",
     markPaidNow: true,
@@ -109,9 +110,24 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
     ),
     [staff.id, form.periodStart, form.periodEnd, staff.paidLeavesPerMonth, staff.standardHoursPerDay, staff.weeklyOffDays],
   );
-  const weeklyOffAdjustments = Number(form.weeklyOffAdjustments) || 0;
+  const absenceUnitsBeforeAdjustment = attendance.absent + attendance.latesAsAbsent + attendance.unmarkedAbsent;
+  const weeklyOffAdjustments = form.weeklyOffWorkedDates.length;
   const salaryBreakdown = salaryAfterAttendance(salaryAmount, attendance, weeklyOffAdjustments);
   const proratedSalary = salaryBreakdown.salary;
+
+  const addWeeklyOffWorkedDate = () => {
+    const date = form.weeklyOffWorkedDate;
+    if (!date || date < form.periodStart || date > form.periodEnd || form.weeklyOffWorkedDates.includes(date) || form.weeklyOffWorkedDates.length >= absenceUnitsBeforeAdjustment) return;
+    setForm((current) => ({
+      ...current,
+      weeklyOffWorkedDate: "",
+      weeklyOffWorkedDates: [...current.weeklyOffWorkedDates, date].sort(),
+    }));
+  };
+
+  const removeWeeklyOffWorkedDate = (date: string) => {
+    setForm((current) => ({ ...current, weeklyOffWorkedDates: current.weeklyOffWorkedDates.filter((item) => item !== date) }));
+  };
 
   // The upsell incentive is added whatever the pay type: it rewards making the
   // sale, which a salaried stylist can do just as well as a commissioned one.
@@ -140,6 +156,7 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
       upsellAmount: upsellAmount > 0 ? upsellAmount : undefined,
       baseAmount,
       weeklyOffAttendanceAdjustments: salaryBreakdown.weeklyOffAdjustments || undefined,
+      weeklyOffWorkedDates: salaryBreakdown.weeklyOffAdjustments ? form.weeklyOffWorkedDates : undefined,
       adjustment,
       adjustmentNote: form.adjustmentNote.trim() || undefined,
       totalAmount: total,
@@ -297,24 +314,43 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
                       <span>Attendance deduction ({salaryBreakdown.absenceUnits} absent × {fmt(salaryBreakdown.dailyRate)} per day)</span>
                       <span style={{ fontWeight: 700, color: "#1a1a2e" }}>{fmt(salaryAmount)} − {fmt(salaryBreakdown.deduction)} = {fmt(proratedSalary)}</span>
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 4 }}>
-                      <label style={{ ...label, color: "#6b6b8a" }}>Weekly Off Worked — Offset Absence</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max={attendance.absent + attendance.latesAsAbsent + attendance.unmarkedAbsent}
-                        step="1"
-                        style={inp}
-                        value={form.weeklyOffAdjustments}
-                        onChange={(e) => set("weeklyOffAdjustments", e.target.value)}
-                        placeholder="0"
-                      />
-                      <div style={{ fontSize: 11, color: "#9898b0" }}>
-                        Each day worked on a weekly off cancels one absence deduction, up to {attendance.absent + attendance.latesAsAbsent + attendance.unmarkedAbsent} day{attendance.absent + attendance.latesAsAbsent + attendance.unmarkedAbsent === 1 ? "" : "s"}.
-                      </div>
-                    </div>
                   </>
                 )}
+              </div>
+              <div style={{ padding: "12px 14px", borderRadius: 10, background: "#f5f3ff", border: "1px solid #e9d5ff", display: "flex", flexDirection: "column", gap: 5 }}>
+                <label style={{ ...label, color: "#6d28d9" }}>Attendance Adjustment — Weekly Off Worked</label>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="date"
+                    min={form.periodStart}
+                    max={form.periodEnd}
+                    style={{ ...inp, flex: 1 }}
+                    value={form.weeklyOffWorkedDate}
+                    onChange={(e) => set("weeklyOffWorkedDate", e.target.value)}
+                    aria-label="Weekly off worked date"
+                  />
+                  <button
+                    type="button"
+                    onClick={addWeeklyOffWorkedDate}
+                    disabled={!form.weeklyOffWorkedDate || form.weeklyOffWorkedDates.length >= absenceUnitsBeforeAdjustment}
+                    style={{ padding: "9px 13px", borderRadius: 8, border: "1px solid #ddd6fe", background: "#fff", color: "#6d28d9", fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap", opacity: !form.weeklyOffWorkedDate || form.weeklyOffWorkedDates.length >= absenceUnitsBeforeAdjustment ? 0.5 : 1 }}
+                  >
+                    Add Date
+                  </button>
+                </div>
+                {form.weeklyOffWorkedDates.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {form.weeklyOffWorkedDates.map((date) => (
+                      <span key={date} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 8px", borderRadius: 20, background: "#ede9fe", color: "#6d28d9", fontSize: 11, fontWeight: 750 }}>
+                        {fmtDate(date)}
+                        <button type="button" onClick={() => removeWeeklyOffWorkedDate(date)} aria-label={`Remove ${date}`} style={{ border: 0, background: "transparent", color: "#7c3aed", cursor: "pointer", padding: 0, fontWeight: 900 }}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ fontSize: 11, color: "#7c6f9e" }}>
+                  Each weekly-off day worked cancels one absence deduction, up to {absenceUnitsBeforeAdjustment} day{absenceUnitsBeforeAdjustment === 1 ? "" : "s"}.
+                </div>
               </div>
             </>
           )}
