@@ -57,7 +57,7 @@ function getStaffStats(staff: Staff, appointments: Appointment[], services: Serv
 
 const STAFF_EXPORT_COLS = [
   "Staff ID", "Name", "Phone", "Email", "Role", "Section", "Active", "Pay Type",
-  "Commission Rate", "Base Salary", "Paid Leaves / Month", "Specialties", "Assigned Services", "Color",
+  "Commission Rate", "Base Salary", "Fuel Allowance", "Paid Leaves / Month", "Specialties", "Assigned Services", "Color",
 ];
 
 const STAFF_ROLES = Object.keys(ROLE_COLORS) as StaffRole[];
@@ -113,6 +113,7 @@ function staffToRows(list: Staff[], servicesList: Service[]) {
       "Pay Type": staff.payType ?? "commission",
       "Commission Rate": staff.commissionRate ?? "",
       "Base Salary": staff.baseSalary ?? "",
+      "Fuel Allowance": staff.fuelAllowance ?? "",
       "Paid Leaves / Month": staff.paidLeavesPerMonth ?? "",
       "Standard Hours / Day": staff.standardHoursPerDay ?? "",
       "Shift Start": staff.shiftStart ?? "",
@@ -155,6 +156,7 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
     payType: staff?.payType ?? "commission",
     commissionRate: staff?.commissionRate ? String(staff.commissionRate) : "",
     baseSalary: staff?.baseSalary ? String(staff.baseSalary) : "",
+    fuelAllowance: staff?.fuelAllowance ? String(staff.fuelAllowance) : "",
     paidLeavesPerMonth: staff?.paidLeavesPerMonth != null ? String(staff.paidLeavesPerMonth) : "",
     upsellCommissionRate: staff?.upsellCommissionRate != null ? String(staff.upsellCommissionRate) : "",
     standardHoursPerDay: staff?.standardHoursPerDay != null ? String(staff.standardHoursPerDay) : "",
@@ -210,6 +212,7 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
       payType: form.payType as StaffPayType,
       commissionRate: (form.payType === "commission" || form.payType === "both") && form.commissionRate ? Number(form.commissionRate) : undefined,
       baseSalary: (form.payType === "salary" || form.payType === "both") && form.baseSalary ? Number(form.baseSalary) : undefined,
+      fuelAllowance: (form.payType === "salary" || form.payType === "both") && form.fuelAllowance ? Number(form.fuelAllowance) : undefined,
       paidLeavesPerMonth: form.paidLeavesPerMonth !== "" && Number(form.paidLeavesPerMonth) >= 0 ? Number(form.paidLeavesPerMonth) : undefined,
       standardHoursPerDay: Number(form.standardHoursPerDay) > 0 ? Number(form.standardHoursPerDay) : undefined,
       shiftStart: form.shiftStart && form.shiftEnd ? form.shiftStart : undefined,
@@ -308,9 +311,16 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
           {(form.payType === "salary" || form.payType === "both") && (
             <>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Base Salary (PKR / pay period)</label>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Basic Salary (PKR / pay period)</label>
                 <input type="number" min="0" value={form.baseSalary} onChange={(e) => set("baseSalary", e.target.value)} placeholder="e.g. 30000"
                   style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #e8e8f0", fontSize: 13, color: "#1a1a2e", outline: "none" }} />
+                <div style={{ fontSize: 11, color: "#b0b0c8" }}>Attendance deductions (absences, lates, short hours) reduce this amount in Payouts.</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Fuel Allowance (PKR / month, fixed)</label>
+                <input type="number" min="0" value={form.fuelAllowance} onChange={(e) => set("fuelAllowance", e.target.value)} placeholder="e.g. 3000"
+                  style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #e8e8f0", fontSize: 13, color: "#1a1a2e", outline: "none" }} />
+                <div style={{ fontSize: 11, color: "#b0b0c8" }}>Paid in full every payout — never reduced by attendance. Leave blank for none.</div>
               </div>
             </>
           )}
@@ -424,7 +434,8 @@ function StaffImportModal({ existing, servicesList, onClose, onImport }: {
 
         const payType = normalizePayType(row["Pay Type"] ?? row["PayType"]);
         const commissionRate = Number(row["Commission Rate"] ?? row["Commission"] ?? "");
-        const baseSalary = Number(row["Base Salary"] ?? row["Salary"] ?? "");
+        const baseSalary = Number(row["Basic Salary"] ?? row["Base Salary"] ?? row["Salary"] ?? "");
+        const fuelAllowance = Number(row["Fuel Allowance"] ?? row["Fuel"] ?? "");
         const paidLeavesPerMonth = Number(row["Paid Leaves / Month"] ?? row["Paid Leaves"] ?? "");
         const standardHoursPerDay = Number(row["Standard Hours / Day"] ?? row["Standard Hours"] ?? "");
         // Excel may hand back "11:00", "11:00 AM" or a day fraction (0.4583…).
@@ -458,6 +469,7 @@ function StaffImportModal({ existing, servicesList, onClose, onImport }: {
             payType,
             commissionRate: (payType === "commission" || payType === "both") && Number.isFinite(commissionRate) ? commissionRate : undefined,
             baseSalary: (payType === "salary" || payType === "both") && Number.isFinite(baseSalary) ? baseSalary : undefined,
+            fuelAllowance: (payType === "salary" || payType === "both") && Number.isFinite(fuelAllowance) && fuelAllowance > 0 ? fuelAllowance : undefined,
             paidLeavesPerMonth: (payType === "salary" || payType === "both") && Number.isFinite(paidLeavesPerMonth) ? paidLeavesPerMonth : undefined,
             standardHoursPerDay: Number.isFinite(standardHoursPerDay) && standardHoursPerDay > 0 ? standardHoursPerDay : undefined,
             shiftStart: shiftStart && shiftEnd ? shiftStart : undefined,
@@ -488,6 +500,7 @@ function StaffImportModal({ existing, servicesList, onClose, onImport }: {
       "Pay Type": "both",
       "Commission Rate": 30,
       "Base Salary": 25000,
+      "Fuel Allowance": 3000,
       "Paid Leaves / Month": 2,
       "Specialties": "Haircut, Blowdry",
       "Assigned Services": "Haircut, Blowdry",

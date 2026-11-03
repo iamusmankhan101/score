@@ -88,6 +88,7 @@ function EditModal({
     payType: staff.payType ?? "commission",
     commissionRate: staff.commissionRate ? String(staff.commissionRate) : "",
     baseSalary: staff.baseSalary ? String(staff.baseSalary) : "",
+    fuelAllowance: staff.fuelAllowance ? String(staff.fuelAllowance) : "",
     paidLeavesPerMonth: staff.paidLeavesPerMonth != null ? String(staff.paidLeavesPerMonth) : "",
     upsellCommissionRate: staff.upsellCommissionRate != null ? String(staff.upsellCommissionRate) : "",
     standardHoursPerDay: staff.standardHoursPerDay != null ? String(staff.standardHoursPerDay) : "",
@@ -125,6 +126,7 @@ function EditModal({
       payType: form.payType as StaffPayType,
       commissionRate: (form.payType === "commission" || form.payType === "both") && form.commissionRate ? Number(form.commissionRate) : undefined,
       baseSalary: (form.payType === "salary" || form.payType === "both") && form.baseSalary ? Number(form.baseSalary) : undefined,
+      fuelAllowance: (form.payType === "salary" || form.payType === "both") && form.fuelAllowance ? Number(form.fuelAllowance) : undefined,
       paidLeavesPerMonth: form.paidLeavesPerMonth !== "" && Number(form.paidLeavesPerMonth) >= 0 ? Number(form.paidLeavesPerMonth) : undefined,
       standardHoursPerDay: Number(form.standardHoursPerDay) > 0 ? Number(form.standardHoursPerDay) : undefined,
       shiftStart: form.shiftStart && form.shiftEnd ? form.shiftStart : undefined,
@@ -211,8 +213,14 @@ function EditModal({
           {(form.payType === "salary" || form.payType === "both") && (
             <>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Base Salary (PKR / pay period)</label>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Basic Salary (PKR / pay period)</label>
                 <input type="number" min="0" style={inp} value={form.baseSalary} onChange={(e) => set("baseSalary", e.target.value)} placeholder="e.g. 30000" />
+                <div style={{ fontSize: 11, color: "#b0b0c8" }}>Attendance deductions (absences, lates, short hours) reduce this amount in Payouts.</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Fuel Allowance (PKR / month, fixed)</label>
+                <input type="number" min="0" style={inp} value={form.fuelAllowance} onChange={(e) => set("fuelAllowance", e.target.value)} placeholder="e.g. 3000" />
+                <div style={{ fontSize: 11, color: "#b0b0c8" }}>Paid in full every payout — never reduced by attendance. Leave blank for none.</div>
               </div>
             </>
           )}

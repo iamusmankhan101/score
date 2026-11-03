@@ -52,8 +52,10 @@ export interface Staff {
   payType?: StaffPayType;
   /** Commission percentage of revenue generated (e.g. 30 for 30%). Used when payType is "commission" or "both". */
   commissionRate?: number;
-  /** Fixed pay-period amount (PKR). Used when payType is "salary" or "both". */
+  /** Fixed pay-period amount (PKR). Used when payType is "salary" or "both". Attendance deductions apply to this portion only. */
   baseSalary?: number;
+  /** Fixed monthly transport allowance (PKR), paid in full regardless of attendance. Added on top of the prorated basic salary in Payouts. */
+  fuelAllowance?: number;
   /**
    * Extra commission %, paid only on services sold beyond what the client
    * booked (see lib/upsell.ts). Stacks on top of any ordinary commission rather

@@ -18,7 +18,9 @@ export interface Payout {
   revenueGenerated: number;
   /** Commission % snapshot at the time this payout was processed (commission only). */
   commissionRate?: number;
-  /** Computed pay before adjustments — revenue × rate for commission, or baseSalary for salary, plus any upsell incentive. */
+  /** Fixed fuel allowance snapshot, paid in full and not reduced by attendance. */
+  fuelAllowance?: number;
+  /** Computed pay before adjustments — commission/basic salary/fuel allowance plus any upsell incentive. */
   baseAmount: number;
   /** Value of services sold beyond what clients booked, in the period. */
   upsellValue?: number;

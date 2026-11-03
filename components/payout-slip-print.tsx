@@ -59,16 +59,20 @@ export default function PayoutSlipPrint({
   // out before the salary line is derived — otherwise "Base Salary" would silently
   // absorb it and the slip wouldn't add up against the stylist's own arithmetic.
   const upsellAmount = payout.upsellAmount ?? 0;
+  const fuelAllowance = payout.fuelAllowance ?? 0;
   const rows: { label: string; amount?: string }[] = [];
   if (payout.payType === "commission" || payout.payType === "both") {
     const commissionAmount = Math.round(payout.revenueGenerated * (payout.commissionRate ?? 0) / 100);
     rows.push({ label: `Revenue Generated (${fmtDate(payout.periodStart)} – ${fmtDate(payout.periodEnd)})`, amount: fmt(payout.revenueGenerated) });
     rows.push({ label: `Commission (${payout.commissionRate ?? 0}%)`, amount: fmt(commissionAmount) });
     if (payout.payType === "both") {
-      rows.push({ label: "Base Salary", amount: fmt(payout.baseAmount - commissionAmount - upsellAmount) });
+      rows.push({ label: "Basic Salary", amount: fmt(payout.baseAmount - commissionAmount - fuelAllowance - upsellAmount) });
     }
   } else {
-    rows.push({ label: "Base Salary", amount: fmt(payout.baseAmount - upsellAmount) });
+    rows.push({ label: "Basic Salary", amount: fmt(payout.baseAmount - fuelAllowance - upsellAmount) });
+  }
+  if (fuelAllowance > 0) {
+    rows.push({ label: "Fixed Fuel Allowance", amount: fmt(fuelAllowance) });
   }
   if (upsellAmount > 0) {
     rows.push({ label: `Upsold Services${payout.upsellValue ? ` (${fmt(payout.upsellValue)})` : ""}`, amount: "" });

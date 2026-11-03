@@ -74,6 +74,7 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
   const rate = Number(form.commissionRate) || 0;
   const commissionAmount = Math.round(revenue * rate / 100);
   const salaryAmount = Number(form.salaryAmount) || 0;
+  const fuelAllowance = staff.fuelAllowance ?? 0;
 
   // Services sold on top of what the client booked. Read straight from the
   // invoices rather than the appointments, which only record the booking.
@@ -103,9 +104,9 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
 
   // The upsell incentive is added whatever the pay type: it rewards making the
   // sale, which a salaried stylist can do just as well as a commissioned one.
-  const payBeforeUpsell = form.payType === "commission" ? commissionAmount
+  const payBeforeUpsell = (form.payType === "commission" ? commissionAmount
     : form.payType === "both" ? commissionAmount + proratedSalary
-    : proratedSalary;
+    : proratedSalary) + fuelAllowance;
   const baseAmount = payBeforeUpsell + upsellAmount;
   const adjustment = Number(form.adjustment) || 0;
   const total = baseAmount + adjustment;
@@ -122,6 +123,7 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
       payType: form.payType as StaffPayType,
       revenueGenerated: revenue,
       commissionRate: (form.payType === "commission" || form.payType === "both") ? rate : undefined,
+      fuelAllowance: fuelAllowance > 0 ? fuelAllowance : undefined,
       upsellValue: upsell.value > 0 ? upsell.value : undefined,
       upsellRate: upsellAmount > 0 ? upsellRate : undefined,
       upsellAmount: upsellAmount > 0 ? upsellAmount : undefined,
@@ -255,7 +257,7 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
           {(form.payType === "salary" || form.payType === "both") && (
             <>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={label}>Salary Amount (PKR)</label>
+                <label style={label}>Basic Salary (PKR)</label>
                 <input type="number" min="0" style={inp} value={form.salaryAmount} onChange={(e) => set("salaryAmount", e.target.value)} placeholder="e.g. 30000" />
               </div>
               <div style={{ padding: "12px 14px", borderRadius: 10, background: "#f9f9fb", border: "1px solid #f0f0f8", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -288,9 +290,14 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
               </div>
             </>
           )}
+          {fuelAllowance > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6b6b8a", padding: "0 2px" }}>
+              <span>Fixed fuel allowance (attendance not applied)</span><span style={{ fontWeight: 700, color: "#1a1a2e" }}>{fmt(fuelAllowance)}</span>
+            </div>
+          )}
           {form.payType === "both" && (
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6b6b8a", padding: "0 2px" }}>
-              <span>Commission + Salary</span><span style={{ fontWeight: 700, color: "#1a1a2e" }}>{fmt(commissionAmount)} + {fmt(proratedSalary)} = {fmt(baseAmount)}</span>
+              <span>Commission + Salary + Fuel</span><span style={{ fontWeight: 700, color: "#1a1a2e" }}>{fmt(commissionAmount)} + {fmt(proratedSalary)} + {fmt(fuelAllowance)} = {fmt(baseAmount)}</span>
             </div>
           )}
 
@@ -572,13 +579,14 @@ export default function PayoutsPage() {
             const revenue = revenueInPeriod(s, appointments, services, periodStart, todayStr(), invoices);
             const estAttendance = getAttendanceSummary(s.id, periodStart, todayStr(), undefined, leaveAllowanceFor(s), standardHoursFor(s), s);
             const estSalary = estAttendance.markedDays > 0 ? Math.round((s.baseSalary ?? 0) * estAttendance.creditFactor) : (s.baseSalary ?? 0);
+            const estFuel = s.fuelAllowance ?? 0;
             const estUpsell = upsellIncentive(
               upsellInPeriod(s, invoices, appointments, services, periodStart, todayStr()).value,
               s.upsellCommissionRate,
             );
             const estimated = (payType === "commission" ? Math.round(revenue * (s.commissionRate ?? 0) / 100)
               : payType === "both" ? Math.round(revenue * (s.commissionRate ?? 0) / 100) + estSalary
-              : estSalary) + estUpsell;
+              : estSalary) + estFuel + estUpsell;
             return (
               <div key={s.id} style={{ background: "#fff", padding: "20px", display: "flex", flexDirection: "column", gap: 14, border: "1px solid #ebebf0", borderRadius: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
