@@ -1862,8 +1862,16 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
       monthRows.push(row);
       grouped.set(key, monthRows);
     }
+    const monthKeys: string[] = [];
+    const monthCursor = new Date(`${rangeStart.slice(0, 7)}-01T12:00:00`);
+    const lastMonth = new Date(`${filterEnd.slice(0, 7)}-01T12:00:00`);
+    while (monthCursor <= lastMonth) {
+      monthKeys.push(toDateStr(monthCursor).slice(0, 7));
+      monthCursor.setMonth(monthCursor.getMonth() + 1);
+    }
     let previousClosing = opening;
-    return [...grouped.entries()].map(([key, monthRows]) => {
+    return monthKeys.map(key => {
+      const monthRows = grouped.get(key) ?? [];
       const monthTotalIn = monthRows.reduce((sum, row) => sum + row.moneyIn, 0);
       const monthTotalOut = monthRows.reduce((sum, row) => sum + row.moneyOut, 0);
       const month = {
@@ -1878,7 +1886,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
       previousClosing = month.closing;
       return month;
     });
-  }, [rows, opening]);
+  }, [rows, opening, rangeStart, filterEnd]);
 
   // Filters only hide rows — each row keeps its place in the book's running balance.
   const query = search.trim().toLowerCase();
@@ -2071,16 +2079,19 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
               <div /><div /><div />
               <div style={{ ...cell, fontWeight: 800, color: "#1a1a2e", textAlign: "right" }}>{signed(opening)}</div>
             </div>
-            {shown.length === 0 ? (
+            {months.length === 0 ? (
               <div style={{ padding: "36px 20px", textAlign: "center", fontSize: 13, color: "#9898b0" }}>
-                {rows.length === 0 ? "No entries in this period" : "No entries match these filters"}
+                No ledger months in this period
               </div>
             ) : months.map(month => {
               const monthShown = shown.filter(row => month.rows.includes(row));
-              if (!monthShown.length) return null;
               return <div key={month.key}>
                 <div style={{ padding: "10px 20px", background: "#F5F3FF", color: "#5B21B6", fontSize: 12, fontWeight: 800 }}>{month.label} · Opening balance {signed(month.opening)}</div>
-                {monthShown.map(row => (
+                {monthShown.length === 0 ? (
+                  <div style={{ padding: "18px 20px", color: "#9898b0", fontSize: 12, borderBottom: "1px solid #f8f8fc" }}>
+                    {month.rows.length === 0 ? "No entries in this month" : "No entries match these filters"}
+                  </div>
+                ) : monthShown.map(row => (
                   <div key={row.id} style={{ display: "grid", gridTemplateColumns: cols, padding: "10px 20px", borderBottom: "1px solid #f8f8fc", alignItems: "center" }}>
                     <div style={cell}>{row.date}</div>
                     <div style={{ ...cell, fontWeight: 700, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.description}>{row.description}</div>
