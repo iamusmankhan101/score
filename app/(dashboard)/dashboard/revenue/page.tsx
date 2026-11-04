@@ -1721,6 +1721,15 @@ type LedgerRow = {
   account: string; category: string; moneyIn: number; moneyOut: number;
 };
 type OwedRow = { id: string; name: string; detail: string; date: string; amount: number };
+type LedgerMonth = {
+  key: string;
+  label: string;
+  opening: number;
+  closing: number;
+  totalIn: number;
+  totalOut: number;
+  rows: (LedgerRow & { balance: number })[];
+};
 
 const ACCOUNT_ORDER = Object.keys(METHOD_LABELS);
 const accountLabel = (key: string) => METHOD_LABELS[key] ?? key;
@@ -1845,6 +1854,32 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
   }, [allRows, account, rangeStart, filterEnd]);
   const closing = opening + totalIn - totalOut;
 
+  const months = useMemo((): LedgerMonth[] => {
+    const grouped = new Map<string, (LedgerRow & { balance: number })[]>();
+    for (const row of rows) {
+      const key = row.date.slice(0, 7);
+      const monthRows = grouped.get(key) ?? [];
+      monthRows.push(row);
+      grouped.set(key, monthRows);
+    }
+    let previousClosing = opening;
+    return [...grouped.entries()].map(([key, monthRows]) => {
+      const monthTotalIn = monthRows.reduce((sum, row) => sum + row.moneyIn, 0);
+      const monthTotalOut = monthRows.reduce((sum, row) => sum + row.moneyOut, 0);
+      const month = {
+        key,
+        label: new Date(`${key}-01T12:00:00`).toLocaleDateString("en-PK", { month: "long", year: "numeric" }),
+        opening: previousClosing,
+        closing: previousClosing + monthTotalIn - monthTotalOut,
+        totalIn: monthTotalIn,
+        totalOut: monthTotalOut,
+        rows: monthRows,
+      };
+      previousClosing = month.closing;
+      return month;
+    });
+  }, [rows, opening]);
+
   // Filters only hide rows — each row keeps its place in the book's running balance.
   const query = search.trim().toLowerCase();
   const shown = rows.filter(r =>
@@ -1881,13 +1916,14 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
 
   async function exportLedger() {
     const XLSX = await import("xlsx");
-    const sheetRows = [
-      { Date: rangeStart, Description: "Opening balance", Details: "", Account: "", "Money In": "", "Money Out": "", Balance: opening },
-      ...shown.map(row => ({ Date: row.date, Description: row.description, Details: row.detail, Account: accountLabel(row.account),
+    const sheetRows: Record<string, string | number>[] = months.flatMap(month => [
+      { Date: month.key === rangeStart.slice(0, 7) ? rangeStart : `${month.key}-01`, Description: `${month.label} — Opening balance`, Details: "", Account: "", "Money In": "", "Money Out": "", Balance: month.opening },
+      ...month.rows.filter(row => shown.includes(row)).map(row => ({ Date: row.date, Description: row.description, Details: row.detail, Account: accountLabel(row.account),
         "Money In": row.moneyIn || "", "Money Out": row.moneyOut || "", Balance: row.balance })),
-      ...(isFiltered ? [{ Date: "", Description: "Total of shown entries", Details: "", Account: "", "Money In": shownIn, "Money Out": shownOut, Balance: "" }] : []),
-      { Date: filterEnd, Description: "Closing balance", Details: "", Account: "", "Money In": totalIn, "Money Out": totalOut, Balance: closing },
-    ];
+      { Date: month.key === filterEnd.slice(0, 7) ? filterEnd : `${month.key}-${new Date(Number(month.key.slice(0, 4)), Number(month.key.slice(5, 7)), 0).getDate()}`, Description: `${month.label} — Closing balance`, Details: "", Account: "", "Money In": month.totalIn, "Money Out": month.totalOut, Balance: month.closing },
+    ]);
+    if (isFiltered) sheetRows.push({ Date: "", Description: "Total of shown entries", Details: "", Account: "", "Money In": shownIn, "Money Out": shownOut, Balance: "" });
+    sheetRows.push({ Date: filterEnd, Description: "Total balance", Details: "", Account: "", "Money In": totalIn, "Money Out": totalOut, Balance: closing });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheetRows), "Ledger");
     XLSX.writeFile(wb, `ledger-${account}-${rangeStart}-to-${filterEnd}.xlsx`);
@@ -1897,8 +1933,11 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
     const e = escapeHtml;
     const money = (n: number) => (n ? fmt(n) : "");
     const now = new Date();
-    const body = shown.map(r => `<tr><td>${r.date}</td><td><b>${e(r.description)}</b><div class="muted">${e(r.detail)}</div></td>
-      <td class="num in">${money(r.moneyIn)}</td><td class="num out">${money(r.moneyOut)}</td><td class="num">${signed(r.balance)}</td></tr>`).join("");
+    const body = months.map(month => {
+      const monthBody = shown.filter(row => month.rows.includes(row)).map(r => `<tr><td>${r.date}</td><td><b>${e(r.description)}</b><div class="muted">${e(r.detail)}</div></td>
+        <td class="num in">${money(r.moneyIn)}</td><td class="num out">${money(r.moneyOut)}</td><td class="num">${signed(r.balance)}</td></tr>`).join("");
+      return `<tr class="month-head"><td colspan="5">${e(month.label)} · Opening ${signed(month.opening)}</td></tr>${monthBody}<tr class="edge"><td></td><td>${e(month.label)} closing balance</td><td class="num in">${fmt(month.totalIn)}</td><td class="num out">${fmt(month.totalOut)}</td><td class="num">${signed(month.closing)}</td></tr>`;
+    }).join("");
     printHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${e(bookName)} ${rangeStart} to ${filterEnd}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
@@ -1922,6 +1961,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
   .in { color: #059669; } .out { color: #dc2626; }
   .muted { color: #a0a0b8; font-size: 10px; margin-top: 2px; }
   .edge td { background: #faf9fd; font-weight: 800; }
+  .month-head td { background: #F5F3FF; color: #5B21B6; font-weight: 800; padding-top: 12px; }
   .foot { margin-top: 28px; padding-top: 14px; border-top: 1px solid #f0f0f8; font-size: 10px; color: #c0c0d0; display: flex; justify-content: space-between; }
   @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .page { padding: 24px 32px; } }
 </style></head><body><div class="page">
@@ -1940,7 +1980,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
     <tr class="edge"><td>${rangeStart}</td><td>Opening balance</td><td></td><td></td><td class="num">${signed(opening)}</td></tr>
     ${body || `<tr><td colspan="5" class="muted" style="text-align:center;padding:24px">No entries</td></tr>`}
     ${isFiltered ? `<tr class="edge"><td></td><td>Total of shown entries</td><td class="num in">${fmt(shownIn)}</td><td class="num out">${fmt(shownOut)}</td><td></td></tr>` : ""}
-    <tr class="edge"><td>${filterEnd}</td><td>Closing balance</td><td class="num in">${fmt(totalIn)}</td><td class="num out">${fmt(totalOut)}</td><td class="num">${signed(closing)}</td></tr>
+    <tr class="edge"><td>${filterEnd}</td><td>Total balance</td><td class="num in">${fmt(totalIn)}</td><td class="num out">${fmt(totalOut)}</td><td class="num">${signed(closing)}</td></tr>
   </tbody></table>
   <div class="foot"><span>Generated ${now.toLocaleDateString("en-PK", { year: "numeric", month: "long", day: "numeric" })} · Salon Central</span><span>Confidential</span></div>
 </div></body></html>`);
@@ -1977,7 +2017,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
           { label: "Opening Balance", value: signed(opening), color: "#6b6b8a" },
           { label: "Money In",  value: fmt(totalIn),  color: "#059669" },
           { label: "Money Out", value: fmt(totalOut), color: "#dc2626" },
-          { label: "Closing Balance", value: signed(closing), color: closing >= 0 ? "var(--accent)" : "#dc2626" },
+          { label: "Total Balance", value: signed(closing), color: closing >= 0 ? "var(--accent)" : "#dc2626" },
         ].map(({ label, value, color }) => (
           <div key={label} style={{ background: "#fff", borderRadius: 16, border: "1px solid rgba(226,223,235,0.8)", padding: "16px 20px" }}>
             <div style={{ fontSize: 22, fontWeight: 850, color, lineHeight: 1.1 }}>{value}</div>
@@ -1996,7 +2036,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
           <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a2e" }}>
             {account === "all" ? "Day Book" : bookName}
             <span style={{ fontSize: 12, fontWeight: 600, color: "#9898b0", marginLeft: 6 }}>
-              {rangeStart} → {filterEnd} · {isFiltered ? `${shown.length} of ${rows.length}` : rows.length} entries
+              {rangeStart} → {filterEnd} · {months.length} month{months.length === 1 ? "" : "s"} · {isFiltered ? `${shown.length} of ${rows.length}` : rows.length} entries
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -2035,16 +2075,31 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
               <div style={{ padding: "36px 20px", textAlign: "center", fontSize: 13, color: "#9898b0" }}>
                 {rows.length === 0 ? "No entries in this period" : "No entries match these filters"}
               </div>
-            ) : shown.map(row => (
-              <div key={row.id} style={{ display: "grid", gridTemplateColumns: cols, padding: "10px 20px", borderBottom: "1px solid #f8f8fc", alignItems: "center" }}>
-                <div style={cell}>{row.date}</div>
-                <div style={{ ...cell, fontWeight: 700, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.description}>{row.description}</div>
-                <div style={{ ...cell, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.detail}>{row.detail}</div>
-                <div style={{ ...cell, fontWeight: 750, color: "#059669", textAlign: "right" }}>{row.moneyIn ? fmt(row.moneyIn) : ""}</div>
-                <div style={{ ...cell, fontWeight: 750, color: "#dc2626", textAlign: "right" }}>{row.moneyOut ? fmt(row.moneyOut) : ""}</div>
-                <div style={{ ...cell, fontWeight: 800, color: row.balance >= 0 ? "#1a1a2e" : "#dc2626", textAlign: "right" }}>{signed(row.balance)}</div>
-              </div>
-            ))}
+            ) : months.map(month => {
+              const monthShown = shown.filter(row => month.rows.includes(row));
+              if (!monthShown.length) return null;
+              return <div key={month.key}>
+                <div style={{ padding: "10px 20px", background: "#F5F3FF", color: "#5B21B6", fontSize: 12, fontWeight: 800 }}>{month.label} · Opening balance {signed(month.opening)}</div>
+                {monthShown.map(row => (
+                  <div key={row.id} style={{ display: "grid", gridTemplateColumns: cols, padding: "10px 20px", borderBottom: "1px solid #f8f8fc", alignItems: "center" }}>
+                    <div style={cell}>{row.date}</div>
+                    <div style={{ ...cell, fontWeight: 700, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.description}>{row.description}</div>
+                    <div style={{ ...cell, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.detail}>{row.detail}</div>
+                    <div style={{ ...cell, fontWeight: 750, color: "#059669", textAlign: "right" }}>{row.moneyIn ? fmt(row.moneyIn) : ""}</div>
+                    <div style={{ ...cell, fontWeight: 750, color: "#dc2626", textAlign: "right" }}>{row.moneyOut ? fmt(row.moneyOut) : ""}</div>
+                    <div style={{ ...cell, fontWeight: 800, color: row.balance >= 0 ? "#1a1a2e" : "#dc2626", textAlign: "right" }}>{signed(row.balance)}</div>
+                  </div>
+                ))}
+                <div style={{ display: "grid", gridTemplateColumns: cols, padding: "10px 20px", background: "#fcfcfe", borderBottom: "1px solid #f0f0f5" }}>
+                  <div style={cell} />
+                  <div style={{ ...cell, fontWeight: 800, color: "#1a1a2e" }}>{month.label} closing balance</div>
+                  <div />
+                  <div style={{ ...cell, fontWeight: 800, color: "#059669", textAlign: "right" }}>{fmt(month.totalIn)}</div>
+                  <div style={{ ...cell, fontWeight: 800, color: "#dc2626", textAlign: "right" }}>{fmt(month.totalOut)}</div>
+                  <div style={{ ...cell, fontWeight: 850, color: month.closing >= 0 ? "var(--accent)" : "#dc2626", textAlign: "right" }}>{signed(month.closing)}</div>
+                </div>
+              </div>;
+            })}
             {isFiltered && (
               <div style={{ display: "grid", gridTemplateColumns: cols, padding: "10px 20px", borderBottom: "1px solid #f0f0f5" }}>
                 <div />
@@ -2057,7 +2112,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
             )}
             <div style={{ display: "grid", gridTemplateColumns: cols, padding: "12px 20px", background: "#faf9fd" }}>
               <div style={cell}>{filterEnd}</div>
-              <div style={{ ...cell, fontWeight: 800, color: "#1a1a2e" }}>Closing balance</div>
+              <div style={{ ...cell, fontWeight: 800, color: "#1a1a2e" }}>Total balance</div>
               <div />
               <div style={{ ...cell, fontWeight: 800, color: "#059669", textAlign: "right" }}>{fmt(totalIn)}</div>
               <div style={{ ...cell, fontWeight: 800, color: "#dc2626", textAlign: "right" }}>{fmt(totalOut)}</div>
