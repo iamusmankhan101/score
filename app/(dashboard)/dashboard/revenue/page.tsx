@@ -1798,7 +1798,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
   const [flow, setFlow]         = useState<"all" | "in" | "out">("all");
   const [category, setCategory] = useState("all");
   const [search, setSearch]     = useState("");
-  const [monthTab, setMonthTab] = useState("all");
+  const [monthTab, setMonthTab] = useState(() => today ? today.slice(0, 7) : "all");
   const requestedLedgerStart = rangeStart ? `${rangeStart.slice(0, 7)}-01` : rangeStart;
   const ledgerFilterEnd = filterEnd
     ? toDateStr(new Date(Number(filterEnd.slice(0, 4)), Number(filterEnd.slice(5, 7)), 0))
@@ -1931,6 +1931,15 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
   const signed = (n: number) => (n < 0 ? "−" : "") + fmt(Math.abs(n));
   const activeMonthTab = monthTab !== "all" && months.some(month => month.key === monthTab) ? monthTab : "all";
   const visibleMonths = activeMonthTab === "all" ? months : months.filter(month => month.key === activeMonthTab);
+  const selectedMonth = activeMonthTab === "all" ? null : months.find(month => month.key === activeMonthTab) ?? null;
+  const displayOpening = selectedMonth?.opening ?? opening;
+  const displayTotalIn = selectedMonth?.totalIn ?? totalIn;
+  const displayTotalOut = selectedMonth?.totalOut ?? totalOut;
+  const displayClosing = selectedMonth?.closing ?? closing;
+  const displayStart = selectedMonth ? `${selectedMonth.key}-01` : ledgerRangeStart;
+  const displayEnd = selectedMonth
+    ? toDateStr(new Date(Number(selectedMonth.key.slice(0, 4)), Number(selectedMonth.key.slice(5, 7)), 0))
+    : ledgerFilterEnd;
 
   async function exportLedger() {
     const XLSX = await import("xlsx");
@@ -2055,10 +2064,10 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12 }}>
         {[
-          { label: "Opening Balance", value: signed(opening), color: "#6b6b8a" },
-          { label: "Money In",  value: fmt(totalIn),  color: "#059669" },
-          { label: "Money Out", value: fmt(totalOut), color: "#dc2626" },
-          { label: "Total Balance", value: signed(closing), color: closing >= 0 ? "var(--accent)" : "#dc2626" },
+          { label: "Opening Balance", value: signed(displayOpening), color: "#6b6b8a" },
+          { label: "Money In",  value: fmt(displayTotalIn),  color: "#059669" },
+          { label: "Money Out", value: fmt(displayTotalOut), color: "#dc2626" },
+          { label: "Total Balance", value: signed(displayClosing), color: displayClosing >= 0 ? "var(--accent)" : "#dc2626" },
         ].map(({ label, value, color }) => (
           <div key={label} style={{ background: "#fff", borderRadius: 16, border: "1px solid rgba(226,223,235,0.8)", padding: "16px 20px" }}>
             <div style={{ fontSize: 22, fontWeight: 850, color, lineHeight: 1.1 }}>{value}</div>
@@ -2107,10 +2116,10 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
               ))}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: cols, padding: "10px 20px", borderBottom: "1px solid #f8f8fc", background: "#fcfcfe" }}>
-              <div style={cell}>{ledgerRangeStart}</div>
+              <div style={cell}>{displayStart}</div>
               <div style={{ ...cell, fontWeight: 750, color: "#1a1a2e" }}>Opening balance</div>
               <div /><div /><div />
-              <div style={{ ...cell, fontWeight: 800, color: "#1a1a2e", textAlign: "right" }}>{signed(opening)}</div>
+              <div style={{ ...cell, fontWeight: 800, color: "#1a1a2e", textAlign: "right" }}>{signed(displayOpening)}</div>
             </div>
             {months.length === 0 ? (
               <div style={{ padding: "36px 20px", textAlign: "center", fontSize: 13, color: "#9898b0" }}>
@@ -2155,12 +2164,12 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
               </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: cols, padding: "12px 20px", background: "#faf9fd" }}>
-              <div style={cell}>{ledgerFilterEnd}</div>
-              <div style={{ ...cell, fontWeight: 800, color: "#1a1a2e" }}>Total balance</div>
+              <div style={cell}>{displayEnd}</div>
+              <div style={{ ...cell, fontWeight: 800, color: "#1a1a2e" }}>{selectedMonth ? `${selectedMonth.label} total balance` : "Total balance"}</div>
               <div />
-              <div style={{ ...cell, fontWeight: 800, color: "#059669", textAlign: "right" }}>{fmt(totalIn)}</div>
-              <div style={{ ...cell, fontWeight: 800, color: "#dc2626", textAlign: "right" }}>{fmt(totalOut)}</div>
-              <div style={{ ...cell, fontWeight: 850, color: closing >= 0 ? "var(--accent)" : "#dc2626", textAlign: "right" }}>{signed(closing)}</div>
+              <div style={{ ...cell, fontWeight: 800, color: "#059669", textAlign: "right" }}>{fmt(displayTotalIn)}</div>
+              <div style={{ ...cell, fontWeight: 800, color: "#dc2626", textAlign: "right" }}>{fmt(displayTotalOut)}</div>
+              <div style={{ ...cell, fontWeight: 850, color: displayClosing >= 0 ? "var(--accent)" : "#dc2626", textAlign: "right" }}>{signed(displayClosing)}</div>
             </div>
           </div>
         </div>
