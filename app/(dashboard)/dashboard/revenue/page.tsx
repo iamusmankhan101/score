@@ -1798,6 +1798,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
   const [flow, setFlow]         = useState<"all" | "in" | "out">("all");
   const [category, setCategory] = useState("all");
   const [search, setSearch]     = useState("");
+  const [monthTab, setMonthTab] = useState("all");
   const ledgerRangeStart = rangeStart ? `${rangeStart.slice(0, 7)}-01` : rangeStart;
   const ledgerFilterEnd = filterEnd
     ? toDateStr(new Date(Number(filterEnd.slice(0, 4)), Number(filterEnd.slice(5, 7)), 0))
@@ -1925,6 +1926,8 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
   ].filter(Boolean).join(" · ");
 
   const signed = (n: number) => (n < 0 ? "−" : "") + fmt(Math.abs(n));
+  const activeMonthTab = monthTab !== "all" && months.some(month => month.key === monthTab) ? monthTab : "all";
+  const visibleMonths = activeMonthTab === "all" ? months : months.filter(month => month.key === activeMonthTab);
 
   async function exportLedger() {
     const XLSX = await import("xlsx");
@@ -2024,6 +2027,29 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
         })}
       </div>
 
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "4px 0 2px" }}>
+        <button type="button" onClick={() => setMonthTab("all")} aria-pressed={activeMonthTab === "all"} style={{
+          flex: "0 0 auto", padding: "9px 14px", borderRadius: 12, cursor: "pointer",
+          border: activeMonthTab === "all" ? "2px solid var(--accent)" : "1px solid rgba(226,223,235,0.9)",
+          background: activeMonthTab === "all" ? "#F5F3FF" : "#fff", color: "#1a1a2e", fontWeight: 800,
+        }}>All months</button>
+        {months.map(month => {
+          const active = activeMonthTab === month.key;
+          return (
+            <button key={month.key} type="button" onClick={() => setMonthTab(month.key)} aria-pressed={active} style={{
+              flex: "0 0 auto", minWidth: 170, textAlign: "left", padding: "8px 12px", borderRadius: 12, cursor: "pointer",
+              border: active ? "2px solid var(--accent)" : "1px solid rgba(226,223,235,0.9)",
+              background: active ? "#F5F3FF" : "#fff", color: "#1a1a2e",
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: active ? "var(--accent)" : "#6b6b8a" }}>{month.label}</div>
+              <div style={{ display: "flex", gap: 10, marginTop: 3, fontSize: 10, color: "#9898b0" }}>
+                <span>Open {signed(month.opening)}</span><span>Close {signed(month.closing)}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12 }}>
         {[
           { label: "Opening Balance", value: signed(opening), color: "#6b6b8a" },
@@ -2048,7 +2074,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
           <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a2e" }}>
             {account === "all" ? "Day Book" : bookName}
             <span style={{ fontSize: 12, fontWeight: 600, color: "#9898b0", marginLeft: 6 }}>
-              {ledgerRangeStart} → {ledgerFilterEnd} · {months.length} month{months.length === 1 ? "" : "s"} · {isFiltered ? `${shown.length} of ${rows.length}` : rows.length} entries
+              {activeMonthTab === "all" ? `${ledgerRangeStart} → ${ledgerFilterEnd} · ${months.length} month${months.length === 1 ? "" : "s"}` : months.find(month => month.key === activeMonthTab)?.label} · {isFiltered ? `${shown.length} of ${rows.length}` : rows.length} entries
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -2087,7 +2113,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
               <div style={{ padding: "36px 20px", textAlign: "center", fontSize: 13, color: "#9898b0" }}>
                 No ledger months in this period
               </div>
-            ) : months.map(month => {
+            ) : visibleMonths.map(month => {
               const monthShown = shown.filter(row => month.rows.includes(row));
               return <div key={month.key}>
                 <div style={{ padding: "10px 20px", background: "#F5F3FF", color: "#5B21B6", fontSize: 12, fontWeight: 800 }}>{month.label} · Opening balance {signed(month.opening)}</div>
