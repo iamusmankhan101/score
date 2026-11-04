@@ -1799,7 +1799,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
   const [category, setCategory] = useState("all");
   const [search, setSearch]     = useState("");
   const [monthTab, setMonthTab] = useState("all");
-  const ledgerRangeStart = rangeStart ? `${rangeStart.slice(0, 7)}-01` : rangeStart;
+  const requestedLedgerStart = rangeStart ? `${rangeStart.slice(0, 7)}-01` : rangeStart;
   const ledgerFilterEnd = filterEnd
     ? toDateStr(new Date(Number(filterEnd.slice(0, 4)), Number(filterEnd.slice(5, 7)), 0))
     : filterEnd;
@@ -1828,6 +1828,9 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
         account: e.paymentMethod || "cash", category: expenseLabel(e.category), moneyIn: 0, moneyOut: e.amount })),
   ].sort((a, b) => a.sortKey.localeCompare(b.sortKey)),
   [appointments, posLinkedAppointmentIds, posInvoices, manualIncome, expenses]);
+  const ledgerRangeStart = allRows.length
+    ? `${allRows[0].date.slice(0, 7)}-01`
+    : requestedLedgerStart;
 
   // Balance of every account as at the end of the period.
   const accounts = useMemo(() => {
