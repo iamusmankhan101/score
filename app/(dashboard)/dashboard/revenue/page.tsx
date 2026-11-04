@@ -1798,6 +1798,10 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
   const [flow, setFlow]         = useState<"all" | "in" | "out">("all");
   const [category, setCategory] = useState("all");
   const [search, setSearch]     = useState("");
+  const ledgerRangeStart = rangeStart ? `${rangeStart.slice(0, 7)}-01` : rangeStart;
+  const ledgerFilterEnd = filterEnd
+    ? toDateStr(new Date(Number(filterEnd.slice(0, 4)), Number(filterEnd.slice(5, 7)), 0))
+    : filterEnd;
 
   // Same sources and rules as the Overview and Net Profit tabs: completed
   // appointments without a POS checkout, paid POS invoices, imported income,
@@ -1828,12 +1832,12 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
   const accounts = useMemo(() => {
     const balances = new Map<string, number>();
     for (const row of allRows) {
-      if (row.date > filterEnd) break;
+      if (row.date > ledgerFilterEnd) break;
       balances.set(row.account, (balances.get(row.account) ?? 0) + row.moneyIn - row.moneyOut);
     }
     const rank = (key: string) => (ACCOUNT_ORDER.indexOf(key) + 1) || 99;
     return [...balances].sort((a, b) => rank(a[0]) - rank(b[0]));
-  }, [allRows, filterEnd]);
+  }, [allRows, ledgerFilterEnd]);
 
   const categories = useMemo(() => [...new Set(allRows.map(r => r.category))].sort(), [allRows]);
 
@@ -1843,15 +1847,15 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
     const rows: (LedgerRow & { balance: number })[] = [];
     for (const row of allRows) {
       if (account !== "all" && row.account !== account) continue;
-      if (row.date > filterEnd) break;
-      if (row.date < rangeStart) { balance += row.moneyIn - row.moneyOut; continue; }
+      if (row.date > ledgerFilterEnd) break;
+      if (row.date < ledgerRangeStart) { balance += row.moneyIn - row.moneyOut; continue; }
       totalIn += row.moneyIn; totalOut += row.moneyOut;
       rows.push({ ...row, balance: 0 });
     }
     const opening = balance;
     rows.forEach(row => { balance += row.moneyIn - row.moneyOut; row.balance = balance; });
     return { opening, rows, totalIn, totalOut };
-  }, [allRows, account, rangeStart, filterEnd]);
+  }, [allRows, account, ledgerRangeStart, ledgerFilterEnd]);
   const closing = opening + totalIn - totalOut;
 
   const months = useMemo((): LedgerMonth[] => {
@@ -1863,8 +1867,8 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
       grouped.set(key, monthRows);
     }
     const monthKeys: string[] = [];
-    const monthCursor = new Date(`${rangeStart.slice(0, 7)}-01T12:00:00`);
-    const lastMonth = new Date(`${filterEnd.slice(0, 7)}-01T12:00:00`);
+    const monthCursor = new Date(`${ledgerRangeStart.slice(0, 7)}-01T12:00:00`);
+    const lastMonth = new Date(`${ledgerFilterEnd.slice(0, 7)}-01T12:00:00`);
     while (monthCursor <= lastMonth) {
       monthKeys.push(toDateStr(monthCursor).slice(0, 7));
       monthCursor.setMonth(monthCursor.getMonth() + 1);
@@ -1886,7 +1890,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
       previousClosing = month.closing;
       return month;
     });
-  }, [rows, opening, rangeStart, filterEnd]);
+  }, [rows, opening, ledgerRangeStart, ledgerFilterEnd]);
 
   // Filters only hide rows — each row keeps its place in the book's running balance.
   const query = search.trim().toLowerCase();
@@ -1925,16 +1929,16 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
   async function exportLedger() {
     const XLSX = await import("xlsx");
     const sheetRows: Record<string, string | number>[] = months.flatMap(month => [
-      { Date: month.key === rangeStart.slice(0, 7) ? rangeStart : `${month.key}-01`, Description: `${month.label} — Opening balance`, Details: "", Account: "", "Money In": "", "Money Out": "", Balance: month.opening },
+      { Date: `${month.key}-01`, Description: `${month.label} — Opening balance`, Details: "", Account: "", "Money In": "", "Money Out": "", Balance: month.opening },
       ...month.rows.filter(row => shown.includes(row)).map(row => ({ Date: row.date, Description: row.description, Details: row.detail, Account: accountLabel(row.account),
         "Money In": row.moneyIn || "", "Money Out": row.moneyOut || "", Balance: row.balance })),
-      { Date: month.key === filterEnd.slice(0, 7) ? filterEnd : `${month.key}-${new Date(Number(month.key.slice(0, 4)), Number(month.key.slice(5, 7)), 0).getDate()}`, Description: `${month.label} — Closing balance`, Details: "", Account: "", "Money In": month.totalIn, "Money Out": month.totalOut, Balance: month.closing },
+      { Date: `${month.key}-${new Date(Number(month.key.slice(0, 4)), Number(month.key.slice(5, 7)), 0).getDate()}`, Description: `${month.label} — Closing balance`, Details: "", Account: "", "Money In": month.totalIn, "Money Out": month.totalOut, Balance: month.closing },
     ]);
     if (isFiltered) sheetRows.push({ Date: "", Description: "Total of shown entries", Details: "", Account: "", "Money In": shownIn, "Money Out": shownOut, Balance: "" });
-    sheetRows.push({ Date: filterEnd, Description: "Total balance", Details: "", Account: "", "Money In": totalIn, "Money Out": totalOut, Balance: closing });
+    sheetRows.push({ Date: ledgerFilterEnd, Description: "Total balance", Details: "", Account: "", "Money In": totalIn, "Money Out": totalOut, Balance: closing });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheetRows), "Ledger");
-    XLSX.writeFile(wb, `ledger-${account}-${rangeStart}-to-${filterEnd}.xlsx`);
+    XLSX.writeFile(wb, `ledger-${account}-${ledgerRangeStart}-to-${ledgerFilterEnd}.xlsx`);
   }
 
   function printStatement() {
@@ -1946,7 +1950,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
         <td class="num in">${money(r.moneyIn)}</td><td class="num out">${money(r.moneyOut)}</td><td class="num">${signed(r.balance)}</td></tr>`).join("");
       return `<tr class="month-head"><td colspan="5">${e(month.label)} · Opening ${signed(month.opening)}</td></tr>${monthBody}<tr class="edge"><td></td><td>${e(month.label)} closing balance</td><td class="num in">${fmt(month.totalIn)}</td><td class="num out">${fmt(month.totalOut)}</td><td class="num">${signed(month.closing)}</td></tr>`;
     }).join("");
-    printHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${e(bookName)} ${rangeStart} to ${filterEnd}</title>
+    printHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${e(bookName)} ${ledgerRangeStart} to ${ledgerFilterEnd}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1975,7 +1979,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
 </style></head><body><div class="page">
   <div class="header">
     <div class="logo-img"><img src="${window.location.origin}/salon-central-logo.png" alt="Salon Central" /></div>
-    <div><div class="title">Ledger Statement — ${e(bookName)}</div><div class="sub">${rangeStart} to ${filterEnd}</div>
+    <div><div class="title">Ledger Statement — ${e(bookName)}</div><div class="sub">${ledgerRangeStart} to ${ledgerFilterEnd}</div>
     ${filterNote ? `<div class="sub">${e(filterNote)}</div>` : ""}</div>
   </div>
   <div class="stats">
@@ -1985,10 +1989,10 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
     <div class="stat"><div class="stat-l">Closing balance</div><div class="stat-v">${signed(closing)}</div></div>
   </div>
   <table><thead><tr><th>Date</th><th>Description</th><th class="num">Money in</th><th class="num">Money out</th><th class="num">Balance</th></tr></thead><tbody>
-    <tr class="edge"><td>${rangeStart}</td><td>Opening balance</td><td></td><td></td><td class="num">${signed(opening)}</td></tr>
+    <tr class="edge"><td>${ledgerRangeStart}</td><td>Opening balance</td><td></td><td></td><td class="num">${signed(opening)}</td></tr>
     ${body || `<tr><td colspan="5" class="muted" style="text-align:center;padding:24px">No entries</td></tr>`}
     ${isFiltered ? `<tr class="edge"><td></td><td>Total of shown entries</td><td class="num in">${fmt(shownIn)}</td><td class="num out">${fmt(shownOut)}</td><td></td></tr>` : ""}
-    <tr class="edge"><td>${filterEnd}</td><td>Total balance</td><td class="num in">${fmt(totalIn)}</td><td class="num out">${fmt(totalOut)}</td><td class="num">${signed(closing)}</td></tr>
+    <tr class="edge"><td>${ledgerFilterEnd}</td><td>Total balance</td><td class="num in">${fmt(totalIn)}</td><td class="num out">${fmt(totalOut)}</td><td class="num">${signed(closing)}</td></tr>
   </tbody></table>
   <div class="foot"><span>Generated ${now.toLocaleDateString("en-PK", { year: "numeric", month: "long", day: "numeric" })} · Salon Central</span><span>Confidential</span></div>
 </div></body></html>`);
@@ -2044,7 +2048,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
           <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a2e" }}>
             {account === "all" ? "Day Book" : bookName}
             <span style={{ fontSize: 12, fontWeight: 600, color: "#9898b0", marginLeft: 6 }}>
-              {rangeStart} → {filterEnd} · {months.length} month{months.length === 1 ? "" : "s"} · {isFiltered ? `${shown.length} of ${rows.length}` : rows.length} entries
+              {ledgerRangeStart} → {ledgerFilterEnd} · {months.length} month{months.length === 1 ? "" : "s"} · {isFiltered ? `${shown.length} of ${rows.length}` : rows.length} entries
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -2074,7 +2078,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
               ))}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: cols, padding: "10px 20px", borderBottom: "1px solid #f8f8fc", background: "#fcfcfe" }}>
-              <div style={cell}>{rangeStart}</div>
+              <div style={cell}>{ledgerRangeStart}</div>
               <div style={{ ...cell, fontWeight: 750, color: "#1a1a2e" }}>Opening balance</div>
               <div /><div /><div />
               <div style={{ ...cell, fontWeight: 800, color: "#1a1a2e", textAlign: "right" }}>{signed(opening)}</div>
@@ -2122,7 +2126,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
               </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: cols, padding: "12px 20px", background: "#faf9fd" }}>
-              <div style={cell}>{filterEnd}</div>
+              <div style={cell}>{ledgerFilterEnd}</div>
               <div style={{ ...cell, fontWeight: 800, color: "#1a1a2e" }}>Total balance</div>
               <div />
               <div style={{ ...cell, fontWeight: 800, color: "#059669", textAlign: "right" }}>{fmt(totalIn)}</div>
@@ -2133,7 +2137,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
         </div>
       </div>
       <div style={{ fontSize: 11, color: "#b0b0c8", lineHeight: 1.6 }}>
-        Each account&rsquo;s balance is everything in minus everything out through it up to {filterEnd || "today"}; sales and
+        Each account&rsquo;s balance is everything in minus everything out through it up to {ledgerFilterEnd || "today"}; sales and
         imported income with no payment method count as cash. Pending expenses, unpaid invoices and petty cash top-ups stay
         out of the books until they&rsquo;re paid — they show under Owed to me / I owe instead.
       </div>
