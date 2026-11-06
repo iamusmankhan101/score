@@ -7,7 +7,7 @@ import {
   Smartphone, Zap, Tag, UserPlus, CheckCircle2, Printer,
   MessageSquare, RefreshCw, User, ChevronRight, Sparkles,
   Clock, AlertCircle, Gift, Percent,
-  ScanBarcode, Lock, PauseCircle, PlayCircle,
+  ScanBarcode, Lock, PauseCircle, PlayCircle, Camera,
 } from "lucide-react";
 import { EasypaisaLogo, JazzCashLogo } from "@/components/wallet-logos";
 import { adjustPoints, awardPoints, redeemPoints, type LoyaltySettings } from "@/lib/loyalty";
@@ -34,6 +34,7 @@ import { getDefaultLocationId } from "@/lib/locations";
 import { getSectionOptions, getActiveSection, inSection } from "@/lib/sections";
 import type { Service, Client, InventoryItem, Staff, PaymentMethod } from "@/lib/types";
 import { settleServiceConsumption } from "@/lib/inventory-consumption";
+import BarcodeCameraScanner from "@/components/barcode-camera-scanner";
 import { activeMembership, addDays, getConsents, membershipAllowanceLeft, membershipUntil, missingConsents, term, usablePackages, useIsClinic } from "@/lib/clinic";
 import { newClientId } from "@/lib/ids";
 import { appointmentStaffIds } from "@/lib/appointment-staff";
@@ -309,6 +310,7 @@ export default function POSPage() {
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogSectionFilter, setCatalogSectionFilter] = useState(() => getActiveSection());
   const [barcodeInput, setBarcodeInput] = useState("");
+  const [cameraScanning, setCameraScanning] = useState(false);
   const [scanFeedback, setScanFeedback] = useState<{ ok: boolean; message: string } | null>(null);
   const scannerBuffer = useRef("");
   const scannerLastKeyAt = useRef(0);
@@ -579,7 +581,7 @@ export default function POSPage() {
   const addBarcodeToCart = useCallback((rawCode: string) => {
     const code = rawCode.trim();
     if (!code) return;
-    const product = inventory.find(item => item.barcode?.trim().toLowerCase() === code.toLowerCase());
+    const product = inventory.find(item => item.isActive !== false && item.barcode?.trim().toLowerCase() === code.toLowerCase());
     if (!product) {
       setScanFeedback({ ok: false, message: `No product found for barcode ${code}` });
       return;
@@ -601,6 +603,9 @@ export default function POSPage() {
       stock: product.currentStock,
       unit: product.unit,
       barcode: product.barcode,
+      variablePrice: product.variablePrice,
+      priceRangeMin: product.priceRangeMin,
+      priceRangeMax: product.priceRangeMax,
     });
     setScanFeedback({ ok: true, message: `${product.name} added to cart.` });
     setBarcodeInput("");
@@ -1591,7 +1596,6 @@ export default function POSPage() {
                   placeholder="Scan barcode or enter code…"
                   autoComplete="off"
                   autoFocus
-                  inputMode="numeric"
                   style={{ width: "100%", height: 36, padding: "0 12px 0 35px", borderRadius: 10, border: "1.5px solid #ddd6fe", fontSize: 12, color: "#1d1d2f", outline: "none", background: "#faf8ff", boxSizing: "border-box" }}
                 />
               </div>
@@ -1602,7 +1606,12 @@ export default function POSPage() {
               >
                 Add Product
               </button>
+              <button type="button" onClick={() => setCameraScanning(true)} aria-label="Scan barcode with camera" title="Scan with camera"
+                style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 10, border: "1.5px solid #ddd6fe", background: "#faf8ff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                <Camera size={15} color="#7C3AED" />
+              </button>
             </form>
+            {cameraScanning && <BarcodeCameraScanner continuous status={scanFeedback} onDetected={addBarcodeToCart} onClose={() => setCameraScanning(false)} />}
 
             {scanFeedback && (
               <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 7, borderRadius: 9, padding: "7px 10px", background: scanFeedback.ok ? "#ecfdf5" : "#fef2f2", border: `1px solid ${scanFeedback.ok ? "#bbf7d0" : "#fecaca"}`, color: scanFeedback.ok ? "#047857" : "#dc2626", fontSize: 11, fontWeight: 700 }}>

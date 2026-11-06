@@ -9,13 +9,15 @@ import { settingsStore } from "@/lib/settings-store";
 import type { InventoryBatch, InventoryItem, InventoryCategory, InventoryUnit, Service } from "@/lib/types";
 import { batchUsage, getTreatmentCharts, newId, todayKey } from "@/lib/clinic";
 import { getSectionOptions, getActiveSection, inSection, defaultSectionForNewRecord } from "@/lib/sections";
+import { barcodeSvg, generateBarcode, isValidLabelSize, LABEL_LIMITS, LABEL_PRESETS, printBarcodeLabels, type LabelSize } from "@/lib/barcode-label";
+import BarcodeCameraScanner from "@/components/barcode-camera-scanner";
 import MobilePageHeader from "@/components/mobile-page-header";
 import PageTitle from "@/components/page-title";
 import {
   Search, X, Plus, AlertTriangle, Package, ChevronDown,
   Edit2, Trash2, Bell, Copy, CheckCircle, TrendingDown,
   MessageCircle, DollarSign, Tag, ToggleLeft, ToggleRight,
-  Upload, Download, FileSpreadsheet, Check,
+  Upload, Download, FileSpreadsheet, Check, Camera,
 } from "lucide-react";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -165,8 +167,86 @@ function formToItem(form: ItemForm, existing?: InventoryItem): InventoryItem {
   };
 }
 
+type LabelChoice = { preset: "roll" | "sheet" | "custom"; width: string; height: string; sheet: boolean };
+const LABEL_CHOICE_KEY = "barcode-label-size";
+
+/** The last size used on this device, so a salon's custom labels needn't be re-entered per product. */
+function loadLabelChoice(): LabelChoice {
+  const fallback: LabelChoice = { preset: "roll", width: "50", height: "25", sheet: false };
+  try {
+    return { ...fallback, ...JSON.parse(localStorage.getItem(LABEL_CHOICE_KEY) ?? "{}") };
+  } catch {
+    return fallback;
+  }
+}
+
+function saveLabelChoice(choice: LabelChoice) {
+  try {
+    localStorage.setItem(LABEL_CHOICE_KEY, JSON.stringify(choice));
+  } catch { /* only a convenience */ }
+}
+
+/** Barcode preview with label printing. Only give it a saved item, so a printed label always scans at POS. */
+function BarcodeLabelPrinter({ item }: { item: InventoryItem }) {
+  const [copies, setCopies] = useState("1");
+  const [choice, setChoice] = useState<LabelChoice>(loadLabelChoice);
+  const [blocked, setBlocked] = useState(false);
+  const code = item.barcode ?? "";
+  const svg = useMemo(() => barcodeSvg(code), [code]);
+  if (!svg) return <div style={{ fontSize: 11, color: "#b45309", marginTop: 4 }}>This code has characters that can&apos;t be printed as a barcode.</div>;
+  const count = Math.min(500, Math.max(1, Math.floor(Number(copies)) || 1));
+  const size: LabelSize = choice.preset === "custom"
+    ? { width: Number(choice.width), height: Number(choice.height), sheet: choice.sheet }
+    : LABEL_PRESETS[choice.preset];
+  const sizeOk = isValidLabelSize(size);
+  const pick = (patch: Partial<LabelChoice>) => setChoice((c) => ({ ...c, ...patch }));
+  const print = () => {
+    saveLabelChoice(choice);
+    setBlocked(!printBarcodeLabels(
+      { name: `${item.brand ? item.brand + " " : ""}${item.name}`, price: priceLabel(item), barcode: code }, svg, count, size,
+    ));
+  };
+  return (
+    <div style={{ marginTop: 8, padding: 10, border: "1px solid #e8e8f0", borderRadius: 10, background: "#fff", textAlign: "left" }}>
+      <div role="img" aria-label={`Barcode ${code}`} style={{ maxWidth: 220, margin: "0 auto 8px" }} dangerouslySetInnerHTML={{ __html: svg.replace("<svg ", '<svg style="width:100%;height:auto" ') }} />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <select aria-label="Label size" value={choice.preset} onChange={(e) => pick({ preset: e.target.value as LabelChoice["preset"] })} style={{ ...INP, flex: "1 1 140px", width: "auto" }}>
+          <option value="roll">Label printer (50 × 25 mm)</option>
+          <option value="sheet">A4 sheet (63 × 30 mm)</option>
+          <option value="custom">Custom size</option>
+        </select>
+        <input aria-label="Number of labels" type="number" min="1" max="500" value={copies} onChange={(e) => setCopies(e.target.value)} style={{ ...INP, flex: "0 0 70px", width: 70 }} />
+        <button type="button" onClick={print} disabled={!sizeOk}
+          style={{ flex: "1 1 110px", padding: "9px 12px", borderRadius: 10, border: "none", background: sizeOk ? "linear-gradient(135deg, #5B21B6, #9333EA)" : "#e8e8f0", color: sizeOk ? "#fff" : "#9898b0", fontSize: 12, fontWeight: 600, cursor: sizeOk ? "pointer" : "not-allowed" }}>
+          Print {count} label{count === 1 ? "" : "s"}
+        </button>
+      </div>
+      {choice.preset === "custom" && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <input aria-label="Label width in millimetres" type="number" min={LABEL_LIMITS.minWidth} max={LABEL_LIMITS.maxWidth} value={choice.width} onChange={(e) => pick({ width: e.target.value })} placeholder="Width" style={{ ...INP, flex: "0 0 80px", width: 80 }} />
+            <span style={{ fontSize: 12, color: "#6b6b8a" }}>×</span>
+            <input aria-label="Label height in millimetres" type="number" min={LABEL_LIMITS.minHeight} max={LABEL_LIMITS.maxHeight} value={choice.height} onChange={(e) => pick({ height: e.target.value })} placeholder="Height" style={{ ...INP, flex: "0 0 80px", width: 80 }} />
+            <span style={{ fontSize: 12, color: "#6b6b8a" }}>mm</span>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b6b8a", cursor: "pointer" }}>
+              <input type="checkbox" checked={choice.sheet} onChange={(e) => pick({ sheet: e.target.checked })} style={{ accentColor: "#7C3AED" }} />
+              Print on A4 sheet
+            </label>
+          </div>
+          {!sizeOk && <div role="alert" style={{ fontSize: 11, color: "#dc2626", marginTop: 6 }}>Width must be {LABEL_LIMITS.minWidth}–{LABEL_LIMITS.maxWidth} mm and height {LABEL_LIMITS.minHeight}–{LABEL_LIMITS.maxHeight} mm.</div>}
+          {sizeOk && size.width < 35 && <div style={{ fontSize: 11, color: "#b45309", marginTop: 6 }}>Bars get thin on narrow labels. Print one and test it with your scanner first.</div>}
+        </div>
+      )}
+      {blocked && <div role="alert" style={{ fontSize: 11, color: "#dc2626", marginTop: 6 }}>Your browser blocked the print window. Allow pop-ups for this site and try again.</div>}
+    </div>
+  );
+}
+
 function ItemFormFields({ form, set, items, original }: { form: ItemForm; set: (k: keyof ItemForm, v: string | boolean) => void; items: InventoryItem[]; original?: InventoryItem }) {
   const stockMoved = !!original && form.currentStock !== "" && Number(form.currentStock) !== original.currentStock;
+  const [scanning, setScanning] = useState(false);
+  const barcodeKey = form.barcode.trim().toLowerCase();
+  const barcodeTwin = barcodeKey ? items.find((i) => i.id !== original?.id && i.barcode?.trim().toLowerCase() === barcodeKey) : undefined;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -234,7 +314,26 @@ function ItemFormFields({ form, set, items, original }: { form: ItemForm; set: (
         </div>
       )}
       <Field label="Product Barcode / SKU">
-        <input value={form.barcode} onChange={(e) => set("barcode", e.target.value.trim())} placeholder="Scan or enter barcode" style={INP} inputMode="numeric" />
+        <div style={{ display: "flex", gap: 8 }}>
+          <input value={form.barcode} onChange={(e) => set("barcode", e.target.value.trim())} placeholder="Scan, enter, or generate" style={{ ...INP, flex: 1, minWidth: 0 }} />
+          <button type="button" onClick={() => set("barcode", generateBarcode(items))}
+            style={{ padding: "0 12px", borderRadius: 10, border: "1px solid #ddd6fe", background: "#faf8ff", color: "#7C3AED", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+            Generate
+          </button>
+          <button type="button" onClick={() => setScanning(true)} aria-label="Scan barcode with camera" title="Scan with camera"
+            style={{ width: 40, borderRadius: 10, border: "1px solid #ddd6fe", background: "#faf8ff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+            <Camera size={15} color="#7C3AED" />
+          </button>
+        </div>
+        {scanning && <BarcodeCameraScanner onDetected={(code) => set("barcode", code)} onClose={() => setScanning(false)} />}
+        {original?.barcode === form.barcode && form.barcode && !barcodeTwin
+          ? <BarcodeLabelPrinter item={original} />
+          : form.barcode && !barcodeTwin && <div style={{ fontSize: 11, color: "#9898b0", marginTop: 4 }}>Save the item to print this barcode.</div>}
+        {barcodeTwin && (
+          <div role="alert" style={{ fontSize: 11, color: "#b45309", marginTop: 4 }}>
+            Already used by {barcodeTwin.brand ? `${barcodeTwin.brand} ` : ""}{barcodeTwin.name}. Scanning this code at POS could add the wrong product.
+          </div>
+        )}
       </Field>
       <Field label="Supplier"><input value={form.supplier} onChange={(e) => set("supplier", e.target.value)} placeholder="e.g. Wella Pakistan" style={INP} /></Field>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
@@ -571,6 +670,7 @@ function AddModal({ onClose, onAdd, items }: { onClose: () => void; onAdd: (item
         <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#ecfdf5", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 28 }}>✓</div>
         <div style={{ fontWeight: 700, fontSize: 17, color: "#1a1a2e", marginBottom: 6 }}>Item Added!</div>
         <div style={{ fontSize: 13, color: "#9898b0", marginBottom: 24 }}>Inventory updated successfully.</div>
+        {form.barcode && <div style={{ marginBottom: 20 }}><BarcodeLabelPrinter item={formToItem(form)} /></div>}
         <button onClick={onClose} style={{ padding: "10px 32px", borderRadius: 10, background: "linear-gradient(135deg, #5B21B6, #9333EA)", border: "none", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Done</button>
       </div>
     </Overlay>
@@ -606,6 +706,7 @@ function EditModal({ item, onClose, onSave, onShowHistory, items }: { item: Inve
         <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#ecfdf5", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 28 }}>✓</div>
         <div style={{ fontWeight: 700, fontSize: 17, color: "#1a1a2e", marginBottom: 6 }}>Changes Saved!</div>
         <div style={{ fontSize: 13, color: "#9898b0", marginBottom: 24 }}>{item.name} has been updated.</div>
+        {form.barcode && <div style={{ marginBottom: 20 }}><BarcodeLabelPrinter item={formToItem(form, item)} /></div>}
         <button onClick={onClose} style={{ padding: "10px 32px", borderRadius: 10, background: "linear-gradient(135deg, #5B21B6, #9333EA)", border: "none", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Done</button>
       </div>
     </Overlay>
@@ -1071,6 +1172,7 @@ export default function InventoryPage() {
   const [tab, setTab]                   = useState<"stock" | "retail">("stock");
   const [items, setItems]               = useState<InventoryItem[]>([]);
   const [search, setSearch]             = useState("");
+  const [searchScanning, setSearchScanning] = useState(false);
   const [catFilter, setCatFilter]       = useState<InventoryCategory | "all">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "low" | "out" | "ok">("all");
   const [sectionFilter, setSectionFilter] = useState(() => getActiveSection());
@@ -1172,6 +1274,7 @@ export default function InventoryPage() {
 
       {/* ── Modals (shared) ── */}
       {showAdd    && <AddModal    onClose={() => setShowAdd(false)}    onAdd={(item) => persist([item, ...items])} items={items} />}
+      {searchScanning && <BarcodeCameraScanner onDetected={setSearch} onClose={() => setSearchScanning(false)} />}
       {editItem   && <EditModal   item={editItem} onClose={() => setEditItem(null)} onSave={(updated, change) => persist(items.map((i) => i.id === updated.id ? updated : i), change)}
         onShowHistory={() => { setUsageItem(editItem); setEditItem(null); }} items={items} />}
       {deleteItem && <DeleteModal item={deleteItem} onClose={() => setDeleteItem(null)} onDelete={() => persist(getStoredInventory().filter((i) => i.id !== deleteItem.id))} />}
@@ -1279,7 +1382,10 @@ export default function InventoryPage() {
           {/* Search */}
           <div className="mobile-search-bar">
             <Search size={16} color="#9898b0" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, brand, supplier…" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, brand, barcode…" />
+            <button type="button" onClick={() => setSearchScanning(true)} aria-label="Search by scanning a barcode" style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 0 }}>
+              <Camera size={16} color="#7C3AED" />
+            </button>
             {search && (
               <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 0 }}>
                 <X size={14} color="#9898b0" />
@@ -1748,9 +1854,12 @@ export default function InventoryPage() {
               <Search size={15} color="#b0b0c8" />
               <input
                 value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name, brand, or supplier…"
+                placeholder="Search by name, brand, supplier, or barcode…"
                 style={{ flex: 1, border: "none", outline: "none", fontSize: 13, color: "#1a1a2e", background: "transparent" }}
               />
+              <button type="button" onClick={() => setSearchScanning(true)} aria-label="Search by scanning a barcode" title="Scan with camera" style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 0 }}>
+                <Camera size={15} color="#7C3AED" />
+              </button>
               {search && <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 0 }}><X size={14} color="#b0b0c8" /></button>}
             </div>
             <button

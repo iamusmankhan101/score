@@ -25,7 +25,8 @@ const securityHeaders = [
   {
     key: "Permissions-Policy",
     // geolocation=(self): QR attendance check-in confirms the phone is at the salon.
-    value: "camera=(), microphone=(), geolocation=(self), payment=(), usb=()",
+    // camera=(self): POS and inventory scan product barcodes with the phone camera.
+    value: "camera=(self), microphone=(), geolocation=(self), payment=(), usb=()",
   },
 
   // ── Prevent cross-site scripting via DNS prefetch ─────────────────────────
