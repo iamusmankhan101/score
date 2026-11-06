@@ -1,16 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, ReceiptText, Trash2, Wallet, X } from "lucide-react";
+import { Camera, ImageIcon, Pencil, Plus, Printer, ReceiptText, Trash2, Wallet, X } from "lucide-react";
+import BarcodeCameraScanner from "@/components/barcode-camera-scanner";
 import MobilePageHeader from "@/components/mobile-page-header";
 import PageTitle from "@/components/page-title";
 import { fmtCurrency as fmt } from "@/lib/format";
+import { uploadImage } from "@/lib/image";
 import { getActiveSection } from "@/lib/sections";
+import { settingsStore } from "@/lib/settings-store";
 import { getStoredInventory, subscribeToStoredData } from "@/lib/storage";
 import { syncFromDB } from "@/lib/turso-sync";
 import { getExpenses, saveExpenses, type Expense, type ExpenseItem } from "@/lib/expenses";
 import {
-  addVendorPayment, createVendorBill, deleteVendorBill, getVendorBills, isVendorPayment, sameVendor, vendorBalances,
+  addVendorPayment, billPayment, createVendorBill, deleteVendorBill, getVendorBills, isVendorPayment, printVendorBill, sameVendor, updateVendorBill, vendorBalances,
   type BillPayment, type VendorBalance, type VendorBill, type VendorPaymentMethod,
 } from "@/lib/vendor-bills";
 import type { InventoryItem } from "@/lib/types";
@@ -74,19 +77,66 @@ function settlementNote(payment: BillPayment, total: number, paidNow: number, ad
 
 type Row = { name: string; qty: string; unitPrice: string; inventoryItemId?: string };
 
-function BillModal({ inventory, balances, section, onClose, onSaved }: {
+const ICON_BUTTON: React.CSSProperties = { width: 36, height: 36, flexShrink: 0, borderRadius: 8, border: "1px solid #e3e0eb", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
+
+function BillModal({ bill, paidWithBill = 0, inventory, balances, section, onClose, onSaved }: {
+  /** The bill being edited; left out for a new one. */
+  bill?: VendorBill; paidWithBill?: number;
   inventory: InventoryItem[]; balances: VendorBalance[]; section?: string;
   onClose: () => void; onSaved: (dbSaved: boolean) => void;
 }) {
-  const [vendor, setVendor] = useState("");
-  const [date, setDate] = useState(todayKey);
-  const [billNo, setBillNo] = useState("");
-  const [notes, setNotes] = useState("");
-  const [payment, setPayment] = useState<BillPayment>("cash");
-  const [paid, setPaid] = useState("");
-  const [rows, setRows] = useState<Row[]>([{ name: "", qty: "1", unitPrice: "" }]);
+  const [vendor, setVendor] = useState(bill?.vendor ?? "");
+  const [date, setDate] = useState(bill?.date ?? todayKey);
+  const [billNo, setBillNo] = useState(bill?.billNo ?? "");
+  const [notes, setNotes] = useState(bill?.notes ?? "");
+  const [payment, setPayment] = useState<BillPayment>(bill?.payment ?? "cash");
+  const [paid, setPaid] = useState(bill && (bill.payment === "cash" || bill.payment === "bank") ? String(paidWithBill) : "");
+  const [rows, setRows] = useState<Row[]>(bill
+    ? bill.items.map((i) => ({ name: i.name, qty: String(i.qty), unitPrice: String(i.unitPrice), inventoryItemId: i.inventoryItemId }))
+    : [{ name: "", qty: "1", unitPrice: "" }]);
+  const [updateCosts, setUpdateCosts] = useState(true);
+  const [imageUrl, setImageUrl] = useState(bill?.imageUrl);
+  const [uploading, setUploading] = useState(false);
+  const [scanCode, setScanCode] = useState("");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [scanStatus, setScanStatus] = useState<{ ok: boolean; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  function addScanned(raw: string) {
+    const code = raw.trim().toLowerCase();
+    if (!code) return;
+    const product = inventory.find((inv) => inv.barcode?.trim().toLowerCase() === code);
+    if (!product) {
+      setScanStatus({ ok: false, message: `No product has barcode ${raw.trim()}. Add it in Inventory, or type its name below.` });
+      return;
+    }
+    setRows((rs) => {
+      const existing = rs.findIndex((r) => r.inventoryItemId === product.id);
+      if (existing >= 0) return rs.map((r, i) => (i === existing ? { ...r, qty: String((parseFloat(r.qty) || 0) + 1) } : r));
+      const row: Row = { name: product.name, qty: "1", unitPrice: product.costPrice ? String(product.costPrice) : "", inventoryItemId: product.id };
+      const blank = rs.findIndex((r) => !r.name.trim() && !r.unitPrice);
+      return blank >= 0 ? rs.map((r, i) => (i === blank ? row : r)) : [...rs, row];
+    });
+    setScanStatus({ ok: true, message: `${product.name} added to the bill.` });
+    setScanCode("");
+  }
+
+  async function attachPhoto(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    try {
+      // Larger than a profile photo so the figures on the bill stay readable.
+      setImageUrl(await uploadImage(file, "bills", 1600));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The photo couldn't be uploaded. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   const setRow = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const setRowName = (i: number, name: string) => {
@@ -98,8 +148,15 @@ function BillModal({ inventory, balances, section, onClose, onSaved }: {
   const total = rows.reduce((sum, r) => sum + (parseFloat(r.qty) || 0) * (parseFloat(r.unitPrice) || 0), 0);
   const paysNow = payment === "cash" || payment === "bank";
   const paidNow = paysNow ? (paid.trim() === "" ? total : parseFloat(paid) || 0) : 0;
-  const balance = balances.find((b) => sameVendor(b.vendor, vendor))?.balance ?? 0;
+  const currentBalance = balances.find((b) => sameVendor(b.vendor, vendor))?.balance ?? 0;
+  // When editing, what stood before this bill: its own total and payment don't count.
+  const balance = bill && sameVendor(bill.vendor, vendor) ? currentBalance - bill.total + paidWithBill : currentBalance;
   const advance = Math.max(0, -balance);
+  const costChanges = rows.some((r) => {
+    const cost = inventory.find((inv) => inv.id === r.inventoryItemId)?.costPrice;
+    const price = parseFloat(r.unitPrice);
+    return cost !== undefined && price > 0 && price !== cost;
+  });
 
   async function save() {
     const items: ExpenseItem[] = [];
@@ -115,16 +172,18 @@ function BillModal({ inventory, balances, section, onClose, onSaved }: {
     if (!date) { setError("Choose the bill date."); return; }
     if (paysNow && (paidNow < 0 || paidNow > total)) { setError(`Amount paid must be between 0 and ${fmt(total)}. To pay extra as advance, use Pay Vendor.`); return; }
     setSaving(true);
-    onSaved(await createVendorBill({
-      vendor, date, items, payment, paidNow,
-      ...(billNo.trim() ? { billNo: billNo.trim() } : {}),
-      ...(notes.trim() ? { notes: notes.trim() } : {}),
+    const input = {
+      vendor, date, items, payment, paidNow, imageUrl,
+      updateCosts: costChanges && updateCosts,
+      billNo: billNo.trim() || undefined,
+      notes: notes.trim() || undefined,
       ...(section ? { section } : {}),
-    }));
+    };
+    onSaved(await (bill ? updateVendorBill(bill.id, input) : createVendorBill(input)));
   }
 
   return (
-    <Modal title="New Vendor Bill" onClose={onClose}>
+    <Modal title={bill ? "Edit Vendor Bill" : "New Vendor Bill"} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <Field label="Vendor *">
           <input list="vendor-names" value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="e.g. Wella Pakistan" style={INPUT} />
@@ -136,6 +195,13 @@ function BillModal({ inventory, balances, section, onClose, onSaved }: {
         </div>
 
         <div style={{ fontSize: 11, fontWeight: 700, color: "#6b6b8a" }}>Products received *</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input aria-label="Scan or type a product barcode" value={scanCode} onChange={(e) => setScanCode(e.target.value)} autoComplete="off" placeholder="Scan or enter barcode, then press Enter"
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addScanned(scanCode); } }} style={{ ...INPUT, flex: 1, minWidth: 0 }} />
+          <button type="button" onClick={() => setCameraOpen(true)} aria-label="Scan barcode with camera" title="Scan with camera" style={{ ...ICON_BUTTON, width: 40, height: "auto", border: "1px solid #ddd6fe", background: "#faf8ff" }}><Camera size={15} color="#7C3AED" /></button>
+        </div>
+        {scanStatus && <div role="status" style={{ fontSize: 12, fontWeight: 600, color: scanStatus.ok ? "#047857" : "#b91c1c" }}>{scanStatus.message}</div>}
+        {cameraOpen && <BarcodeCameraScanner continuous status={scanStatus} idleMessage="Each product you scan is added to this bill." onDetected={addScanned} onClose={() => setCameraOpen(false)} />}
         <datalist id="vendor-bill-products">{inventory.map((inv) => <option key={inv.id} value={inv.name} />)}</datalist>
         {rows.map((r, i) => {
           const linked = inventory.find((inv) => inv.id === r.inventoryItemId);
@@ -150,7 +216,10 @@ function BillModal({ inventory, balances, section, onClose, onSaved }: {
               </div>
               {r.name.trim() && (
                 <div style={{ fontSize: 11, marginTop: 4, color: linked ? "#047857" : "#7C3AED" }}>
-                  {linked ? `In Inventory: stock ${linked.currentStock} → ${linked.currentStock + (parseFloat(r.qty) || 0)} ${linked.unit}` : `New: will be added to Inventory with ${parseFloat(r.qty) || 0} in stock`}
+                  {!linked ? `New: will be added to Inventory with ${parseFloat(r.qty) || 0} in stock`
+                    : bill ? `In Inventory: ${linked.currentStock} ${linked.unit} in stock now`
+                    : `In Inventory: stock ${linked.currentStock} → ${linked.currentStock + (parseFloat(r.qty) || 0)} ${linked.unit}`}
+                  {linked && parseFloat(r.unitPrice) > 0 && parseFloat(r.unitPrice) !== linked.costPrice && <span style={{ color: "#b45309" }}> · Cost was {fmt(linked.costPrice)}</span>}
                 </div>
               )}
             </div>
@@ -158,6 +227,13 @@ function BillModal({ inventory, balances, section, onClose, onSaved }: {
         })}
         <button type="button" onClick={() => setRows((rs) => [...rs, { name: "", qty: "1", unitPrice: "" }])} style={{ ...SECONDARY, alignSelf: "flex-start", padding: "8px 12px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Add product</button>
         <div style={{ textAlign: "right", fontSize: 15, fontWeight: 700, color: "#1a1a2e" }}>Total: {fmt(total)}</div>
+
+        {costChanges && (
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#6b6b8a", cursor: "pointer" }}>
+            <input type="checkbox" checked={updateCosts} onChange={(e) => setUpdateCosts(e.target.checked)} style={{ accentColor: "#7C3AED" }} />
+            Update cost prices in Inventory to these new prices
+          </label>
+        )}
 
         <div style={{ fontSize: 11, fontWeight: 700, color: "#6b6b8a" }}>How is this bill being paid?</div>
         <div role="radiogroup" aria-label="Payment type" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
@@ -175,8 +251,20 @@ function BillModal({ inventory, balances, section, onClose, onSaved }: {
         )}
         {total > 0 && <div style={{ fontSize: 12, color: "#6b6b8a" }}>{settlementNote(payment, total, paidNow, advance)}</div>}
         <Field label="Notes"><input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" style={INPUT} /></Field>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <label style={{ ...SECONDARY, padding: "8px 12px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6, opacity: uploading ? 0.6 : 1 }}>
+            <ImageIcon size={14} /> {uploading ? "Uploading…" : imageUrl ? "Change bill photo" : "Attach bill photo"}
+            <input type="file" accept="image/*" onChange={attachPhoto} disabled={uploading} style={{ position: "absolute", width: 1, height: 1, opacity: 0 }} />
+          </label>
+          {imageUrl && (
+            <>
+              <a href={imageUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "#7C3AED" }}>View photo</a>
+              <button type="button" onClick={() => setImageUrl(undefined)} style={{ background: "none", border: "none", padding: 0, color: "#dc2626", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove</button>
+            </>
+          )}
+        </div>
         {error && <div role="alert" style={{ fontSize: 12, color: "#dc2626" }}>{error}</div>}
-        <button type="button" onClick={save} disabled={saving} style={{ ...PRIMARY, opacity: saving ? 0.6 : 1 }}>{saving ? "Saving…" : "Save Bill & Add to Stock"}</button>
+        <button type="button" onClick={save} disabled={saving || uploading} style={{ ...PRIMARY, opacity: saving || uploading ? 0.6 : 1 }}>{saving ? "Saving…" : bill ? "Save Changes" : "Save Bill & Add to Stock"}</button>
       </div>
     </Modal>
   );
@@ -243,6 +331,8 @@ export default function VendorBillsPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [filter, setFilter] = useState("");
   const [showBill, setShowBill] = useState(false);
+  const [editBill, setEditBill] = useState<VendorBill | null>(null);
+  const [printBlocked, setPrintBlocked] = useState(false);
   const [payVendor, setPayVendor] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<HistoryEntry | null>(null);
   const [syncFailed, setSyncFailed] = useState(false);
@@ -285,9 +375,17 @@ export default function VendorBillsPage() {
   const finished = (dbSaved: boolean) => {
     setSyncFailed(!dbSaved);
     setShowBill(false);
+    setEditBill(null);
     setPayVendor(null);
     reload();
   };
+
+  const printBill = (bill: VendorBill) => setPrintBlocked(!printVendorBill(bill, {
+    salonName: settingsStore.salon.name,
+    paid: billPayment(bill.id)?.amount ?? 0,
+    paymentLabel: BILL_PAYMENT_LABEL[bill.payment],
+    money: fmt,
+  }));
 
   async function confirmDelete() {
     if (!toDelete) return;
@@ -314,6 +412,8 @@ export default function VendorBillsPage() {
         </div>
 
         {syncFailed && <div role="alert" style={{ padding: "10px 14px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 12, fontWeight: 600 }}>Saved on this device, but it hasn&apos;t reached the database yet. It will show on other devices once it syncs. Check your internet connection.</div>}
+
+        {printBlocked && <div role="alert" style={{ padding: "10px 14px", borderRadius: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 12, fontWeight: 600 }}>Your browser blocked the print window. Allow pop-ups for this site and try again.</div>}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
           <div style={{ ...CARD, padding: 16 }}><div style={{ fontSize: 12, color: "#6b6b8a", fontWeight: 600 }}>You owe vendors</div><div style={{ fontSize: 22, fontWeight: 700, color: totalOwed > 0 ? "#b91c1c" : "#1a1a2e", marginTop: 4 }}>{fmt(totalOwed)}</div></div>
@@ -348,8 +448,8 @@ export default function VendorBillsPage() {
           {history.length === 0 ? (
             <div style={{ padding: "28px 16px", textAlign: "center", fontSize: 13, color: "#9898b0" }}>Nothing recorded yet.</div>
           ) : history.map((entry) => (
-            <div key={entry.kind === "bill" ? entry.bill.id : entry.expense.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid #f4f4f8" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
+            <div key={entry.kind === "bill" ? entry.bill.id : entry.expense.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "12px 16px", borderBottom: "1px solid #f4f4f8" }}>
+              <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                 {entry.kind === "bill" ? (
                   <>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a2e" }}>{entry.bill.vendor}{entry.bill.billNo ? ` · Bill ${entry.bill.billNo}` : ""}</div>
@@ -365,6 +465,13 @@ export default function VendorBillsPage() {
               <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", color: entry.kind === "bill" ? "#1a1a2e" : "#047857" }}>
                 {entry.kind === "bill" ? fmt(entry.bill.total) : `− ${fmt(entry.expense.amount)}`}
               </div>
+              {entry.kind === "bill" && (
+                <>
+                  {entry.bill.imageUrl && <a href={entry.bill.imageUrl} target="_blank" rel="noreferrer" aria-label={`View photo of bill from ${entry.bill.vendor}`} title="View bill photo" style={ICON_BUTTON}><ImageIcon size={13} color="#7C3AED" /></a>}
+                  <button type="button" onClick={() => printBill(entry.bill)} aria-label={`Print bill from ${entry.bill.vendor}`} title="Print" style={ICON_BUTTON}><Printer size={13} color="#7C3AED" /></button>
+                  <button type="button" onClick={() => setEditBill(entry.bill)} aria-label={`Edit bill from ${entry.bill.vendor}`} title="Edit" style={ICON_BUTTON}><Pencil size={13} color="#7C3AED" /></button>
+                </>
+              )}
               <button type="button" onClick={() => setToDelete(entry)} aria-label={entry.kind === "bill" ? `Delete bill from ${entry.bill.vendor}` : `Delete payment to ${entry.expense.vendor}`}
                 style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 8, border: "1px solid #fecaca", background: "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
                 <Trash2 size={13} color="#dc2626" />
@@ -375,6 +482,7 @@ export default function VendorBillsPage() {
       </div>
 
       {showBill && <BillModal inventory={inventory} balances={balances} section={section} onClose={() => setShowBill(false)} onSaved={finished} />}
+      {editBill && <BillModal bill={editBill} paidWithBill={billPayment(editBill.id)?.amount ?? 0} inventory={inventory} balances={balances} section={section} onClose={() => setEditBill(null)} onSaved={finished} />}
       {payVendor !== null && <PaymentModal initialVendor={payVendor} balances={balances} section={section} onClose={() => setPayVendor(null)} onSaved={finished} />}
       {toDelete && (
         <Modal title={toDelete.kind === "bill" ? "Delete this bill?" : "Delete this payment?"} onClose={() => setToDelete(null)}>

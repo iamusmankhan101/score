@@ -1611,7 +1611,7 @@ export default function POSPage() {
                 <Camera size={15} color="#7C3AED" />
               </button>
             </form>
-            {cameraScanning && <BarcodeCameraScanner continuous status={scanFeedback} onDetected={addBarcodeToCart} onClose={() => setCameraScanning(false)} />}
+            {cameraScanning && <BarcodeCameraScanner continuous status={scanFeedback} idleMessage="Each product you scan is added to the bill." onDetected={addBarcodeToCart} onClose={() => setCameraScanning(false)} />}
 
             {scanFeedback && (
               <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 7, borderRadius: 9, padding: "7px 10px", background: scanFeedback.ok ? "#ecfdf5" : "#fef2f2", border: `1px solid ${scanFeedback.ok ? "#bbf7d0" : "#fecaca"}`, color: scanFeedback.ok ? "#047857" : "#dc2626", fontSize: 11, fontWeight: 700 }}>

@@ -42,7 +42,7 @@ export class ImageUploadError extends Error {}
  * much later as bloated sync payloads.
  */
 /** @param maxEdge clinical photos pass a larger size so before/after detail survives. */
-export async function uploadImage(file: File, folder: "clients" | "staff" | "salon" | "patients", maxEdge = MAX_EDGE_PX): Promise<string> {
+export async function uploadImage(file: File, folder: "clients" | "staff" | "salon" | "patients" | "bills", maxEdge = MAX_EDGE_PX): Promise<string> {
   const dataUrl = await fileToResizedDataUrl(file, maxEdge);
   let res: Response;
   try {

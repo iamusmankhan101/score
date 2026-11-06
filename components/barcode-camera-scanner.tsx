@@ -20,11 +20,13 @@ function cameraErrorMessage(err: unknown): string {
  * or with `continuous` stays open for the next one (`status` shows the result
  * of the last scan, since the page behind is covered).
  */
-export default function BarcodeCameraScanner({ onDetected, onClose, continuous, status }: {
+export default function BarcodeCameraScanner({ onDetected, onClose, continuous, status, idleMessage }: {
   onDetected: (code: string) => void;
   onClose: () => void;
   continuous?: boolean;
   status?: { ok: boolean; message: string } | null;
+  /** Shown until the first scan. */
+  idleMessage?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const callbacks = useRef({ onDetected, onClose });
@@ -96,7 +98,7 @@ export default function BarcodeCameraScanner({ onDetected, onClose, continuous, 
         {error && <div role="alert" style={{ padding: "48px 24px", textAlign: "center", fontSize: 14, lineHeight: 1.5 }}>{error}</div>}
       </div>
       <div aria-live="polite" style={{ minHeight: 52, padding: "16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: status ? (status.ok ? "#6ee7b7" : "#fca5a5") : "#d4d4d8" }}>
-        {status?.message ?? (continuous ? "Each product you scan is added to the bill." : "")}
+        {status?.message ?? idleMessage}
       </div>
     </div>,
     document.body,

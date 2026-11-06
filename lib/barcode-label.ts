@@ -1,4 +1,5 @@
 import JsBarcode from "jsbarcode";
+import { printInNewWindow } from "./print-window";
 
 /** In millimetres. `sheet` fits as many as it can on A4; otherwise each label is its own page, as label printers expect. */
 export type LabelSize = { width: number; height: number; sheet: boolean };
@@ -66,15 +67,10 @@ export function labelsHtml(label: BarcodeLabel, svg: string, copies: number, siz
       .text { max-width: 100%; font: 600 8pt -apple-system, "Segoe UI", Roboto, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       svg { display: block; width: 100%; height: ${barcodeHeight()}mm; flex: none; }
     </style>
-    <script>window.onload = function () { window.focus(); window.print(); };</script>
     </head><body>${tile.repeat(copies)}</body></html>`;
 }
 
 /** Opens the labels in their own window and prints them. False if the browser blocked the window. */
 export function printBarcodeLabels(label: BarcodeLabel, svg: string, copies: number, size: LabelSize): boolean {
-  const win = window.open("", "_blank", "width=700,height=800");
-  if (!win) return false;
-  win.document.write(labelsHtml(label, svg, copies, size));
-  win.document.close();
-  return true;
+  return printInNewWindow(labelsHtml(label, svg, copies, size));
 }

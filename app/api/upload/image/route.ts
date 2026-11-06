@@ -22,7 +22,7 @@ import { API_KEY, CLOUD_NAME, cloudinaryConfigured, sign } from "@/lib/cloudinar
 
 /** Refuse anything that isn't a small inline image, before it reaches Cloudinary. */
 const MAX_DATA_URL_BYTES = 3 * 1024 * 1024;
-const ALLOWED_FOLDERS = new Set(["clients", "staff", "salon", "patients"]);
+const ALLOWED_FOLDERS = new Set(["clients", "staff", "salon", "patients", "bills"]);
 
 export async function POST(req: NextRequest) {
   const actor = await resolveActor(req);
