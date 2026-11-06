@@ -2095,7 +2095,7 @@ interface DeletedRecordRow {
 
 const DELETED_ENTITY_LABELS: Record<string, string> = {
   clients: "Client", salon_invoices: "Invoice / Sale", appointments: "Appointment", expenses: "Expense",
-  staff: "Staff", services: "Service", inventory: "Product", payouts: "Payout", cash_flow_income: "Income",
+  staff: "Staff", services: "Service", inventory: "Product", payouts: "Payout", cash_flow_income: "Income", vendor_bills: "Vendor bill",
 };
 
 function DeletedRecordsSection({ users }: { users: AccountUserRow[] }) {

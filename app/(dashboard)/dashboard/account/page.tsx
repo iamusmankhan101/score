@@ -2203,6 +2203,7 @@ const PERMISSION_OPTIONS = [
   { key: "revenue", label: "Revenue" },
   { key: "cash-flow", label: "Cash Flow" },
   { key: "inventory", label: "Inventory" },
+  { key: "vendor-bills", label: "Vendor Bills" },
   { key: "services", label: "Services" },
   { key: "staff", label: "Staff" },
   { key: "attendance", label: "Attendance" },
@@ -2227,7 +2228,7 @@ const PERMISSION_OPTIONS = [
 const ROLE_PRESETS: { label: string; permissions: string[] }[] = [
   { label: "Doctor / Practitioner", permissions: ["dashboard", "calendar", "appointments", "clients", "medical", "consent-forms", "services", "waitlist"] },
   { label: "Receptionist", permissions: ["dashboard", "calendar", "floor", "appointments", "clients", "pos", "invoices", "loyalty", "waitlist", "leads", "messages"] },
-  { label: "Inventory Manager", permissions: ["dashboard", "inventory", "services", "cash-flow"] },
+  { label: "Inventory Manager", permissions: ["dashboard", "inventory", "vendor-bills", "services", "cash-flow"] },
   { label: "Stylist", permissions: DEFAULT_STAFF_PERMISSIONS },
 ];
 

@@ -40,6 +40,10 @@ export interface Expense {
   notes?: string;
   /** Products bought, name-wise. When present, `amount` is their total. */
   items?: ExpenseItem[];
+  /** Set on money paid to a vendor; it counts against that vendor's bills (lib/vendor-bills.ts). */
+  vendor?: string;
+  /** The vendor bill this was paid with, so deleting the bill removes the payment too. */
+  vendorBillId?: string;
   createdAt: string;   // ISO timestamp
   /** Which salon section this expense belongs to (e.g. "Men's", "Women's"). Untagged = shared overhead, excluded from a section-restricted view. */
   section?: string;

@@ -22,7 +22,7 @@ export const STOCK_REASON_LABEL: Record<StockChangeReason, string> = {
   wastage: "Wastage",
   correction: "Stock count correction",
   sold: "Sold at POS",
-  purchase: "Purchase (Expenses)",
+  purchase: "Purchase",
   returned: "Returned to stock",
   import: "Excel import",
 };

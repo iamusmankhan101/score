@@ -48,6 +48,7 @@ export const NAV_GROUPS: {
       { href: "/dashboard/revenue",    icon: BarChart3, label: "Revenue"   },
       { href: "/dashboard/cash-flow",  icon: Banknote,  label: "Cash Flow" },
       { href: "/dashboard/inventory",  icon: Package,   label: "Inventory" },
+      { href: "/dashboard/vendor-bills", icon: ReceiptText, label: "Vendor Bills" },
       { href: "/dashboard/services",   icon: Scissors,  label: "Services"  },
       { href: "/dashboard/staff",      icon: UserCog,   label: "Staff"     },
       { href: "/dashboard/attendance", icon: ClipboardCheck, label: "Attendance" },

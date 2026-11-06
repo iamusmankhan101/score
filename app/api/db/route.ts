@@ -6,7 +6,7 @@ import { invalidatePublicSalon } from "@/lib/public-salon-cache";
 
 const DELETED_RECORDS_ENTITY = "deleted_records";
 
-const ALLOWED = new Set(["clients", "appointments", "staff", "services", "inventory", "salon_invoices", "expenses", "attendance", "payouts", "cash_flow_income", "held_sales", "inventory_log", "consultations", "treatment_plans", "consents", "clinic_photos", "prescriptions", "leads", "treatment_charts", "waitlist", DELETED_RECORDS_ENTITY]);
+const ALLOWED = new Set(["clients", "appointments", "staff", "services", "inventory", "salon_invoices", "expenses", "attendance", "payouts", "cash_flow_income", "held_sales", "inventory_log", "vendor_bills", "consultations", "treatment_plans", "consents", "clinic_photos", "prescriptions", "leads", "treatment_charts", "waitlist", DELETED_RECORDS_ENTITY]);
 
 /**
  * Staff logins see only what their ticked pages need (see PERMISSION_OPTIONS on the Account
@@ -15,7 +15,9 @@ const ALLOWED = new Set(["clients", "appointments", "staff", "services", "invent
  */
 const ENTITY_PERMISSIONS: Record<string, string[]> = {
   payouts: ["payouts"],
-  expenses: ["cash-flow", "revenue", "clinic-reports"],
+  // vendor-bills: payments to vendors are expenses, and balances are counted from them.
+  expenses: ["cash-flow", "revenue", "clinic-reports", "vendor-bills"],
+  vendor_bills: ["vendor-bills"],
   cash_flow_income: ["cash-flow", "revenue"],
   consultations: ["medical"],
   treatment_plans: ["medical"],
