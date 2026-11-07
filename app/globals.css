@@ -1505,3 +1505,9 @@ html[dir="rtl"] main[style*="--sidebar-width"] {
     box-shadow: none !important;
   }
 }
+
+/* POS: 100vh on phones includes the browser's toolbar area, which pushed the
+   Customer/Catalog/Cart tab bar off-screen. dvh tracks the visible height. */
+@supports (height: 100dvh) {
+  .pos-polish { height: 100dvh !important; }
+}
