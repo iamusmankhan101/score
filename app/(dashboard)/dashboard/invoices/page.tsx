@@ -137,21 +137,24 @@ export default function InvoicesPage() {
   }, [invoices]);
 
   const stats = useMemo(() => {
-    const paid   = invoices.filter((i) => i.status === "paid");
-    const unpaid = invoices.filter((i) => i.status === "unpaid");
-    const uniqueClients = new Set(invoices.map((i) => i.clientPhone || i.clientName)).size;
+    // Stats cover the current calendar month only.
+    const thisMonth = localDateKey().slice(0, 7);
+    const monthInvoices = invoices.filter((i) => i.date.startsWith(thisMonth));
+    const paid   = monthInvoices.filter((i) => i.status === "paid");
+    const unpaid = monthInvoices.filter((i) => i.status === "unpaid");
+    const uniqueClients = new Set(monthInvoices.map((i) => i.clientPhone || i.clientName)).size;
     // Billed amount before any discount is applied — subtotal, not total.
-    const billedAmount = invoices.reduce((s, i) => s + i.subtotal, 0);
-    const totalDiscount = invoices.reduce((s, i) => s + i.discountAmount + (i.discount2Amount ?? 0), 0);
+    const billedAmount = monthInvoices.reduce((s, i) => s + i.subtotal, 0);
+    const totalDiscount = monthInvoices.reduce((s, i) => s + i.discountAmount + (i.discount2Amount ?? 0), 0);
     return {
-      total:        invoices.length,
+      total:        monthInvoices.length,
       paidCount:    paid.length,
       unpaidCount:  unpaid.length,
       revenue:      paid.reduce((s, i) => s + i.total, 0),
       outstanding:  unpaid.reduce((s, i) => s + i.total, 0),
       uniqueClients,
       billedAmount,
-      discountedTotal: invoices.reduce((s, i) => s + i.total, 0),
+      discountedTotal: monthInvoices.reduce((s, i) => s + i.total, 0),
       totalDiscount,
     };
   }, [invoices]);
@@ -550,8 +553,8 @@ export default function InvoicesPage() {
 
         {/* Stats */}
         <div className="stats-grid-4">
-          <StatCard label="Total Transactions" value={String(stats.total)}        sub={`${stats.paidCount} paid · ${stats.unpaidCount} unpaid`} icon={<ReceiptText size={22} />} bg="rgba(124, 58, 237, 0.08)" color="var(--accent)" />
-          <StatCard label="Revenue Collected"  value={fmt(stats.revenue)}         icon={<TrendingUp size={22} />} bg="#ecfdf5" color="#059669" />
+          <StatCard label="Transactions (This Month)" value={String(stats.total)}        sub={`${stats.paidCount} paid · ${stats.unpaidCount} unpaid`} icon={<ReceiptText size={22} />} bg="rgba(124, 58, 237, 0.08)" color="var(--accent)" />
+          <StatCard label="Revenue Collected (This Month)"  value={fmt(stats.revenue)}         icon={<TrendingUp size={22} />} bg="#ecfdf5" color="#059669" />
           <StatCard label="Outstanding"        value={fmt(stats.outstanding)}      sub={`${stats.unpaidCount} unpaid`} icon={<Clock size={22} />} bg="#fffbeb" color="#d97706" />
           <StatCard label="Unique Clients"     value={String(stats.uniqueClients)} icon={<Users size={22} />} bg="#f0f9ff" color="#0284c7" />
         </div>

@@ -106,6 +106,7 @@ export default function DashboardPage() {
   const [posInvoices, setPosInvoices] = useState<SalonInvoice[]>([]);
   const [posInvoiceAppointmentIds, setPosInvoiceAppointmentIds] = useState<string[]>([]);
   const [today] = useState(() => new Date().toLocaleDateString("en-CA"));
+  const [month, setMonth] = useState(() => new Date().toLocaleDateString("en-CA").slice(0, 7));
 
   useEffect(() => {
     let cancelled = false;
@@ -168,6 +169,19 @@ export default function DashboardPage() {
     });
   }, [appointmentsForRevenue, posLinkedAppointmentIds, posInvoicesForRevenue, today]);
 
+  const sumMonth = (m: string) => {
+    let t = 0;
+    appointmentsForRevenue.forEach((a) => {
+      if (a.status === "completed" && !posLinkedAppointmentIds.has(a.id) && a.date.startsWith(m)) t += a.totalAmount;
+    });
+    posInvoicesForRevenue.forEach((inv) => {
+      if ((inv.paidDate || inv.date).startsWith(m)) t += revenueAmount(inv);
+    });
+    return t;
+  };
+  const monthTotal = sumMonth(month);
+  const currentMonthTotal = sumMonth(today.slice(0, 7));
+
   const maxRevenue = Math.max(...revenueLast7Days.map((day) => day.total), 0);
   const axisMax = maxRevenue > 0 ? Math.ceil((maxRevenue * 1.2) / 1000) * 1000 : 60000;
   const yAxisLabels = [axisMax, axisMax * 0.75, axisMax * 0.5, axisMax * 0.25, 0]
@@ -213,8 +227,8 @@ export default function DashboardPage() {
             <TrendingUp size={80} />
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#a0a0b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Today's Revenue</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: "#1a1a2e", marginTop: 6 }}>{fmt(todayTotal)}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#a0a0b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>This Month's Revenue</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#1a1a2e", marginTop: 6 }}>{fmt(currentMonthTotal)}</div>
             <div style={{ fontSize: 11, color: "#059669", fontWeight: 600, display: "flex", alignItems: "center", gap: 3, marginTop: 4 }}>
               <ArrowUpRight size={12} />
               <span>{revenueScoped ? `${activeSection} only` : "Gross earnings · combined"}</span>
@@ -581,9 +595,8 @@ export default function DashboardPage() {
               <div style={{ fontSize: 11, color: "#a0a0b8", marginTop: 4, fontWeight: 500, paddingLeft: 40 }}>Last 7 days of performance</div>
             </div>
             
-            {/* Weekly Total Badge */}
+            {/* Monthly Total Badge */}
             {(() => {
-              const weeklyTotal = revenueLast7Days.reduce((s, d) => s + d.total, 0);
               return (
                 <div style={{
                   background: "var(--accent-gradient)",
@@ -593,8 +606,9 @@ export default function DashboardPage() {
                   boxShadow: "0 4px 12px var(--accent-glow)",
                   textAlign: "right"
                 }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", opacity: 0.8, letterSpacing: "0.05em" }}>Weekly Total</div>
-                  <div style={{ fontSize: 13, fontWeight: 900, marginTop: 1 }}>{fmt(weeklyTotal)}</div>
+                  <input type="month" value={month} max={today.slice(0, 7)} onChange={(e) => e.target.value && setMonth(e.target.value)}
+                    style={{ fontSize: 10, fontWeight: 700, background: "transparent", color: "#fff", border: "none", outline: "none", textAlign: "right" }} />
+                  <div style={{ fontSize: 13, fontWeight: 900, marginTop: 1 }}>{fmt(monthTotal)}</div>
                 </div>
               );
             })()}
