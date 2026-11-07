@@ -847,6 +847,11 @@ export default function POSPage() {
       // appointment record — mark it completed so it's reflected in the
       // calendar and in dashboard/revenue stats that key off appointment status.
       // An advance is taken before the visit, so that booking stays as it is.
+      // A booking already counted its visit and amount on the client when it was
+      // made, so checking out must not count them again (only any price change).
+      const bookedAmount = checkoutAppointmentId
+        ? getStoredAppointments().find(a => a.id === checkoutAppointmentId)?.totalAmount ?? 0
+        : 0;
       if (checkoutAppointmentId) {
         const advanceOnly = !isCredit && isAdvance;
         // Commission on a booking is paid from the appointment, not the invoice,
@@ -908,6 +913,7 @@ export default function POSPage() {
           }
         }
         const amount = cart.filter(e => e.guestName === g.name).reduce((sum, e) => sum + e.total, 0);
+        if (checkoutAppointmentId) continue; // guests on a booking were credited when it was made
         updatedClients = updatedClients.map(c => c.id === clientId
           ? { ...c, totalVisits: c.totalVisits + 1, totalSpend: c.totalSpend + amount, lastVisitDate: today }
           : c);
@@ -916,8 +922,8 @@ export default function POSPage() {
       if (selectedClient?.id) {
         let updatedClient: Client = {
           ...(updatedClients.find(c => c.id === selectedClient.id) ?? selectedClient),
-          totalVisits: selectedClient.totalVisits + 1,
-          totalSpend:  selectedClient.totalSpend + total,
+          totalVisits: selectedClient.totalVisits + (checkoutAppointmentId ? 0 : 1),
+          totalSpend:  selectedClient.totalSpend + (checkoutAppointmentId ? total - bookedAmount : total),
           lastVisitDate: today,
         };
         console.log("[POS loyalty] client:", selectedClient.name, "| total:", total, "| loyalty enabled:", loyaltySettings.enabled, "| ppr:", loyaltySettings.pointsPerRupee, "| pts before:", selectedClient.loyaltyPoints ?? 0);
