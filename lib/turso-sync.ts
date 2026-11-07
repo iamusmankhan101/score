@@ -106,6 +106,9 @@ export async function syncFromDB(): Promise<void> {
             if (!lc) return dbClient;
             const base = pickNewer(lc, dbClient);
             if (base === lc && !sameRecordContent(lc, dbClient)) localWon = true;
+            // The DB copy is newer (e.g. a corrected total): take it as is. Max only
+            // protects a local save that is still in flight, where local is newer.
+            if (base !== lc) return base;
             return {
               ...base,
               loyaltyPoints:       Math.max(Number(lc.loyaltyPoints       ?? 0), Number(dbClient.loyaltyPoints       ?? 0)),
