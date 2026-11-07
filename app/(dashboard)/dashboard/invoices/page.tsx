@@ -83,6 +83,7 @@ export default function InvoicesPage() {
   const canDelete = useCanDelete();
   const [invoices, setInvoices]         = useState<SalonInvoice[]>([]);
   const [search, setSearch]             = useState("");
+  const [month, setMonth]               = useState(() => localDateKey().slice(0, 7)); // "" = all months
   const [filterStatus, setFilterStatus] = useState<"all" | "paid" | "unpaid">("all");
   const [viewingInvoice, setViewingInvoice] = useState<SalonInvoice | null>(null);
   /** Outcome of re-sending an edited invoice on WhatsApp, shown briefly as a toast. */
@@ -137,9 +138,8 @@ export default function InvoicesPage() {
   }, [invoices]);
 
   const stats = useMemo(() => {
-    // Stats cover the current calendar month only.
-    const thisMonth = localDateKey().slice(0, 7);
-    const monthInvoices = invoices.filter((i) => i.date.startsWith(thisMonth));
+    // Stats cover the selected month (all invoices when none is picked).
+    const monthInvoices = invoices.filter((i) => i.date.startsWith(month));
     const paid   = monthInvoices.filter((i) => i.status === "paid");
     const unpaid = monthInvoices.filter((i) => i.status === "unpaid");
     const uniqueClients = new Set(monthInvoices.map((i) => i.clientPhone || i.clientName)).size;
@@ -157,7 +157,7 @@ export default function InvoicesPage() {
       discountedTotal: monthInvoices.reduce((s, i) => s + i.total, 0),
       totalDiscount,
     };
-  }, [invoices]);
+  }, [invoices, month]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -168,12 +168,12 @@ export default function InvoicesPage() {
           inv.number.toLowerCase().includes(q) ||
           inv.staffName.toLowerCase().includes(q);
         const matchStatus = filterStatus === "all" || inv.status === filterStatus;
-        return matchSearch && matchStatus;
+        return matchSearch && matchStatus && inv.date.startsWith(month);
       })
       // Newest first — explicit rather than relying on storage order, which
       // can get reshuffled by a DB sync merge (see syncFromDB in turso-sync.ts).
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [invoices, search, filterStatus]);
+  }, [invoices, search, filterStatus, month]);
 
   function confirmMarkPaid(method: PaymentMethod) {
     if (!markPaidPromptId) return;
@@ -349,6 +349,10 @@ export default function InvoicesPage() {
       <div className="mobile-search-bar mobile-only">
         <Search size={16} color="#9898b0" />
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search invoices…" />
+      </div>
+      <div className="mobile-only" style={{ display: "flex", gap: 8, padding: "0 16px 8px" }}>
+        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ flex: 1, padding: "8px 10px", border: "1px solid #e3e0eb", borderRadius: 10, fontSize: 14 }} />
+        {month && <button type="button" onClick={() => setMonth("")} style={{ border: "1px solid #e3e0eb", background: "#fff", borderRadius: 10, padding: "8px 12px", fontSize: 12, fontWeight: 700 }}>All</button>}
       </div>
 
       {/* Mobile filter chips */}
@@ -553,8 +557,8 @@ export default function InvoicesPage() {
 
         {/* Stats */}
         <div className="stats-grid-4">
-          <StatCard label="Transactions (This Month)" value={String(stats.total)}        sub={`${stats.paidCount} paid · ${stats.unpaidCount} unpaid`} icon={<ReceiptText size={22} />} bg="rgba(124, 58, 237, 0.08)" color="var(--accent)" />
-          <StatCard label="Revenue Collected (This Month)"  value={fmt(stats.revenue)}         icon={<TrendingUp size={22} />} bg="#ecfdf5" color="#059669" />
+          <StatCard label="Transactions " value={String(stats.total)}        sub={`${stats.paidCount} paid · ${stats.unpaidCount} unpaid`} icon={<ReceiptText size={22} />} bg="rgba(124, 58, 237, 0.08)" color="var(--accent)" />
+          <StatCard label="Revenue Collected "  value={fmt(stats.revenue)}         icon={<TrendingUp size={22} />} bg="#ecfdf5" color="#059669" />
           <StatCard label="Outstanding"        value={fmt(stats.outstanding)}      sub={`${stats.unpaidCount} unpaid`} icon={<Clock size={22} />} bg="#fffbeb" color="#d97706" />
           <StatCard label="Unique Clients"     value={String(stats.uniqueClients)} icon={<Users size={22} />} bg="#f0f9ff" color="#0284c7" />
         </div>
@@ -571,6 +575,10 @@ export default function InvoicesPage() {
 
           {/* Toolbar */}
           <div style={{ padding: "16px 24px", borderBottom: "1px solid #f0f0f5", display: "flex", alignItems: "center", gap: 12, background: "#fff" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ ...inputStyle, width: "auto", padding: "9px 12px", borderRadius: 12, border: "1px solid #e3e0eb" }} />
+              {month && <button type="button" onClick={() => setMonth("")} style={{ border: "1px solid #e3e0eb", background: "#fff", borderRadius: 12, padding: "9px 12px", fontSize: 12, fontWeight: 700, color: "#6b6b8a", cursor: "pointer" }}>All months</button>}
+            </div>
             <div style={{ flex: 1, position: "relative" }}>
               <Search size={15} color="#b0b0c8" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
               <input
