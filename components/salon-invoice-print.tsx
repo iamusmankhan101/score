@@ -9,6 +9,7 @@ import { settingsStore } from "@/lib/settings-store";
 import SalonCentralWordmark from "@/components/salon-central-wordmark";
 import { fmtCurrency as fmt } from "@/lib/format";
 import { rasterizeLogoForThermal } from "@/lib/escpos-raster";
+import { printInNewWindow } from "@/lib/print-window";
 
 /**
  * An amount with its currency word in a span of its own, so the 80mm rules can
@@ -43,7 +44,12 @@ const PRINT_STYLES = `
       inset: 0 !important; background: #fff !important;
       z-index: 99999 !important; overflow: visible !important;
     }
-    .sip-overlay  { background: transparent !important; padding: 0 !important; overflow: visible !important; }
+    /* The screen modal is fixed, but fixed descendants are inconsistently
+       captured by the print pipeline used by installed/offline Chromium apps.
+       Flatten the modal into normal document flow before taking the print
+       snapshot so the receipt itself is the printable page. */
+    .sip-overlay  { position: static !important; display: block !important; background: transparent !important; padding: 0 !important; overflow: visible !important; }
+    .sip-overlay > div { display: block !important; width: auto !important; max-width: none !important; }
     .sip-no-print { display: none !important; }
     .sip-sheet    { border-radius: 0 !important; box-shadow: none !important; max-width: 100% !important; width: 100% !important; margin: 0 !important; }
     @page { size: A4 portrait; margin: 18mm 16mm; }
@@ -279,11 +285,6 @@ export default function SalonInvoicePrint({
 }: Props) {
   const [mounted, setMounted]           = useState(false);
   const [thermalStatus, setThermalStatus] = useState<"idle" | "printing" | "ok" | "error">("idle");
-  // Which stylesheet the next window.print() should use. Reset afterwards so the
-  // browser's own Print command still produces the full-page A4 invoice.
-  const [printMode, setPrintMode] = useState<"a4" | "receipt">("a4");
-  // Height of the page box for the next receipt print, measured just before it.
-  const [receiptPageMm, setReceiptPageMm] = useState(FALLBACK_RECEIPT_MM);
   const [thermalError, setThermalError]   = useState("");
 
   // Kept locally so a "Send to FBR" retry shows its number without reopening.
@@ -380,22 +381,35 @@ export default function SalonInvoicePrint({
     return Math.max(MIN_RECEIPT_MM, Math.ceil(heightPx / PX_PER_MM) + RECEIPT_TAIL_MM);
   }
 
-  // The <style> swap has to be committed to the DOM before the (synchronous)
-  // print dialog opens, so this waits a paint rather than calling print() inline.
   function printReceipt80mm() {
-    setReceiptPageMm(measureReceiptHeightMm());
-    setPrintMode("receipt");
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      window.print();
-      setPrintMode("a4");
-    }));
+    const portal = document.getElementById("salon-invoice-portal");
+    const sheet = portal?.querySelector(".sip-sheet") as HTMLElement | null;
+    if (!sheet) {
+      setThermalError("Receipt is not ready to print. Please try again.");
+      setThermalStatus("error");
+      return;
+    }
+
+    const pageHeightMm = measureReceiptHeightMm();
+    const html = `<!doctype html>
+      <html><head><meta charset="utf-8"><title>${invoice.number}</title>
+      <style>
+        ${receiptPrintStyles(pageHeightMm)}
+        @media screen { body { margin: 0; background: #fff; } }
+      </style></head>
+      <body><div id="salon-invoice-portal"><div class="sip-sheet">${sheet.innerHTML}</div></div></body></html>`;
+
+    if (!printInNewWindow(html)) {
+      setThermalError("The print window was blocked. Allow pop-ups and try again.");
+      setThermalStatus("error");
+    }
   }
 
   const content = (
     <div id="salon-invoice-portal" translate="no" dir="ltr">
-      {/* The measure rules stay mounted in both modes — printReceipt80mm reads
-          the 80mm height back before it can switch printMode. */}
-      <style>{(printMode === "receipt" ? PRINT_STYLES + receiptPrintStyles(receiptPageMm) : PRINT_STYLES) + RECEIPT_MEASURE_STYLES}</style>
+      {/* The measurement rules stay mounted so the receipt's page height can be
+          calculated immediately before the standalone print window is opened. */}
+      <style>{PRINT_STYLES + RECEIPT_MEASURE_STYLES}</style>
 
       <div
         className="sip-overlay"
