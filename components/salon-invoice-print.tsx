@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Printer, CheckCircle, Pencil, MessageSquare } from "lucide-react";
+import { X, Printer, CheckCircle, Pencil, MessageSquare, RotateCcw } from "lucide-react";
 import QRCode from "qrcode";
 import { ADVANCE_NON_REFUNDABLE_NOTE, PAYMENT_NON_REFUNDABLE_NOTE, balanceDue, advancePercent, invoiceItemsByPerson, invoiceTimeLabel, reportInvoiceToFbr, type SalonInvoice } from "@/lib/salon-invoices";
 import { settingsStore } from "@/lib/settings-store";
@@ -274,6 +274,7 @@ interface Props {
   salonAddress: string;
   onClose: () => void;
   onMarkPaid?: () => void;
+  onMarkUnpaid?: () => void;
   onEdit?: () => void;
   onSendWhatsApp?: () => void;
   sendingWhatsApp?: boolean;
@@ -281,7 +282,7 @@ interface Props {
 
 export default function SalonInvoicePrint({
   invoice, salonName, salonPhone, salonAddress,
-  onClose, onMarkPaid, onEdit, onSendWhatsApp, sendingWhatsApp,
+  onClose, onMarkPaid, onMarkUnpaid, onEdit, onSendWhatsApp, sendingWhatsApp,
 }: Props) {
   const [mounted, setMounted]           = useState(false);
   const [thermalStatus, setThermalStatus] = useState<"idle" | "printing" | "ok" | "error">("idle");
@@ -426,6 +427,12 @@ export default function SalonInvoicePrint({
                 <button onClick={e => { e.stopPropagation(); onMarkPaid(); }}
                   style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 9, border: "1px solid #6ee7b7", background: "rgba(5,150,105,0.25)", fontSize: 12, fontWeight: 700, color: "#6ee7b7", cursor: "pointer" }}>
                   <CheckCircle size={13} /> {invoice.status === "partial" ? `Collect ${fmt(balanceDue(invoice))}` : "Mark Paid"}
+                </button>
+              )}
+              {invoice.status === "paid" && onMarkUnpaid && (
+                <button onClick={e => { e.stopPropagation(); onMarkUnpaid(); }}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 9, border: "1px solid #fcd34d", background: "rgba(217,119,6,0.25)", fontSize: 12, fontWeight: 700, color: "#fde68a", cursor: "pointer" }}>
+                  <RotateCcw size={13} /> Mark Unpaid
                 </button>
               )}
               {printer.enabled && (

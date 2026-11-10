@@ -439,6 +439,16 @@ export function markSalonInvoicePaid(id: string, paymentMethod: PaymentMethod, p
   saveSalonInvoices(list);
 }
 
+/** Reopens a fully paid invoice as unpaid, for corrections or reversed payments. */
+export function markSalonInvoiceUnpaid(id: string): void {
+  const list = getSalonInvoices().map((inv) =>
+    inv.id === id && inv.status === "paid"
+      ? { ...inv, status: "unpaid" as SalonInvoiceStatus, paymentMethod: "" as PaymentMethod | "", paidDate: undefined }
+      : inv
+  );
+  saveSalonInvoices(list);
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function calcTotals(

@@ -9,7 +9,7 @@ import { addExpense } from "@/lib/expenses";
 import { getCurrentUser } from "@/lib/auth";
 import { useCanDelete } from "@/lib/use-can-delete";
 import {
-  getSalonInvoices, deleteSalonInvoice, cancelInvoiceOnFbr, markSalonInvoicePaid, updateSalonInvoice, createBalancePaymentInvoice, localDateKey, balanceDue, advancePercent,
+  getSalonInvoices, deleteSalonInvoice, cancelInvoiceOnFbr, markSalonInvoicePaid, markSalonInvoiceUnpaid, updateSalonInvoice, createBalancePaymentInvoice, localDateKey, balanceDue, advancePercent,
   paymentMethodLabel, refundedTotal, revenueAmount, type SalonInvoice,
 } from "@/lib/salon-invoices";
 import type { PaymentMethod } from "@/lib/types";
@@ -93,6 +93,7 @@ export default function InvoicesPage() {
   const [deleteConfirm, setDeleteConfirm]   = useState<string | null>(null);
   const [refunding, setRefunding]           = useState<SalonInvoice | null>(null);
   const [markPaidPromptId, setMarkPaidPromptId] = useState<string | null>(null);
+  const [markUnpaidConfirmId, setMarkUnpaidConfirmId] = useState<string | null>(null);
   const [createBalanceReceipt, setCreateBalanceReceipt] = useState(false);
   const [creatingBalanceReceipt, setCreatingBalanceReceipt] = useState(false);
   const [markPaidDate, setMarkPaidDate] = useState(() => localDateKey());
@@ -227,6 +228,19 @@ export default function InvoicesPage() {
       const settled = getSalonInvoices().find((inv) => inv.id === id);
       if (settled) void resendEditedInvoice(settled);
     }
+  }
+
+  function confirmMarkUnpaid() {
+    if (!markUnpaidConfirmId) return;
+    const id = markUnpaidConfirmId;
+    markSalonInvoiceUnpaid(id);
+    reload();
+    if (viewingInvoice?.id === id) {
+      setViewingInvoice((prev) => prev ? { ...prev, status: "unpaid", paymentMethod: "", paidDate: undefined } : prev);
+    }
+    setMarkUnpaidConfirmId(null);
+    setResendNotice({ ok: true, text: "Invoice marked unpaid." });
+    setTimeout(() => setResendNotice(null), 6000);
   }
 
   function openEditDate(inv: SalonInvoice) {
@@ -438,6 +452,15 @@ export default function InvoicesPage() {
                   <RotateCcw size={12} color="#b45309" />
                 </button>
               )}
+              {inv.status === "paid" && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMarkUnpaidConfirmId(inv.id); }}
+                  title="Mark Unpaid"
+                  style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #fde68a", background: "#fffbeb", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, marginLeft: 6 }}
+                >
+                  <RotateCcw size={12} color="#b45309" />
+                </button>
+              )}
               {canDelete && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setDeleteConfirm(inv.id); }}
@@ -462,6 +485,7 @@ export default function InvoicesPage() {
           salonAddress={salon.address as string}
           onClose={() => setViewingInvoice(null)}
           onMarkPaid={() => setMarkPaidPromptId(viewingInvoice.id)}
+          onMarkUnpaid={() => setMarkUnpaidConfirmId(viewingInvoice.id)}
           onEdit={() => setEditingInvoice(viewingInvoice)}
           onSendWhatsApp={() => sendInvoiceOnWhatsApp(viewingInvoice)}
           sendingWhatsApp={sendingWaId === viewingInvoice.id}
@@ -554,6 +578,21 @@ export default function InvoicesPage() {
               ))}
             </div>
             <button onClick={() => setMarkPaidPromptId(null)} style={{ padding: "8px 20px", borderRadius: 9, border: "none", background: "none", fontSize: 13, fontWeight: 600, color: "#9898b0", cursor: "pointer" }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {markUnpaidConfirmId && (
+        <div onClick={() => setMarkUnpaidConfirmId(null)} className="modal-overlay" style={{ zIndex: 250 }}>
+          <div onClick={(e) => e.stopPropagation()} className="modal-sheet" style={{ background: "#fff", borderRadius: 16, padding: "28px 32px", maxWidth: 360, width: "100%", boxShadow: "0 16px 50px rgba(0,0,0,0.2)", textAlign: "center" }}>
+            <div style={{ width: 52, height: 52, borderRadius: 14, background: "#fffbeb", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+              <RotateCcw size={22} color="#b45309" />
+            </div>
+            <div style={{ fontWeight: 800, fontSize: 16, color: "#1a1a2e", marginBottom: 6 }}>Mark invoice unpaid?</div>
+            <div style={{ fontSize: 13, color: "#6b6b8a", marginBottom: 20 }}>This clears its paid date and payment method and returns the full amount to outstanding.</div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button onClick={() => setMarkUnpaidConfirmId(null)} style={{ padding: "9px 20px", borderRadius: 9, border: "1px solid #e8e8f0", background: "#fff", fontSize: 13, fontWeight: 600, color: "#6b6b8a", cursor: "pointer" }}>Cancel</button>
+              <button onClick={confirmMarkUnpaid} style={{ padding: "9px 20px", borderRadius: 9, border: "none", background: "#d97706", fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer" }}>Mark Unpaid</button>
+            </div>
           </div>
         </div>
       )}
@@ -765,6 +804,16 @@ export default function InvoicesPage() {
                           className="hover-scale"
                         >
                           <CheckCircle size={14} color="#059669" />
+                        </button>
+                      )}
+                      {inv.status === "paid" && (
+                        <button
+                          onClick={() => setMarkUnpaidConfirmId(inv.id)}
+                          title="Mark Unpaid"
+                          style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #fde68a", background: "#fffbeb", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.15s" }}
+                          className="hover-scale"
+                        >
+                          <RotateCcw size={14} color="#b45309" />
                         </button>
                       )}
                       {inv.status !== "unpaid" && revenueAmount(inv) - refundedTotal(inv) > 0 && (
