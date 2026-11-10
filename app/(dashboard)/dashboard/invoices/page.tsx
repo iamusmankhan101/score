@@ -84,7 +84,7 @@ export default function InvoicesPage() {
   const [invoices, setInvoices]         = useState<SalonInvoice[]>([]);
   const [search, setSearch]             = useState("");
   const [month, setMonth]               = useState(() => localDateKey().slice(0, 7)); // "" = all months
-  const [filterStatus, setFilterStatus] = useState<"all" | "paid" | "unpaid">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "paid" | "advance" | "unpaid">("all");
   const [viewingInvoice, setViewingInvoice] = useState<SalonInvoice | null>(null);
   /** Outcome of re-sending an edited invoice on WhatsApp, shown briefly as a toast. */
   const [resendNotice, setResendNotice] = useState<{ ok: boolean; text: string } | null>(null);
@@ -167,7 +167,13 @@ export default function InvoicesPage() {
           inv.clientName.toLowerCase().includes(q) ||
           inv.number.toLowerCase().includes(q) ||
           inv.staffName.toLowerCase().includes(q);
-        const matchStatus = filterStatus === "all" || inv.status === filterStatus;
+        // Partial invoices are advance-payment invoices. They are outstanding,
+        // but get their own filter so they cannot be confused with full credit
+        // invoices or fully paid sales.
+        const matchStatus = filterStatus === "all"
+          || (filterStatus === "advance" && inv.status === "partial")
+          || (filterStatus === "unpaid" && inv.status === "unpaid")
+          || (filterStatus === "paid" && inv.status === "paid");
         return matchSearch && matchStatus && inv.date.startsWith(month);
       })
       // Newest first — explicit rather than relying on storage order, which
@@ -357,9 +363,9 @@ export default function InvoicesPage() {
 
       {/* Mobile filter chips */}
       <div className="mobile-filter-row mobile-only">
-        {(["all", "paid", "unpaid"] as const).map((s) => (
+        {(["all", "paid", "advance", "unpaid"] as const).map((s) => (
           <button key={s} type="button" className={`mobile-filter-chip ${filterStatus === s ? "active" : ""}`} onClick={() => setFilterStatus(s)}>
-            {s === "all" ? "All" : s === "paid" ? "Paid" : "Unpaid"}
+            {s === "all" ? "All" : s === "paid" ? "Paid" : s === "advance" ? "Advance" : "Unpaid"}
           </button>
         ))}
       </div>
@@ -588,7 +594,7 @@ export default function InvoicesPage() {
                 style={{ ...inputStyle, paddingLeft: 38, maxWidth: 360, borderRadius: 12, border: "1px solid #e3e0eb", padding: "10px 14px 10px 38px", boxShadow: "0 2px 8px rgba(0,0,0,0.01)", transition: "border-color 0.15s" }}
               />
             </div>
-            {(["all", "paid", "unpaid"] as const).map((s) => (
+            {(["all", "paid", "advance", "unpaid"] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setFilterStatus(s)}
@@ -601,7 +607,7 @@ export default function InvoicesPage() {
                 }}
                 className={filterStatus !== s ? "hover-bg-light" : ""}
               >
-                {s === "all" ? "All" : s === "paid" ? "Paid" : "Unpaid"}
+                {s === "all" ? "All" : s === "paid" ? "Paid" : s === "advance" ? "Advance" : "Unpaid"}
               </button>
             ))}
           </div>
