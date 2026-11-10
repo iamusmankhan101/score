@@ -9,7 +9,7 @@ import { addExpense } from "@/lib/expenses";
 import { getCurrentUser } from "@/lib/auth";
 import { useCanDelete } from "@/lib/use-can-delete";
 import {
-  getSalonInvoices, deleteSalonInvoice, cancelInvoiceOnFbr, markSalonInvoicePaid, updateSalonInvoice, localDateKey, balanceDue, advancePercent,
+  getSalonInvoices, deleteSalonInvoice, cancelInvoiceOnFbr, markSalonInvoicePaid, updateSalonInvoice, createBalancePaymentInvoice, localDateKey, balanceDue, advancePercent,
   paymentMethodLabel, refundedTotal, revenueAmount, type SalonInvoice,
 } from "@/lib/salon-invoices";
 import type { PaymentMethod } from "@/lib/types";
@@ -93,6 +93,8 @@ export default function InvoicesPage() {
   const [deleteConfirm, setDeleteConfirm]   = useState<string | null>(null);
   const [refunding, setRefunding]           = useState<SalonInvoice | null>(null);
   const [markPaidPromptId, setMarkPaidPromptId] = useState<string | null>(null);
+  const [createBalanceReceipt, setCreateBalanceReceipt] = useState(false);
+  const [creatingBalanceReceipt, setCreatingBalanceReceipt] = useState(false);
   const [markPaidDate, setMarkPaidDate] = useState(() => localDateKey());
   const [editDateInvoice, setEditDateInvoice] = useState<SalonInvoice | null>(null);
   const [editDateValue, setEditDateValue] = useState("");
@@ -142,6 +144,7 @@ export default function InvoicesPage() {
     const monthInvoices = invoices.filter((i) => i.date.startsWith(month));
     const paid   = monthInvoices.filter((i) => i.status === "paid");
     const unpaid = monthInvoices.filter((i) => i.status === "unpaid");
+    const partial = monthInvoices.filter((i) => i.status === "partial");
     const uniqueClients = new Set(monthInvoices.map((i) => i.clientPhone || i.clientName)).size;
     // Billed amount before any discount is applied — subtotal, not total.
     const billedAmount = monthInvoices.reduce((s, i) => s + i.subtotal, 0);
@@ -150,8 +153,8 @@ export default function InvoicesPage() {
       total:        monthInvoices.length,
       paidCount:    paid.length,
       unpaidCount:  unpaid.length,
-      revenue:      paid.reduce((s, i) => s + i.total, 0),
-      outstanding:  unpaid.reduce((s, i) => s + i.total, 0),
+      revenue:      paid.reduce((s, i) => s + revenueAmount(i), 0),
+      outstanding:  unpaid.reduce((s, i) => s + i.total, 0) + partial.reduce((s, i) => s + balanceDue(i), 0),
       uniqueClients,
       billedAmount,
       discountedTotal: monthInvoices.reduce((s, i) => s + i.total, 0),
@@ -181,16 +184,24 @@ export default function InvoicesPage() {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [invoices, search, filterStatus, month]);
 
-  function confirmMarkPaid(method: PaymentMethod) {
+  async function confirmMarkPaid(method: PaymentMethod) {
     if (!markPaidPromptId) return;
     const id = markPaidPromptId;
-    const wasPartial = invoices.find((inv) => inv.id === id)?.status === "partial";
+    const invoiceBeingPaid = invoices.find((inv) => inv.id === id);
+    const wasPartial = invoiceBeingPaid?.status === "partial";
+    if (wasPartial && createBalanceReceipt && invoiceBeingPaid) {
+      setCreatingBalanceReceipt(true);
+      const created = await createBalancePaymentInvoice(invoiceBeingPaid, method, markPaidDate);
+      if (created.invoice) setViewingInvoice(created.invoice);
+      setCreatingBalanceReceipt(false);
+    }
     markSalonInvoicePaid(id, method, markPaidDate);
     reload();
     if (viewingInvoice?.id === id) {
       setViewingInvoice((prev) => prev ? { ...prev, status: "paid", paymentMethod: method, paidDate: markPaidDate } : prev);
     }
     setMarkPaidPromptId(null);
+    setCreateBalanceReceipt(false);
     // Collecting the balance settles an invoice the client already has a copy
     // of, so send the paid-in-full version the same way an edit does.
     if (wasPartial) {
@@ -482,6 +493,13 @@ export default function InvoicesPage() {
                     Balance due {fmt(balance)}
                   </div>
                   <div style={{ fontSize: 13, color: "#6b6b8a", marginBottom: 16 }}>How was the balance paid?</div>
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: 9, textAlign: "left", marginBottom: 14, padding: "10px 12px", borderRadius: 10, background: "#f0f9ff", border: "1px solid #bae6fd", cursor: "pointer" }}>
+                    <input type="checkbox" checked={createBalanceReceipt} onChange={(e) => setCreateBalanceReceipt(e.target.checked)} style={{ marginTop: 2, accentColor: "#0284c7" }} />
+                    <span>
+                      <span style={{ display: "block", fontSize: 12, fontWeight: 800, color: "#075985" }}>Create a separate balance invoice</span>
+                      <span style={{ display: "block", fontSize: 11, color: "#0369a1", marginTop: 3, lineHeight: 1.4 }}>Creates a paid receipt for only the remaining amount and links it to the original invoice.</span>
+                    </span>
+                  </label>
                 </>
               ) : (
                 <>
@@ -507,7 +525,8 @@ export default function InvoicesPage() {
               {PAYMENT_METHOD_OPTIONS.map((pm) => (
                 <button
                   key={pm.value}
-                  onClick={() => confirmMarkPaid(pm.value)}
+                  onClick={() => void confirmMarkPaid(pm.value)}
+                  disabled={creatingBalanceReceipt}
                   style={{ padding: "10px 12px", borderRadius: 9, border: "1px solid #e8e8f0", background: "#faf9fd", fontSize: 13, fontWeight: 700, color: "#1a1a2e", cursor: "pointer" }}
                   className="hover-bg-light"
                 >

@@ -127,6 +127,8 @@ export interface SalonInvoice {
   source?: "pos" | "manual";
   /** Which salon section this sale belongs to (e.g. "Men's", "Women's"). Free text, cosmetic only. */
   section?: string;
+  /** Set on a separate receipt created for the balance of an advance invoice. */
+  balanceInvoiceOf?: string;
   /** Fiscal invoice number FBR issued for this sale; printed with its QR code. */
   fbrInvoiceNumber?: string;
   /** Why the last FBR report failed; cleared once it goes through. */
@@ -223,7 +225,8 @@ export const refundedTotal = (inv: Pick<SalonInvoice, "refunds">) => (inv.refund
  * the revenue screens), so introducing advances doesn't quietly restate
  * historical figures.
  */
-export function revenueAmount(inv: Pick<SalonInvoice, "status" | "total" | "advanceAmount">): number {
+export function revenueAmount(inv: Pick<SalonInvoice, "status" | "total" | "advanceAmount" | "balanceInvoiceOf">): number {
+  if (inv.balanceInvoiceOf) return 0;
   return inv.status === "partial" ? (inv.advanceAmount ?? 0) : inv.total;
 }
 
@@ -350,6 +353,54 @@ export async function createSalonInvoice(
   const list = [invoice, ...getSalonInvoices()];
   const dbSaved = await saveSalonInvoices(list);
   return { invoice, dbSaved };
+}
+
+/**
+ * Creates a separate paid receipt for the outstanding balance on an advance
+ * invoice. The parent sale remains the source of revenue; this receipt is
+ * linked to it and therefore excluded from revenue totals to avoid double
+ * counting the same payment.
+ */
+export async function createBalancePaymentInvoice(
+  parent: SalonInvoice,
+  paymentMethod: PaymentMethod,
+  paidDate = localDateKey(),
+): Promise<{ invoice: SalonInvoice; dbSaved: boolean; alreadyExists: boolean }> {
+  const balance = balanceDue(parent);
+  const existing = getSalonInvoices().find((inv) => inv.balanceInvoiceOf === parent.id);
+  if (existing) return { invoice: existing, dbSaved: true, alreadyExists: true };
+
+  const item: SalonInvoiceItem = {
+    id: crypto.randomUUID(),
+    type: "service",
+    description: `Remaining balance for ${parent.number}`,
+    qty: 1,
+    unitPrice: balance,
+    total: balance,
+  };
+  return createSalonInvoice({
+    appointmentId: parent.appointmentId,
+    clientId: parent.clientId,
+    clientName: parent.clientName,
+    clientPhone: parent.clientPhone,
+    clientEmail: parent.clientEmail,
+    staffName: parent.staffName,
+    staffId: parent.staffId,
+    staffIds: parent.staffIds,
+    section: parent.section,
+    items: [item],
+    subtotal: balance,
+    discountAmount: 0,
+    taxAmount: 0,
+    total: balance,
+    paymentMethod,
+    date: paidDate,
+    paidDate,
+    status: "paid",
+    balanceInvoiceOf: parent.id,
+    notes: `Balance payment receipt for advance invoice ${parent.number}. Advance received: PKR ${(parent.advanceAmount ?? 0).toLocaleString("en-PK")}.`,
+    source: "pos",
+  }).then(({ invoice, dbSaved }) => ({ invoice, dbSaved, alreadyExists: false }));
 }
 
 export function updateSalonInvoice(updated: SalonInvoice): void {
