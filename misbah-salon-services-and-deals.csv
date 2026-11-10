@@ -1,0 +1,30 @@
+Service ID,Name,Description,Category,Sub-category,Section,Duration (Min),Variable Price,Price,Min Price,Max Price,Included Services,Assigned Staff,Active
+misbah-janssen-cleansing,Janssen Cleansing,,skin,Janssen,,60,No,3000,,,,,Yes
+misbah-janssen-deep-exfoliating,Janssen Deep Exfoliating,,skin,Janssen,,60,No,4000,,,,,Yes
+misbah-jansen-skin-polisher,Jansen Skin Polisher,,skin,Janssen,,60,No,4500,,,,,Yes
+misbah-janssen-whitening-facail,Janssen Whitening Facail,,skin,Janssen,,60,No,7000,,,,,Yes
+misbah-janssen-supreme-brightening-facial,Janssen Supreme Brightening Facial,,skin,Janssen,,60,No,8000,,,,,Yes
+misbah-janssen-radiance-repairing-therapy,Janssen Radiance Repairing Therapy,,skin,Janssen,,60,No,8500,,,,,Yes
+misbah-janssen-equa-glass-blue-line,Janssen Equa Glass Blue Line,,skin,Janssen,,60,No,8000,,,,,Yes
+misbah-janseen-customize-glass-skin-treatment,Janseen Customize Glass Skin Treatment,,skin,Janssen,,60,No,10000,,,,,Yes
+misbah-jansen-signature-customize-brightening-treatment,Jansen Signature Customize Brightening Treatment,,skin,Janssen,,60,No,12000,,,,,Yes
+misbah-jansssn-signature-customize-hydra-treatment,Jansssn Signature Customize with Hydra Treatment,,skin,Janssen,,60,No,15000,,,,,Yes
+misbah-jansem-dark-circle-treatment,Jansem Dark Circle Treatment,,skin,Janssen,,60,No,5000,,,,,Yes
+misbah-janssen-glass-skin-impuls-botanical-mask,"Janssen Glass Skin Impuls,Botanical Mask",,skin,Janssen,,60,No,1500,,,,,Yes
+misbah-hair-deal-1,Deal 1,"Senior Hair Cut; Hair Deep Cleansing; Deep Conditioning; Inward Blow-Dry Setting. Regular Rs 5,000/-; Offer Rs 3,500/-.",package,Hair Deals,,120,No,3500,,,"Senior Hair Cut, Hair Deep Cleansing, Deep Conditioning, Inward Blow-Dry Setting",,Yes
+misbah-hair-deal-2,Deal 2,"Signature Hair Cut; Hair Wash; Protein Hair Mask; Hair Protection Serum; Signature Blow-Dry Setting. Regular Rs 7,000/-; Offer Rs 5,000/-.",package,Hair Deals,,150,No,5000,,,"Signature Hair Cut, Hair Wash, Protein Hair Mask, Hair Protection Serum, Signature Blow-Dry Setting",,Yes
+misbah-hair-deal-3,Deal 3,"Signature Hair Cut; Blow-Dry Setting. Rs 4,500/-.",package,Hair Deals,,90,No,4500,,,"Signature Hair Cut, Blow-Dry Setting",,Yes
+misbah-hair-deal-4,Deal 4,"Hair Oiling; Head Massage (15 minutes); Deep Cleansing; Shoulder Massage (15 minutes). Regular Rs 5,000/-; Offer Rs 3,500/-.",package,Hair Deals,,75,No,3500,,,"Hair Oiling, Head Massage (15 minutes), Deep Cleansing, Shoulder Massage (15 minutes)",,Yes
+misbah-hair-deal-5,Deal 5,"Head Wash; Signature Hair Cutting; Protein Mask; Head Massage; Shoulder Massage; Signature Blow-Dry Setting. Regular Rs 8,000/-; Offer Rs 5,500/-.",package,Hair Deals,,180,No,5500,,,"Head Wash, Signature Hair Cutting, Protein Mask, Head Massage, Shoulder Massage, Signature Blow-Dry Setting",,Yes
+misbah-global-hair-dye-shoulder-silky,Global Hair Dye Package — Shoulder Length — Silky,"Complimentary: Global Hair Dye; Protein Treatment; After-Color Treatment; One-Length Haircut.",package,Global Hair Dye,,180,No,8500,,,"Global Hair Dye, Protein Treatment, After-Color Treatment, One-Length Haircut",,Yes
+misbah-global-hair-dye-shoulder-kuene,Global Hair Dye Package — Shoulder Length — Kuene,"Complimentary: Global Hair Dye; Protein Treatment; After-Color Treatment; One-Length Haircut.",package,Global Hair Dye,,180,No,9500,,,"Global Hair Dye, Protein Treatment, After-Color Treatment, One-Length Haircut",,Yes
+misbah-global-hair-dye-shoulder-farmesi,Global Hair Dye Package — Shoulder Length — Farmesi,"Complimentary: Global Hair Dye; Protein Treatment; After-Color Treatment; One-Length Haircut.",package,Global Hair Dye,,180,No,10500,,,"Global Hair Dye, Protein Treatment, After-Color Treatment, One-Length Haircut",,Yes
+misbah-global-hair-dye-mid-silky,Global Hair Dye Package — Mid Length — Silky,"Complimentary: Global Hair Dye, Protein Treatment, After-Color Treatment, One-Length Haircut.",package,Global Hair Dye,,210,No,15500,,,"Global Hair Dye, Protein Treatment, After-Color Treatment, One-Length Haircut",,Yes
+misbah-global-hair-dye-mid-kuene,Global Hair Dye Package — Mid Length — Kuene,"Complimentary: Global Hair Dye; Protein Treatment; After-Color Treatment; One-Length Haircut.",package,Global Hair Dye,,210,No,16500,,,"Global Hair Dye, Protein Treatment, After-Color Treatment, One-Length Haircut",,Yes
+misbah-global-hair-dye-mid-farmesi,Global Hair Dye Package — Mid Length — Farmesi,"Complimentary: Global Hair Dye; Protein Treatment; After-Color Treatment; One-Length Haircut.",package,Global Hair Dye,,210,No,17500,,,"Global Hair Dye, Protein Treatment, After-Color Treatment, One-Length Haircut",,Yes
+misbah-global-hair-dye-waist-silky,Global Hair Dye Package — Waist Length — Silky,"Complimentary: Global Hair Dye; Protein Treatment; After-Color Treatment; One-Length Haircut.",package,Global Hair Dye,,240,No,22500,,,"Global Hair Dye, Protein Treatment, After-Color Treatment, One-Length Haircut",,Yes
+misbah-global-hair-dye-waist-kuene,Global Hair Dye Package — Waist Length — Kuene,"Complimentary: Global Hair Dye; Protein Treatment; After-Color Treatment; One-Length Haircut",package,Global Hair Dye,,240,No,23500,,,"Global Hair Dye, Protein Treatment, After-Color Treatment, One-Length Haircut",,Yes
+misbah-global-hair-dye-waist-farmesi,Global Hair Dye Package — Waist Length — Farmesi,"Complimentary: Global Hair Dye; Protein Treatment; After-Color Treatment; One-Length Haircut.",package,Global Hair Dye,,240,No,25000,,,"Global Hair Dye, Protein Treatment, After-Color Treatment, One-Length Haircut",,Yes
+misbah-bundle-janssen-customize-glass-skin-facial,Janssen Customize Glass Skin Facial — 3 Sessions,"Regular Rs 36,000; bundle price Rs 27,000.",package,Bundle Discount,,180,No,27000,,,"Janssen Customize Glass Skin Facial",,Yes
+misbah-bundle-korean-glass-facial,Korean Glass Facial — 3 Sessions,"Regular Rs 30,000; bundle price Rs 25,000.",package,Bundle Discount,,180,No,25000,,,"Korean Glass Facial",,Yes
+misbah-bundle-janssen-radiance-glow-therapy,Janssen Radiance Glow Therapy — 3 Sessions,"Regular Rs 30,000; bundle price Rs 25,000.",package,Bundle Discount,,180,No,25000,,,"Janssen Radiance Glow Therapy",,Yes

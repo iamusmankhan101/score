@@ -175,7 +175,12 @@ function ServiceImportModal({ existing, staffList, onClose, onImport }: {
             priceRangeMin: variablePrice && Number.isFinite(priceRangeMin) ? priceRangeMin : undefined,
             priceRangeMax: variablePrice && Number.isFinite(priceRangeMax) ? priceRangeMax : undefined,
             packageServiceIds: isPackage ? [] : undefined,
-            customServices: existingService?.customServices,
+            // A poster deal can list included treatments that are not separate
+            // master-catalog services. Keep those names on the package instead
+            // of silently importing the deal as an empty service card.
+            customServices: isPackage
+              ? splitList(row["Included Services"] ?? row["Services"]).map((includedName) => ({ name: includedName }))
+              : existingService?.customServices,
             assignedStaffIds: [],
             multiStylist: existingService?.multiStylist,
             isActive: parseActive(row["Active"] ?? row["Status"]),
@@ -1015,9 +1020,13 @@ export default function ServicesPage() {
         .map((name) => staff.find((st) => st.name.toLowerCase() === name.toLowerCase())?.id)
         .filter((id): id is string => Boolean(id));
       if (sv.category === "package") {
-        sv.packageServiceIds = record.includedServiceNames
+        const linkedIds = record.includedServiceNames
           .map((name) => nextServices.find((s) => s.id !== sv.id && s.name.toLowerCase() === name.toLowerCase())?.id)
           .filter((id): id is string => Boolean(id));
+        sv.packageServiceIds = linkedIds.length > 0 ? linkedIds : undefined;
+        if (record.includedServiceNames.length > 0 && linkedIds.length === 0) {
+          sv.customServices = record.includedServiceNames.map((name) => ({ name }));
+        }
       }
     }
 
@@ -1267,9 +1276,12 @@ export default function ServicesPage() {
             const assigned = staff.filter((st) => sv.assignedStaffIds.includes(st.id));
             const isPkg = sv.category === "package";
             const includedNames = isPkg
-              ? (sv.packageServiceIds
-                  ?.map((id) => services.find((s) => s.id === id)?.name)
-                  .filter((n): n is string => Boolean(n)) ?? [])
+              ? [
+                  ...(sv.packageServiceIds
+                    ?.map((id) => services.find((s) => s.id === id)?.name)
+                    .filter((n): n is string => Boolean(n)) ?? []),
+                  ...(sv.customServices?.map((component) => component.name) ?? []),
+                ]
               : undefined;
             const componentNames = !isPkg ? sv.customServices?.map((cs) => cs.name) : undefined;
             return (
