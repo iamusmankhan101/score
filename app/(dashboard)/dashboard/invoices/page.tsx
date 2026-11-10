@@ -193,6 +193,25 @@ export default function InvoicesPage() {
       setCreatingBalanceReceipt(true);
       const created = await createBalancePaymentInvoice(invoiceBeingPaid, method, markPaidDate);
       if (created.invoice) setViewingInvoice(created.invoice);
+      // A newly created balance receipt is a customer-facing invoice, so queue
+      // it automatically just like a normal POS receipt.
+      if (!created.alreadyExists) {
+        const client = created.invoice.clientId ? getStoredClients().find((c) => c.id === created.invoice.clientId) : undefined;
+        const phone = created.invoice.clientPhone || client?.phone || "";
+        const name = created.invoice.clientName || client?.name || "";
+        if (!phone) {
+          setResendNotice({ ok: false, text: `${created.invoice.number} was created, but it has no customer phone number for WhatsApp.` });
+        } else {
+          const receiptResult = await queueInvoiceReceipt(created.invoice, { name, phone });
+          setResendNotice(
+            receiptResult === "queued"
+              ? { ok: true, text: `${created.invoice.number} was created and queued for ${name || phone} on WhatsApp.` }
+              : receiptResult === "skipped"
+                ? { ok: false, text: `${created.invoice.number} was created, but WhatsApp automation is off.` }
+                : { ok: false, text: `${created.invoice.number} was created, but WhatsApp delivery could not be queued.` }
+          );
+        }
+      }
       setCreatingBalanceReceipt(false);
     }
     markSalonInvoicePaid(id, method, markPaidDate);
