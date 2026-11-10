@@ -407,7 +407,6 @@ export async function persistEntity(entity: Entity, list: unknown[], options: Pe
   });
   const key = entityStorageKey(entity, loc);
   const serialized = JSON.stringify(records);
-  let cached = false;
 
   // localStorage is only a cache now that the entity is persisted in Turso.
   // In particular, a large client photo or a long offline history can fill the
@@ -415,7 +414,6 @@ export async function persistEntity(entity: Entity, list: unknown[], options: Pe
   // the database. Keep the previous cache until the remote write succeeds.
   try {
     localStorage.setItem(key, serialized);
-    cached = true;
   } catch (error) {
     console.warn(`[persistEntity:${entity}] local cache is full; continuing with remote save`, error);
   }
@@ -427,17 +425,10 @@ export async function persistEntity(entity: Entity, list: unknown[], options: Pe
   const tombstoned = removedIds.length === 0 ? true : await recordDeletions(entity, removedIds);
   const saved = await saveToDB(entity, records);
 
-  // If the browser was full, the old value may be the space that prevented the
-  // replacement. Once Turso has the new list, it is safe to evict that stale
-  // cache and make one best-effort retry. A later sync can rebuild it.
-  if (!cached && saved) {
-    try {
-      localStorage.removeItem(key);
-      localStorage.setItem(key, serialized);
-    } catch (error) {
-      console.warn(`[persistEntity:${entity}] local cache remains unavailable`, error);
-    }
-  }
+  // Never evict the previous cache just to make room: a failed/forbidden
+  // remote response must not turn a recoverable quota error into data loss.
+  // The current page already has `records`; a later DB sync can refresh the
+  // cache when storage becomes available again.
   return saved && tombstoned;
 }
 

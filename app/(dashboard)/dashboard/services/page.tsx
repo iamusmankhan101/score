@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getStoredServices, saveServices, getStoredStaff, getStoredInventory, subscribeToStoredData } from "@/lib/storage";
+import { syncFromDB } from "@/lib/turso-sync";
 import type { InventoryItem, InventoryUnit, Service, Staff } from "@/lib/types";
 import { compatibleUnits } from "@/lib/inventory-usage";
 import { term, useIsClinic } from "@/lib/clinic";
@@ -1005,7 +1006,13 @@ export default function ServicesPage() {
   };
 
   const handleImportServices = async (records: ServiceImportRecord[]): Promise<ServiceImportResult> => {
-    const byId = new Map(services.map((sv) => [sv.id, sv]));
+    // A dashboard can open before its background sync finishes. Reconcile the
+    // latest remote catalog before applying an import so a stale empty React
+    // snapshot can never make the upload appear to replace the catalog.
+    await syncFromDB();
+    const latestServices = getStoredServices();
+    const baseServices = latestServices.length >= services.length ? latestServices : services;
+    const byId = new Map(baseServices.map((sv) => [sv.id, sv]));
     let added = 0;
     let updated = 0;
     const skipped = 0;
