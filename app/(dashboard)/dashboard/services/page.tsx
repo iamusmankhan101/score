@@ -104,7 +104,7 @@ function ServiceImportModal({ existing, staffList, onClose, onImport }: {
   existing: Service[];
   staffList: Staff[];
   onClose: () => void;
-  onImport: (records: ServiceImportRecord[]) => ServiceImportResult;
+  onImport: (records: ServiceImportRecord[]) => Promise<ServiceImportResult>;
 }) {
   const [step, setStep] = useState<"pick" | "preview" | "done">("pick");
   const [parsed, setParsed] = useState<ServiceImportRecord[]>([]);
@@ -217,8 +217,8 @@ function ServiceImportModal({ existing, staffList, onClose, onImport }: {
     XLSX.writeFile(wb, "services-import-template.xlsx");
   }
 
-  function confirmImport() {
-    const importResult = onImport(parsed);
+  async function confirmImport() {
+    const importResult = await onImport(parsed);
     setResult(importResult);
     setStep("done");
   }
@@ -308,6 +308,11 @@ function ServiceImportModal({ existing, staffList, onClose, onImport }: {
             <div style={{ width: 60, height: 60, borderRadius: "50%", background: "#ecfdf5", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}><Check size={28} color="#059669" /></div>
             <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a2e", marginBottom: 6 }}>Import Complete</div>
             <div style={{ fontSize: 13, color: "#6b6b8a", marginBottom: 20 }}>{result.added} added, {result.updated} updated{result.skipped ? `, ${result.skipped} skipped` : ""}.</div>
+            {result.errors.length > 0 && (
+              <div style={{ marginBottom: 18, padding: "10px 12px", borderRadius: 10, background: "#fff7ed", border: "1px solid #fed7aa", color: "#c2410c", fontSize: 12, lineHeight: 1.45, textAlign: "left" }}>
+                {result.errors.join(" ")}
+              </div>
+            )}
             <button onClick={onClose} style={{ padding: "10px 32px", borderRadius: 10, border: "none", background: "#7C3AED", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Done</button>
           </div>
         )}
@@ -999,7 +1004,7 @@ export default function ServicesPage() {
     setDeleteTarget(null);
   };
 
-  const handleImportServices = (records: ServiceImportRecord[]): ServiceImportResult => {
+  const handleImportServices = async (records: ServiceImportRecord[]): Promise<ServiceImportResult> => {
     const byId = new Map(services.map((sv) => [sv.id, sv]));
     let added = 0;
     let updated = 0;
@@ -1031,8 +1036,13 @@ export default function ServicesPage() {
     }
 
     setServices(nextServices);
-    saveServices(nextServices);
-    return { added, updated, skipped, errors: [] };
+    const saved = await saveServices(nextServices);
+    return {
+      added,
+      updated,
+      skipped,
+      errors: saved ? [] : ["The catalog was saved on this device but could not be synced to the backend. Keep this page open and try again when the account is online."]
+    };
   };
 
   // Everything below narrows from the chosen section first: with Men's picked,

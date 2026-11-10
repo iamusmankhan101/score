@@ -136,11 +136,10 @@ export function getStoredServices(): Service[] {
 }
 
 /** @param deletedIds see saveClients — absence alone never deletes a service. */
-export function saveServices(servicesList: Service[], deletedIds: string[] = []) {
-  if (typeof window !== "undefined") {
-    checkSchema();
-    persistEntity("services", servicesList, { deletedIds, inferDeletes: false });
-  }
+export function saveServices(servicesList: Service[], deletedIds: string[] = []): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  checkSchema();
+  return persistEntity("services", servicesList, { deletedIds, inferDeletes: false });
 }
 
 export function getStoredInventory(): InventoryItem[] {
