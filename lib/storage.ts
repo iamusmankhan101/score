@@ -135,6 +135,23 @@ export function getStoredServices(): Service[] {
   return JSON.parse(saved);
 }
 
+/**
+ * Reads services directly from the server when localStorage is unavailable.
+ * Core records are cached locally for offline use, but a full browser quota
+ * must not make an otherwise healthy database look like an empty catalog.
+ */
+export async function fetchServicesFromDB(): Promise<Service[]> {
+  if (typeof window === "undefined") return [];
+  try {
+    const response = await fetch(`/api/db?entity=services&locationId=${encodeURIComponent(getActiveLocationFilter())}`);
+    if (!response.ok) return [];
+    const data = await response.json() as unknown;
+    return Array.isArray(data) ? data as Service[] : [];
+  } catch {
+    return [];
+  }
+}
+
 /** @param deletedIds see saveClients — absence alone never deletes a service. */
 export function saveServices(servicesList: Service[], deletedIds: string[] = []): Promise<boolean> {
   if (typeof window === "undefined") return Promise.resolve(false);

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { getStoredServices, saveServices, getStoredStaff, getStoredInventory, subscribeToStoredData } from "@/lib/storage";
+import { useState, useEffect, useRef } from "react";
+import { getStoredServices, fetchServicesFromDB, saveServices, getStoredStaff, getStoredInventory, subscribeToStoredData } from "@/lib/storage";
 import { syncFromDB } from "@/lib/turso-sync";
 import type { InventoryItem, InventoryUnit, Service, Staff } from "@/lib/types";
 import { compatibleUnits } from "@/lib/inventory-usage";
@@ -967,18 +967,40 @@ export default function ServicesPage() {
   const [search, setSearch] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const serverFallback = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
     const load = () => {
-      setServices(getStoredServices());
+      const localServices = getStoredServices();
+      // Do not erase a live server fallback just because a storage event fired
+      // while the browser is still over quota.
+      if (localServices.length > 0) {
+        serverFallback.current = false;
+        setServices(localServices);
+      } else if (!serverFallback.current) {
+        setServices([]);
+      }
       setStaff(getStoredStaff());
       setInventory(getStoredInventory());
     };
     load();
+    // localStorage may be full (often because client photos are stored as data
+    // URLs). In that case syncFromDB() cannot populate the cache, so read the
+    // authoritative services row directly for this page.
+    syncFromDB().then(async () => {
+      if (cancelled || getStoredServices().length > 0) return;
+      const remoteServices = await fetchServicesFromDB();
+      if (!cancelled && remoteServices.length > 0) {
+        serverFallback.current = true;
+        setServices(remoteServices);
+      }
+    }).catch(() => {});
     // Re-read whenever a DB sync (or another tab) rewrites localStorage, so this
     // page never keeps showing — or saving from — a list that is missing
     // services added on another terminal.
-    return subscribeToStoredData(load);
+    const unsubscribe = subscribeToStoredData(load);
+    return () => { cancelled = true; unsubscribe(); };
   }, []);
 
   const handleSaveService = (savedService: Service) => {
