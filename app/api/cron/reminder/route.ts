@@ -18,6 +18,9 @@ import { appointmentStartMs, isWithinSalonHours, nextSalonOpenMs, timezoneFromSe
 const MINUTE_MS = 60 * 1000;
 const REMINDER_TARGET_GRACE_MS = 75 * MINUTE_MS;
 const REMINDER_MIN_LEAD_MS = 30 * MINUTE_MS;
+// If the 24-hour window was missed, still remind about an appointment that is
+// happening today, but never queue it more than four hours early.
+const SAME_DAY_REMINDER_MAX_LEAD_MS = 4 * 60 * MINUTE_MS;
 
 function reminderSpacingMs() {
   return Math.round(10 * MINUTE_MS + Math.random() * 10 * MINUTE_MS);
@@ -226,6 +229,9 @@ async function runReminderCron() {
       const template  = s?.whatsapp?.reminder;
       const salonName = s?.salon?.name || "Your Salon";
       const timezone  = timezoneFromSettings(s);
+      const salonToday = new Intl.DateTimeFormat("en-CA", {
+        timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
+      }).format(now);
 
       // Master "WhatsApp Automation" toggle in Account settings — when off, all
       // automated sends must stop, not just autoReminder.
@@ -249,16 +255,13 @@ async function runReminderCron() {
 
       const eligible = appointments.filter((appt) => {
         if (appt.status === "cancelled" || appt.status === "no-show" || appt.status === "completed") return false;
-        // A walk-in booked today for later today never gets a reminder — the
-        // confirmation that just went out makes an advance-notice reminder
-        // redundant. createdAt's date equalling appt.date can only happen for
-        // a booking made on the same calendar day as its own appointment
-        // (createdAt can never be later than "now", so for a still-upcoming
-        // appointment this is equivalent to "booked today").
-        if (appt.createdAt && appt.createdAt.slice(0, 10) === appt.date) return false;
         const apptTimeMs = appointmentStartMs(appt.date, appt.startTime, timezone);
         if (apptTimeMs == null) return false;
-        return reminderIsInSendWindow(apptTimeMs, reminderHours, now.getTime());
+        const nowMs = now.getTime();
+        const sameDayFallback = appt.date === salonToday
+          && apptTimeMs - nowMs >= REMINDER_MIN_LEAD_MS
+          && apptTimeMs - nowMs <= SAME_DAY_REMINDER_MAX_LEAD_MS;
+        return reminderIsInSendWindow(apptTimeMs, reminderHours, nowMs) || sameDayFallback;
       });
 
       for (const appt of eligible) {

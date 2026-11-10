@@ -71,6 +71,7 @@ const MESSAGE_JITTER_MAX_MS = 10 * 60_000;
 const MINUTE_MS = 60_000;
 const REMINDER_TARGET_GRACE_MS = 75 * MINUTE_MS;
 const REMINDER_MIN_LEAD_MS = 30 * MINUTE_MS;
+const SAME_DAY_REMINDER_MAX_LEAD_MS = 4 * 60 * MINUTE_MS;
 const FOLLOWUP_STALE_GRACE_MS = 36 * 60 * MINUTE_MS;
 // Kept in step with posReceiptDelayMs in /api/whatsapp/queue-pos-receipt, which
 // is the path POS receipts actually take now: a receipt goes out on the sale,
@@ -1179,11 +1180,9 @@ async function runSchedulerInternal(): Promise<void> {
   const pendingConfirmIds = new Set(getQueue(CONFIRM_QUEUE_KEY).map((item) => item.id));
 
   // 1. Appointment reminders — send X hours before appointment (only during salon hours).
-  // A walk-in booked today for later today never gets a reminder — the confirmation
-  // that just went out makes an advance-notice reminder redundant. This only applies
-  // when the booking itself was ALSO made today (appt.createdAt), not merely whenever
-  // the appointment happens to fall on today's date — an appointment booked days or
-  // weeks ago that's simply due today still needs its reminder.
+  // If the 24-hour window was missed, recover upcoming appointments happening today
+  // once they are within four hours. This also covers same-day bookings where the
+  // confirmation was sent but the salon still wants a practical day-of reminder.
   // Gated by both the Account → WhatsApp automation toggle (ws.autoReminder) and the
   // Settings → Notifications toggle (notifications.apptReminder) — either one turned off
   // stops reminders from being queued.
@@ -1191,7 +1190,6 @@ async function runSchedulerInternal(): Promise<void> {
   if (openNow && ws.autoReminder && notifications.apptReminder !== false && waTpl.reminder) {
     for (const appt of appointments) {
       if (appt.status === "cancelled" || appt.status === "no-show" || appt.status === "completed") continue;
-      if (appt.date === todayKey && appt.createdAt?.slice(0, 10) === todayKey) continue;
       if (ws.autoConfirmation && pendingConfirmIds.has(appt.id)) continue;
       const apptTimeMs = appointmentStartMs(appt.date, appt.startTime, timezoneFromSettings(settingsStore as unknown as Record<string, unknown>));
       // Scoped to this one appointment, not the client overall — sentKey is keyed by
@@ -1199,7 +1197,12 @@ async function runSchedulerInternal(): Promise<void> {
       // reminder still gets one reminder per appointment, not just one total.
       const sentKey = `reminder_${appt.id}`;
       const phone = clientPhone(appt.clientId);
-      if (phone && apptTimeMs != null && !alreadySent(sentKey) && reminderIsInSendWindow(apptTimeMs, ws.reminderHours, now.getTime())) {
+      const sameDayFallback = apptTimeMs != null
+        && appt.date === todayKey
+        && apptTimeMs - now.getTime() >= REMINDER_MIN_LEAD_MS
+        && apptTimeMs - now.getTime() <= SAME_DAY_REMINDER_MAX_LEAD_MS;
+      if (phone && apptTimeMs != null && !alreadySent(sentKey)
+        && (reminderIsInSendWindow(apptTimeMs, ws.reminderHours, now.getTime()) || sameDayFallback)) {
         // Wait out this reminder's own 5-10 min jitter (from when it first became
         // due) before sending — see getReminderSendAt.
         if (Date.now() < getReminderSendAt(appt.id)) continue;
