@@ -2036,7 +2036,7 @@ function RestoreBundleModal({ bundle, userLabel, onClose, onRestored }: {
   bundle: SalonBundleRow;
   userLabel: string;
   onClose: () => void;
-  onRestored: () => void;
+  onRestored: (recordCounts: Record<string, number>) => void;
 }) {
   const [restoring, setRestoring] = useState(false);
   const [error, setError] = useState("");
@@ -2052,7 +2052,11 @@ function RestoreBundleModal({ bundle, userLabel, onClose, onRestored }: {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Restore failed.");
-      onRestored();
+      const recordCounts = data.restored?.recordCounts as Record<string, number> | undefined;
+      if (!recordCounts || Object.keys(recordCounts).length === 0) {
+        throw new Error("Restore completed without any restorable data in that backup.");
+      }
+      onRestored(recordCounts);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Restore failed.");
       setRestoring(false);
@@ -2270,7 +2274,15 @@ function BackupsPanel() {
           bundle={restoreTarget}
           userLabel={userLabel(restoreTarget.userId)}
           onClose={() => setRestoreTarget(null)}
-          onRestored={() => { setRestoreTarget(null); setMessage("Restored successfully."); setMessageIsError(false); loadBundles(userFilter); }}
+          onRestored={(recordCounts) => {
+            const services = Object.entries(recordCounts).find(([kind]) => kind === "services")?.[1];
+            setRestoreTarget(null);
+            setMessage(services == null
+              ? "Restored successfully."
+              : `Restored successfully — ${services.toLocaleString()} services restored.`);
+            setMessageIsError(false);
+            loadBundles(userFilter);
+          }}
         />
       )}
 

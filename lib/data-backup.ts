@@ -71,8 +71,25 @@ export function locationIdFromEntity(entity: string, userId: string): string {
  * Otherwise GET /api/db filters the freshly restored rows out again before a
  * browser can see them.
  */
-async function reviveRestoredKinds(userId: string, locationId: string, kinds: Set<string>): Promise<void> {
-  if (kinds.size === 0 || kinds.has("deleted_records")) return;
+type RestoredIds = Map<string, Set<string>>;
+
+function idsFromBackupData(data: string): Set<string> {
+  try {
+    const parsed = JSON.parse(data) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(
+      parsed
+        .filter((item): item is { id?: unknown } => !!item && typeof item === "object")
+        .map((item) => String(item.id ?? ""))
+        .filter(Boolean),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+async function reviveRestoredKinds(userId: string, locationId: string, restored: RestoredIds): Promise<void> {
+  if (restored.size === 0) return;
   const key = salonDataKey(userId, locationId, "deleted_records");
   const result = await db.execute({ sql: "SELECT data FROM salon_data WHERE entity = ?", args: [key] });
   if (result.rows.length === 0) return;
@@ -85,7 +102,8 @@ async function reviveRestoredKinds(userId: string, locationId: string, kinds: Se
     return;
   }
   const next = tombstones.map((tombstone) => {
-    if (typeof tombstone.entity !== "string" || !kinds.has(tombstone.entity) || tombstone.restoredAt) return tombstone;
+    const ids = typeof tombstone.entity === "string" ? restored.get(tombstone.entity) : undefined;
+    if (!ids || !ids.has(String(tombstone.id ?? "")) || tombstone.restoredAt) return tombstone;
     const now = new Date().toISOString();
     return { ...tombstone, restoredAt: now, _updatedAt: now };
   });
@@ -314,7 +332,8 @@ export async function restoreSalonDataBackup(backupIdToRestore: string): Promise
     sql: "INSERT OR REPLACE INTO salon_data (entity, data, updated_at) VALUES (?, ?, ?)",
     args: [backup.entity, backup.data, new Date().toISOString()],
   });
-  await reviveRestoredKinds(backup.userId, backup.locationId, new Set([backup.dataKind]));
+  const restored = new Map<string, Set<string>>([[backup.dataKind, idsFromBackupData(backup.data)]]);
+  await reviveRestoredKinds(backup.userId, backup.locationId, restored);
   invalidatePublicSalon(backup.userId);
   return backup;
 }
@@ -418,6 +437,7 @@ export interface RestoredBundleSummary {
   id: string;
   userId: string;
   entityCount: number;
+  recordCounts: Record<string, number>;
   createdAt: string;
 }
 
@@ -432,20 +452,32 @@ export async function restoreSalonBackupBundle(bundleId: string): Promise<Restor
   const row = result.rows[0];
   const userId = row.user_id as string;
   const parsed = JSON.parse(row.data as string) as { entities: BundleEntity[] };
+  if (!parsed || !Array.isArray(parsed.entities) || parsed.entities.length === 0) {
+    throw new Error("Backup contains no restorable entities.");
+  }
   const now = new Date().toISOString();
-  const restoredKinds = new Set<string>();
+  const restoredByLocation = new Map<string, RestoredIds>();
+  const recordCounts: Record<string, number> = {};
 
   for (const entry of parsed.entities) {
+    if (!entry || typeof entry.entity !== "string" || typeof entry.data !== "string") {
+      throw new Error("Backup contains an invalid entity payload.");
+    }
     await backupExistingSalonData(entry.entity, userId, "before-write");
     await db.execute({
       sql: "INSERT OR REPLACE INTO salon_data (entity, data, updated_at) VALUES (?, ?, ?)",
       args: [entry.entity, entry.data, now],
     });
-    restoredKinds.add(dataKindFromEntity(entry.entity));
+    const locationId = locationIdFromEntity(entry.entity, userId);
+    const kind = dataKindFromEntity(entry.entity);
+    const ids = idsFromBackupData(entry.data);
+    const byKind = restoredByLocation.get(locationId) ?? new Map<string, Set<string>>();
+    byKind.set(kind, ids);
+    restoredByLocation.set(locationId, byKind);
+    recordCounts[kind] = recordCountFor(entry.data);
   }
-  const locationIds = new Set(parsed.entities.map((entry) => locationIdFromEntity(entry.entity, userId)));
-  for (const locationId of locationIds) {
-    await reviveRestoredKinds(userId, locationId, restoredKinds);
+  for (const [locationId, restored] of restoredByLocation) {
+    await reviveRestoredKinds(userId, locationId, restored);
   }
   invalidatePublicSalon(userId);
 
@@ -453,6 +485,7 @@ export async function restoreSalonBackupBundle(bundleId: string): Promise<Restor
     id: row.id as string,
     userId,
     entityCount: Number(row.entity_count),
+    recordCounts,
     createdAt: row.created_at as string,
   };
 }
