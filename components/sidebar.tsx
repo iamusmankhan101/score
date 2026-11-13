@@ -111,7 +111,8 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
   const navGroups: typeof NAV_GROUPS = NAV_GROUPS.map((group) => ({
     ...group,
     items: [
-      ...group.items.map((item) => ({ ...item, label: term(item.label, clinic) })),
+      // Salon-only screens (hair/makeup Virtual Try-On) don't belong in a clinic.
+      ...group.items.filter((item) => !(clinic && item.href === "/dashboard/try-on")).map((item) => ({ ...item, label: term(item.label, clinic) })),
       ...(clinic && group.label === "Clients & Sales" ? [{ href: "/dashboard/consent-forms", icon: FileSignature, label: "Consent Forms" }] : []),
       ...(clinic && group.label === "Business" ? [{ href: "/dashboard/clinic-reports", icon: BarChart3, label: "Clinic Reports" }, { href: "/dashboard/cash-closing", icon: Banknote, label: "Cash Closing" }, { href: "/dashboard/rooms", icon: DoorOpen, label: "Rooms & Machines" }] : []),
       ...(clinic && group.label === "Marketing" ? [{ href: "/dashboard/leads", icon: Megaphone, label: "Leads" }, { href: "/dashboard/aftercare", icon: HeartPulse, label: "Aftercare" }] : []),
