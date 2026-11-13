@@ -6,7 +6,7 @@ import { invalidatePublicSalon } from "@/lib/public-salon-cache";
 
 const DELETED_RECORDS_ENTITY = "deleted_records";
 
-const ALLOWED = new Set(["clients", "appointments", "staff", "services", "inventory", "salon_invoices", "expenses", "attendance", "payouts", "cash_flow_income", "held_sales", "inventory_log", "vendor_bills", "consultations", "treatment_plans", "consents", "clinic_photos", "prescriptions", "leads", "treatment_charts", "waitlist", DELETED_RECORDS_ENTITY]);
+const ALLOWED = new Set(["clients", "appointments", "staff", "services", "inventory", "salon_invoices", "expenses", "attendance", "payouts", "cash_flow_income", "held_sales", "inventory_log", "vendor_bills", "consultations", "treatment_plans", "consents", "clinic_photos", "prescriptions", "leads", "treatment_charts", "waitlist", "clinic_documents", "cash_closings", DELETED_RECORDS_ENTITY]);
 
 /**
  * Staff logins see only what their ticked pages need (see PERMISSION_OPTIONS on the Account
@@ -24,6 +24,8 @@ const ENTITY_PERMISSIONS: Record<string, string[]> = {
   clinic_photos: ["medical"],
   prescriptions: ["medical"],
   treatment_charts: ["medical"],
+  clinic_documents: ["medical"],
+  cash_closings: ["cash-closing", "invoices", "revenue"],
   consents: ["medical", "consent-forms"],
   leads: ["leads"],
 };

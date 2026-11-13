@@ -2220,6 +2220,7 @@ const PERMISSION_OPTIONS = [
   { key: "aftercare", label: "Aftercare (clinic)" },
   { key: "waitlist", label: "Waiting List" },
   { key: "clinic-reports", label: "Clinic Reports (clinic)" },
+  { key: "cash-closing", label: "Daily Cash Closing" },
   // Not a page: lets this login delete invoices/sales, clients, staff and services.
   { key: "delete", label: "Can delete records" },
 ];

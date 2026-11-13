@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, CalendarDays, Camera, Check, ClipboardList, FileSignature, ListChecks,
-  Package, Plus, Stethoscope, Trash2, X, Columns2, Receipt, Images, Clock, Pill, Send, FileDown, Crown, Copy, Syringe, ShieldCheck,
+  Package, Plus, Stethoscope, Trash2, X, Columns2, Receipt, Images, Clock, Pill, Send, FileDown, Crown, Copy, Syringe, ShieldCheck, FileText,
 } from "lucide-react";
 import ChartsTab from "@/components/clinic/charting";
 import { normalizePhone, whatsAppConnected } from "@/lib/whatsapp-scheduler";
@@ -22,7 +22,7 @@ import { getSalonInvoices } from "@/lib/salon-invoices";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccessHref } from "@/components/sidebar";
 import SignaturePad from "@/components/clinic/signature-pad";
-import { uploadImage } from "@/lib/image";
+import { uploadDocument, uploadImage } from "@/lib/image";
 import {
   CONCERNS, PHOTO_ANGLES, PHOTO_STAGES, consentIsValid, consentTemplates, getClinicPhotos, getConsents,
   getConsultations, getTreatmentPlans, newId, packagesForClient, patientTimeline, planProgress, removeRecord,
@@ -30,6 +30,7 @@ import {
   activeMembership, getPrescriptions, getTreatmentCharts, audit, type TreatmentChart, savePrescriptions, prescriptionTemplates, prescriptionText, REGIME_TIMES,
   type ClinicPhoto, type ConsentRecord, type ConsentTemplate, type Consultation, type TimelineKind, type TreatmentPlan,
   type Prescription, type PrescriptionItem, type PrescriptionTemplate,
+  DOCUMENT_KINDS, getClinicDocuments, saveClinicDocuments, type ClinicDocument,
 } from "@/lib/clinic";
 import type { Appointment, Client, FitzpatrickType, InventoryItem, MedicalProfile, Service, Staff } from "@/lib/types";
 import type { SalonInvoice } from "@/lib/salon-invoices";
@@ -135,7 +136,7 @@ function TreatmentPicker({ services, value, onChange }: { services: Service[]; v
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-type Tab = "timeline" | "medical" | "consultations" | "plans" | "charting" | "consent" | "prescriptions" | "photos" | "access";
+type Tab = "timeline" | "medical" | "consultations" | "plans" | "charting" | "consent" | "prescriptions" | "photos" | "documents" | "access";
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "timeline", label: "Timeline", icon: Clock },
   { id: "medical", label: "Medical", icon: Stethoscope },
@@ -145,6 +146,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "consent", label: "Consent", icon: FileSignature },
   { id: "prescriptions", label: "Prescriptions", icon: Pill },
   { id: "photos", label: "Photos", icon: Camera },
+  { id: "documents", label: "Documents", icon: FileText },
 ];
 
 interface Data {
@@ -175,6 +177,7 @@ export default function PatientClinicalRecord({ client, onClientChange }: { clie
   const [data, setData] = useState<Data | null>(null);
   const [allowed, setAllowed] = useState(true);
   const [canSeeLog, setCanSeeLog] = useState(false);
+  const [portalMsg, setPortalMsg] = useState("");
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -190,6 +193,26 @@ export default function PatientClinicalRecord({ client, onClientChange }: { clie
   if (!data) return null;
   const refresh = () => setData(loadData());
   const allergies = client.medical?.allergies?.trim();
+  async function sharePortal() {
+    setPortalMsg("Creating…");
+    try {
+      const res = await fetch("/api/clinic/portal-link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id, locationId: getActiveLocationFilter() }) });
+      const d = await res.json() as { ok?: boolean; token?: string; error?: string };
+      if (!d.ok || !d.token) throw new Error(d.error || "Couldn't create the link.");
+      const url = `${window.location.origin}/portal/${d.token}`;
+      audit("send", "portal link", client.id);
+      if (autoWhatsApp() && client.phone) {
+        await sendClinicWhatsApp({ kind: "text", phone: client.phone, text: `Hi ${client.name.split(" ")[0]}, view your appointments, prescriptions and bills at ${clinicHeader().name}: ${url}` });
+        setPortalMsg("Sent on WhatsApp");
+      } else {
+        await navigator.clipboard?.writeText(url);
+        setPortalMsg("Link copied");
+      }
+    } catch (e) {
+      setPortalMsg(e instanceof Error ? e.message : "Failed");
+    }
+    setTimeout(() => setPortalMsg(""), 4000);
+  }
 
   return (
     <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e8e8f0", overflow: "hidden" }}>
@@ -197,6 +220,8 @@ export default function PatientClinicalRecord({ client, onClientChange }: { clie
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <Stethoscope size={17} color={ACCENT} />
           <div style={{ fontSize: 15, fontWeight: 900, color: "#1a1a2e", flex: 1 }}>Clinical Record</div>
+          {allowed && <button type="button" onClick={sharePortal} style={{ ...BTN_GHOST, padding: "6px 10px", fontSize: 11.5 }} title="Patient portal: appointments, prescriptions, bills and progress">
+            <Send size={13} /> {portalMsg || "Portal link"}</button>}
           {(() => {
             const m = activeMembership(client.id, data.invoices);
             return m ? (
@@ -233,6 +258,7 @@ export default function PatientClinicalRecord({ client, onClientChange }: { clie
           : tab === "charting" ? <ChartsTab client={client} data={data} onChange={refresh} />
           : tab === "consent" ? <ConsentTab client={client} data={data} onChange={refresh} />
           : tab === "prescriptions" ? <PrescriptionsTab client={client} data={data} onChange={refresh} />
+          : tab === "documents" ? <DocumentsTab client={client} onChange={refresh} />
           : tab === "access" ? <AccessLogTab client={client} />
           : <PhotosTab client={client} data={data} onChange={refresh} />}
       </div>
@@ -1024,5 +1050,60 @@ function CompareSlider({ before, after, onClose }: { before: ClinicPhoto; after:
       </div>
       <input type="range" min={0} max={100} value={pos} onChange={(e) => setPos(Number(e.target.value))} aria-label="Before / after position" style={{ width: "100%", marginTop: 12, accentColor: ACCENT }} />
     </Modal>
+  );
+}
+
+
+// ─── Documents ───────────────────────────────────────────────────────────────
+
+function DocumentsTab({ client, onChange }: { client: Client; onChange: () => void }) {
+  const [kind, setKind] = useState<string>(DOCUMENT_KINDS[0]);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const mine = getClinicDocuments().filter((d) => d.clientId === client.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  async function upload(files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true); setError("");
+    try {
+      const added: ClinicDocument[] = [];
+      for (const file of Array.from(files)) {
+        const { url, isPdf } = await uploadDocument(file);
+        added.push({ id: newId("doc"), clientId: client.id, url, isPdf, name: file.name, kind, date: todayKey(), createdAt: new Date().toISOString() });
+      }
+      saveClinicDocuments([...added, ...getClinicDocuments()]);
+      audit("upload", "document", client.id, `${added.length} ${kind}`);
+      onChange();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: 12, border: "1px solid #ececf4", borderRadius: 12, background: "#fafafd", marginBottom: 16 }}>
+        <select value={kind} onChange={(e) => setKind(e.target.value)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #e4e4ee", fontSize: 12.5 }}>
+          {DOCUMENT_KINDS.map((k) => <option key={k}>{k}</option>)}
+        </select>
+        <label style={{ ...BTN, opacity: uploading ? 0.6 : 1 }}>
+          <Plus size={14} /> {uploading ? "Uploading…" : "Add PDF or photo"}
+          <input type="file" accept="application/pdf,image/*" multiple hidden disabled={uploading} onChange={(e) => { upload(e.target.files); e.target.value = ""; }} />
+        </label>
+        {error && <span style={{ color: "#dc2626", fontSize: 12 }}>{error}</span>}
+      </div>
+      {mine.length === 0 ? <Empty>No documents yet. Lab reports, referral letters and IDs go here.</Empty> : mine.map((d) => (
+        <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid #ececf4", borderRadius: 10, marginBottom: 8 }}>
+          <FileText size={18} color={ACCENT} />
+          <a href={d.url} target="_blank" rel="noreferrer" onClick={() => audit("download", "document", client.id, d.name)} style={{ flex: 1, minWidth: 0, color: "#1a1a2e", textDecoration: "none" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</div>
+            <div style={{ fontSize: 11.5, color: "#8a8aa3" }}>{d.kind} · {fmtDate(d.date)}</div>
+          </a>
+          <button type="button" aria-label="Delete document" onClick={() => { if (window.confirm("Delete this document?")) { removeRecord(getClinicDocuments, saveClinicDocuments, d.id); onChange(); } }}
+            style={{ ...BTN_GHOST, color: "#dc2626", borderColor: "#fecaca", padding: "6px 10px" }}><Trash2 size={13} /></button>
+        </div>
+      ))}
+    </div>
   );
 }

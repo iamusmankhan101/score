@@ -113,7 +113,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
     items: [
       ...group.items.map((item) => ({ ...item, label: term(item.label, clinic) })),
       ...(clinic && group.label === "Clients & Sales" ? [{ href: "/dashboard/consent-forms", icon: FileSignature, label: "Consent Forms" }] : []),
-      ...(clinic && group.label === "Business" ? [{ href: "/dashboard/clinic-reports", icon: BarChart3, label: "Clinic Reports" }, { href: "/dashboard/rooms", icon: DoorOpen, label: "Rooms & Machines" }] : []),
+      ...(clinic && group.label === "Business" ? [{ href: "/dashboard/clinic-reports", icon: BarChart3, label: "Clinic Reports" }, { href: "/dashboard/cash-closing", icon: Banknote, label: "Cash Closing" }, { href: "/dashboard/rooms", icon: DoorOpen, label: "Rooms & Machines" }] : []),
       ...(clinic && group.label === "Marketing" ? [{ href: "/dashboard/leads", icon: Megaphone, label: "Leads" }, { href: "/dashboard/aftercare", icon: HeartPulse, label: "Aftercare" }] : []),
       ...(group.label === "Overview" ? [{ href: "/dashboard/waitlist", icon: Hourglass, label: "Waiting List" }] : []),
     ],

@@ -43,7 +43,8 @@ export async function POST(req: NextRequest) {
   }
 
   const dataUrl = body.dataUrl ?? "";
-  if (!/^data:image\/(jpeg|png|webp);base64,/.test(dataUrl)) {
+  const isPdf = dataUrl.startsWith("data:application/pdf;base64,") && body.folder === "patients"; // patient documents
+  if (!isPdf && !/^data:image\/(jpeg|png|webp);base64,/.test(dataUrl)) {
     return Response.json({ ok: false, error: "Expected a JPEG, PNG or WebP data URL." }, { status: 400 });
   }
   if (dataUrl.length > MAX_DATA_URL_BYTES) {

@@ -106,3 +106,14 @@ export async function fileToResizedDataUrl(file: File, maxEdge = MAX_EDGE_PX, qu
 
   return canvas.toDataURL("image/jpeg", quality);
 }
+
+/** Patient documents: a PDF (up to 2 MB) or a photo of one. Returns the private URL. */
+export async function uploadDocument(file: File): Promise<{ url: string; isPdf: boolean }> {
+  if (file.type !== "application/pdf") return { url: await uploadImage(file, "patients", 2000), isPdf: false };
+  if (file.size > 2 * 1024 * 1024) throw new ImageUploadError("That PDF is over 2 MB. Compress it or upload photos of the pages.");
+  const dataUrl = await new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => no(new ImageUploadError("Couldn't read that file.")); r.readAsDataURL(file); });
+  const res = await fetch("/api/upload/image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataUrl, folder: "patients" }) });
+  const data = await res.json().catch(() => ({})) as { ok?: boolean; url?: string; error?: string };
+  if (!data.ok || !data.url) throw new ImageUploadError(data.error || "Upload failed. Please try again.");
+  return { url: data.url, isPdf: true };
+}

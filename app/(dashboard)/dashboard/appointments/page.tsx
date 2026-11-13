@@ -33,7 +33,8 @@ const ALL_STATUSES = Object.keys(STATUS) as AppointmentStatus[];
 import { fmtCurrency as fmt } from "@/lib/format";
 import { TimeSelect } from "@/components/time-select";
 import { returnToStock, settleServiceConsumption, settledConsumption } from "@/lib/inventory-consumption";
-import { assignResources, resourcesAt, type ClinicResource } from "@/lib/clinic-resources";
+import { isWeeklyOff } from "@/lib/attendance";
+import { assignResources, resourceClash, resourcesAt, type ClinicResource } from "@/lib/clinic-resources";
 import { getActiveLocationFilter } from "@/lib/locations";
 import { WaitlistOffer, waitlistMatches } from "@/components/waitlist-offer";
 import { canAccessHref } from "@/components/sidebar";
@@ -998,6 +999,9 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
   const [createdApptId, setCreatedApptId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [resourceError, setResourceError] = useState("");
+  // Recurring: repeat a single-day booking every N days, `repeatCount` more times.
+  const [repeatEvery, setRepeatEvery] = useState(0);
+  const [repeatCount, setRepeatCount] = useState(4);
   // useState updates aren't applied synchronously, so a fast double-click can fire
   // handleBook twice before React re-renders to disable the button — both calls
   // would then read the same stale `submitting === false`. A ref flips immediately,
@@ -1313,6 +1317,17 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
     }
     setResourceError("");
     appts.splice(0, appts.length, ...withResources.appointments);
+
+    // Recurring: clone the booking forward. Each copy keeps the same room/machine,
+    // and is skipped (not failed) if that resource is already taken that day.
+    if (!isMultiDay && repeatEvery > 0 && appts[0]) {
+      const base = appts[0];
+      for (let n = 1; n <= repeatCount; n++) {
+        const copy = { ...base, id: `${base.id}_r${n}`, date: addDaysToDateKey(base.date, repeatEvery * n) };
+        const clash = (base.resourceIds ?? []).some((rid) => resourceClash(copy, rid, [...getStoredAppointments(), ...appts]));
+        if (!clash) appts.push(copy);
+      }
+    }
 
     try {
       onAdd(appts, [...(newClientObj ? [newClientObj] : []), ...newGuestClients]);
@@ -1721,6 +1736,21 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
           </div>
 
           <FormField label="Notes (optional)">
+            {days.map((d, i) => {
+              const st = staffList.find((x) => x.id === d.staffId);
+              return st && d.date && isWeeklyOff(st, d.date)
+                ? <div key={i} style={{ marginBottom: 8, padding: "8px 10px", borderRadius: 8, background: "#fffbeb", color: "#92400e", fontSize: 12.5, fontWeight: 700 }}>⚠ {st.name} is off on {d.date}. You can still book, but check availability.</div>
+                : null;
+            })}
+            {!isMultiDay && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, fontSize: 13 }}>
+                <span style={{ fontWeight: 700 }}>Repeat</span>
+                <select value={repeatEvery} onChange={(e) => setRepeatEvery(Number(e.target.value))} style={selectStyle}>
+                  <option value={0}>Does not repeat</option><option value={7}>Weekly</option><option value={14}>Every 2 weeks</option><option value={28}>Every 4 weeks</option>
+                </select>
+                {repeatEvery > 0 && <><input type="number" min={1} max={26} value={repeatCount} onChange={(e) => setRepeatCount(Math.min(26, Math.max(1, Number(e.target.value) || 1)))} style={{ ...selectStyle, width: 70 }} /><span>more times</span></>}
+              </div>
+            )}
             <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Any special requests or notes…" rows={2} style={{ ...selectStyle, resize: "none", lineHeight: 1.5 }} />
           </FormField>
 

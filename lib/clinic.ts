@@ -357,7 +357,7 @@ export interface WaitlistEntry {
   createdAt: string;
 }
 
-type ClinicEntity = "consultations" | "treatment_plans" | "consents" | "clinic_photos" | "prescriptions" | "leads" | "treatment_charts" | "waitlist";
+type ClinicEntity = "consultations" | "treatment_plans" | "consents" | "clinic_photos" | "prescriptions" | "leads" | "treatment_charts" | "waitlist" | "clinic_documents" | "cash_closings";
 
 function readList<T>(entity: ClinicEntity): T[] {
   if (typeof window === "undefined") return [];
@@ -386,6 +386,40 @@ export const getPrescriptions = () => readList<Prescription>("prescriptions");
 export const savePrescriptions = (list: Prescription[], deletedIds?: string[]) => writeList("prescriptions", list, deletedIds);
 export const getTreatmentCharts = () => readList<TreatmentChart>("treatment_charts");
 export const saveTreatmentCharts = (list: TreatmentChart[], deletedIds?: string[]) => writeList("treatment_charts", list, deletedIds);
+export interface ClinicDocument {
+  id: string;
+  clientId: string;
+  /** Hosted URL (private, shown through /api/clinic/photo). Image or PDF. */
+  url: string;
+  name: string;
+  /** "Lab report", "Referral", "ID", "Other"… */
+  kind: string;
+  isPdf?: boolean;
+  date: string;
+  createdAt: string;
+}
+export const DOCUMENT_KINDS = ["Lab report", "Referral letter", "ID / Passport", "Prescription (external)", "Insurance", "Other"] as const;
+export const getClinicDocuments = () => readList<ClinicDocument>("clinic_documents");
+export const saveClinicDocuments = (list: ClinicDocument[], deletedIds?: string[]) => writeList("clinic_documents", list, deletedIds);
+
+/** One day's till reconciliation (Dashboard → Cash Closing). */
+export interface CashClosing {
+  id: string;
+  /** YYYY-MM-DD — one closing per day. */
+  date: string;
+  expectedCash: number;
+  countedCash: number;
+  /** Counted − expected; negative = short. */
+  difference: number;
+  /** Takings by payment method that day, net of refunds. */
+  byMethod: Record<string, number>;
+  notes?: string;
+  closedBy?: string;
+  closedAt: string;
+}
+export const getCashClosings = () => readList<CashClosing>("cash_closings");
+export const saveCashClosings = (list: CashClosing[], deletedIds?: string[]) => writeList("cash_closings", list, deletedIds);
+
 export const getWaitlist = () => readList<WaitlistEntry>("waitlist");
 export const saveWaitlist = (list: WaitlistEntry[], deletedIds?: string[]) => writeList("waitlist", list, deletedIds);
 export const getLeads = () => readList<Lead>("leads");
@@ -426,7 +460,7 @@ export function removeRecord<T extends { id: string }>(get: () => T[], save: (li
 
 // Clinical records are audited; leads and the waiting list aren't patient records.
 AUDIT_NAMES.set(getConsultations, "consultation").set(getTreatmentPlans, "treatment plan").set(getConsents, "consent")
-  .set(getClinicPhotos, "photo").set(getPrescriptions, "prescription").set(getTreatmentCharts, "treatment record");
+  .set(getClinicPhotos, "photo").set(getPrescriptions, "prescription").set(getClinicDocuments, "document").set(getTreatmentCharts, "treatment record");
 
 export const newId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
