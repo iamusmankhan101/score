@@ -8,6 +8,7 @@ import type { Staff, Service, StaffRole, StaffRoleValue, StaffPayType, Appointme
 import { X, Plus, Check, ChevronRight, Trash2, UserCog, Pencil, Lock, Upload, Download, FileSpreadsheet, ChevronDown } from "lucide-react";
 import { getCurrentPlan, isAtLimit } from "@/lib/plan-limits";
 import { getSectionOptions, getActiveSection, inSection, defaultSectionForNewRecord } from "@/lib/sections";
+import { term, useIsClinic } from "@/lib/clinic";
 import PageTitle from "@/components/page-title";
 import MobilePageHeader from "@/components/mobile-page-header";
 
@@ -628,6 +629,7 @@ function DeleteConfirmModal({ name, onConfirm, onCancel }: { name: string; onCon
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function StaffPage() {
+  const clinic = useIsClinic();
   const canDelete = useCanDelete();
   const router = useRouter();
   const [showAdd, setShowAdd]       = useState(false);
@@ -762,8 +764,8 @@ export default function StaffPage() {
 
       {/* Native mobile app bar */}
       <MobilePageHeader
-        title="Staff"
-        subtitle={`${staffList.length} team members`}
+        title={term("Staff", clinic)}
+        subtitle={`${staffList.length} ${clinic ? "doctors" : "team members"}`}
         action={{ label: staffLimited ? "Limit reached" : "Add", icon: <Plus size={14} />, onClick: () => !staffLimited && setShowAdd(true) }}
       />
 
@@ -771,10 +773,10 @@ export default function StaffPage() {
       <div className="dashboard-topbar page-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <PageTitle
           icon={<UserCog size={24} />}
-          title="Staff"
+          title={term("Staff", clinic)}
           subtitle={
             <>
-            {staffList.length} team members
+            {staffList.length} {clinic ? "doctors" : "team members"}
             {plan.staffLimit !== -1 && <span style={{ marginLeft: 8, color: staffLimited ? "#dc2626" : "#b0b0c8", fontWeight: 700 }}>· {activeCount}/{plan.staffLimit} active</span>}
             </>
           }
@@ -818,7 +820,7 @@ export default function StaffPage() {
             style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", borderRadius: 12, border: "none", background: staffLimited ? "#e8e8f0" : "var(--accent-gradient)", fontSize: 13, fontWeight: 750, color: staffLimited ? "#aaaabc" : "#fff", boxShadow: staffLimited ? "none" : "0 4px 14px var(--accent-glow)", cursor: staffLimited ? "not-allowed" : "pointer", transition: "all 0.18s ease" }}
             className={`desktop-only ${!staffLimited ? "page-header-btn" : ""}`}
           >
-            <Plus size={16} /> Add Staff
+            <Plus size={16} /> Add {clinic ? "Doctor" : "Staff"}
             {staffLimited && <span style={{ fontSize: 10, background: "#dc2626", color: "#fff", borderRadius: 20, padding: "1px 7px" }}>Limit reached</span>}
           </button>
         </div>

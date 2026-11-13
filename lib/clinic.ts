@@ -53,7 +53,7 @@ export function useIsClinic(): boolean {
 const CLINIC_TERMS: Record<string, string> = {
   Clients: "Patients", Client: "Patient", clients: "patients", client: "patient",
   Services: "Treatments", Service: "Treatment", services: "treatments", service: "treatment",
-  "Salon Floor": "Clinic Floor",
+  "Salon Floor": "Clinic Floor", Staff: "Doctors",
 };
 
 /** The clinic's word for a salon word, when in clinic mode. */
