@@ -7,11 +7,12 @@
  */
 
 import { useEffect, useState } from "react";
-import { ListOrdered, LogIn, PhoneCall, Check, UserPlus, Printer, Send, Monitor, X, Clock, Users, Stethoscope, CalendarClock, CircleCheck } from "lucide-react";
+import { ListOrdered, LogIn, PhoneCall, Check, UserPlus, Printer, Send, Monitor, X, Download, Clock, Users, Stethoscope, CalendarClock, CircleCheck } from "lucide-react";
 import PageTitle from "@/components/page-title";
 import { getStoredAppointments, getStoredClients, getStoredServices, getStoredStaff, saveAppointments, saveClients, subscribeToStoredData } from "@/lib/storage";
 import { applyClientCredits, creditsFromAppointments, newGuestClient } from "@/lib/appointment-credit";
 import { autoWhatsApp, clinicHeader, sendClinicWhatsApp, whatsAppLink } from "@/lib/clinic-wa";
+import { settingsStore } from "@/lib/settings-store";
 import { todayKey, withToken } from "@/lib/clinic-core";
 import { newId } from "@/lib/clinic";
 import type { Appointment, AppointmentStatus, Client, Service, Staff } from "@/lib/types";
@@ -22,6 +23,14 @@ const GHOST: React.CSSProperties = { ...BTN, background: "#fff", color: "#6b6b8a
 
 const hhmm = (d = new Date()) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 const addMin = (t: string, m: number) => { const [h, mi] = t.split(":").map(Number); const x = h * 60 + mi + m; return `${String(Math.floor(x / 60) % 24).padStart(2, "0")}:${String(x % 60).padStart(2, "0")}`; };
+
+/** The clinic's own logo (Account settings), as an absolute URL; empty when none is set. */
+const slipLogo = () => {
+  const logo = (settingsStore.salon as { logo?: string }).logo || "";
+  try { return logo ? new URL(logo, window.location.href).href : ""; } catch { return ""; }
+};
+// Thermal paper prints only black, so the logo is flattened to high-contrast grey.
+const LOGO_FILTER = "grayscale(1) contrast(1.6)";
 
 /** The message a patient gets with their token. */
 const tokenMessage = (a: Appointment, ahead: number) =>
@@ -43,8 +52,9 @@ function printSlip(a: Appointment, ahead: number) {
     .s{font-size:14px;font-weight:700;margin:1mm 0}.m{font-size:11px;margin:1mm 0}
     hr{border:0;border-top:1px dashed #000;margin:3mm 0}
   </style>
-    <h1>${esc(clinicHeader().name)}</h1><hr><div class="l">Your token</div><div class="n">${a.tokenNo}</div><hr>
+    ${slipLogo() ? `<img src="${esc(slipLogo())}" alt="${esc(clinicHeader().name)}" style="max-width:66mm;max-height:24mm;filter:${LOGO_FILTER}">` : `<h1>${esc(clinicHeader().name)}</h1>`}<hr><div class="l">Your token</div><div class="n">${a.tokenNo}</div><hr>
     <div class="s">${esc(a.clientName)}</div>${a.staffName ? `<div class="s">${esc(a.staffName)}</div>` : ""}
+    ${a.serviceNames.length ? `<div class="m"><b>Treatment:</b> ${esc(a.serviceNames.join(", "))}</div>` : ""}
     <div class="m">${esc(todayKey())} &middot; ${esc(hhmm())}</div><div class="s">${ahead > 0 ? `${ahead} ahead of you` : "You are next"}</div>
     <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300)}</script>`);
   w.document.close();
@@ -58,6 +68,8 @@ export default function QueuePage() {
   const today = todayKey();
   const [walkIn, setWalkIn] = useState(false);
   const [notice, setNotice] = useState("");
+  /** The token slip being shown in the popup (nothing prints until the user chooses). */
+  const [slip, setSlip] = useState<{ a: Appointment; ahead: number } | null>(null);
   /** Shown after a patient is marked done, so the prescription is written while the visit is fresh. */
   const [rxPrompt, setRxPrompt] = useState<{ clientId: string; apptId: string; name: string } | null>(null);
   const auto = autoWhatsApp();
@@ -76,7 +88,11 @@ export default function QueuePage() {
     if (status === "arrived") list = withToken(list, id);
     saveAppointments(list);
     setAppts(list);
-    if (status === "arrived") announce(list, id);
+    if (status === "arrived") {
+      announce(list, id);
+      const a = list.find((x) => x.id === id);
+      if (a?.tokenNo) setSlip({ a, ahead: list.filter((x) => x.date === a.date && x.status === "arrived" && (x.tokenNo ?? 0) < a.tokenNo!).length });
+    }
     if (status === "completed") { const a = list.find((x) => x.id === id); if (a) setRxPrompt({ clientId: a.clientId, apptId: a.id, name: a.clientName }); }
   }
 
@@ -113,7 +129,7 @@ export default function QueuePage() {
     setAppts(list);
     announce(list, appt.id);
     const given = list.find((x) => x.id === appt.id)!;
-    printSlip(given, list.filter((x) => x.date === today && x.status === "arrived" && (x.tokenNo ?? 0) < (given.tokenNo ?? 0)).length);
+    setSlip({ a: given, ahead: list.filter((x) => x.date === today && x.status === "arrived" && (x.tokenNo ?? 0) < (given.tokenNo ?? 0)).length });
     setWalkIn(false);
   }
 
@@ -225,7 +241,7 @@ export default function QueuePage() {
         {column("Waiting", waiting.length, "#7C3AED", <Users size={17} />,
           waiting.map((a, i) => card(a, chip(a, "#7C3AED"), waitPill(waited(a)),
             <>
-              <button type="button" title="Print token slip" aria-label="Print token slip" onClick={() => printSlip(a, i)} style={GHOST}><Printer size={13} /></button>
+              <button type="button" title="Token slip" aria-label="Token slip" onClick={() => setSlip({ a, ahead: i })} style={GHOST}><Printer size={13} /></button>
               {!auto && (() => { const ph = getStoredClients().find((c) => c.id === a.clientId)?.phone; return ph ? <a href={whatsAppLink(ph, tokenMessage(a, i))} target="_blank" rel="noopener noreferrer" title="Send the token on WhatsApp" style={{ ...GHOST, textDecoration: "none", color: "#16a34a" }}><Send size={13} /></a> : null; })()}
               <button type="button" onClick={() => setStatus(a.id, "in-progress")} style={BTN}><PhoneCall size={14} /> {i === 0 ? "Call next" : "Call"}</button>
             </>)),
@@ -252,7 +268,70 @@ export default function QueuePage() {
           </div>
         </div>
       )}
+      {slip && <TokenSlipModal a={slip.a} ahead={slip.ahead} phone={getStoredClients().find((c) => c.id === slip.a.clientId)?.phone} onClose={() => setSlip(null)} />}
       {walkIn && <WalkInModal onClose={() => setWalkIn(false)} onSave={addWalkIn} />}
+    </div>
+  );
+}
+
+/** Draws the slip as a PNG (80 mm at ~8 px/mm) so it can be saved or shared. */
+async function slipPng(a: Appointment, ahead: number, useLogo = true): Promise<string> {
+  const W = 640, c = document.createElement("canvas");
+  // The logo replaces the clinic name when it loads; any failure falls back to the name.
+  let logo: HTMLImageElement | null = null;
+  const url = useLogo ? slipLogo() : "";
+  if (url) {
+    logo = await new Promise<HTMLImageElement | null>((ok) => { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = url; });
+  }
+  const logoH = logo ? Math.min(150, Math.round(logo.height * Math.min(460 / logo.width, 150 / logo.height))) : 0;
+  const lines: { t: string; size: number; bold?: boolean; gap: number }[] = [
+    ...(logo ? [] : [{ t: clinicHeader().name, size: 34, bold: true, gap: 50 }]), { t: "Your token", size: 26, gap: 40 }, { t: String(a.tokenNo ?? ""), size: 200, bold: true, gap: 210 },
+    { t: a.clientName, size: 32, bold: true, gap: 44 }, ...(a.staffName ? [{ t: a.staffName, size: 30, bold: true, gap: 42 }] : []),
+    ...(a.serviceNames.length ? [{ t: `Treatment: ${a.serviceNames.join(", ")}`, size: 24, gap: 36 }] : []),
+    { t: `${todayKey()} · ${hhmm()}`, size: 24, gap: 36 }, { t: ahead > 0 ? `${ahead} ahead of you` : "You are next", size: 30, bold: true, gap: 44 },
+  ];
+  c.width = W; c.height = lines.reduce((n, l) => n + l.gap, 40) + (logo ? logoH + 20 : 0);
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#fff"; g.fillRect(0, 0, W, c.height); g.fillStyle = "#000"; g.textAlign = "center";
+  let y = 20;
+  if (logo) {
+    const w = Math.round(logo.width * (logoH / logo.height));
+    g.filter = LOGO_FILTER; g.drawImage(logo, (W - w) / 2, y, w, logoH); g.filter = "none";
+    y += logoH + 20;
+  }
+  for (const l of lines) { y += l.gap; g.font = `${l.bold ? "bold " : ""}${l.size}px Arial, sans-serif`; g.fillText(l.t, W / 2, y - 8, W - 40); }
+  try { return c.toDataURL("image/png"); } catch { return slipPng(a, ahead, false); } // a logo host without CORS taints the canvas: save the slip without it
+}
+
+function TokenSlipModal({ a, ahead, phone, onClose }: { a: Appointment; ahead: number; phone?: string; onClose: () => void }) {
+  const download = async () => { const l = document.createElement("a"); l.href = await slipPng(a, ahead); l.download = `token-${a.tokenNo}.png`; document.body.appendChild(l); l.click(); l.remove(); };
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Token slip" style={{ background: "#fff", borderRadius: 16, width: 380, maxWidth: "100%", maxHeight: "92vh", overflowY: "auto", padding: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ fontWeight: 900, fontSize: 16, flex: 1 }}>Token {a.tokenNo}</div>
+          <button type="button" aria-label="Close" onClick={onClose} style={{ border: "none", background: "none", cursor: "pointer" }}><X size={18} /></button>
+        </div>
+        <div style={{ width: 240, margin: "0 auto", padding: "14px 12px", border: "1px dashed #c8c8e0", borderRadius: 6, textAlign: "center", background: "#fafafa", color: "#000", fontFamily: "Arial, sans-serif" }}>
+          {slipLogo()
+            // eslint-disable-next-line @next/next/no-img-element -- clinic-chosen logo URL
+            ? <img src={slipLogo()} alt={clinicHeader().name} style={{ maxWidth: "100%", maxHeight: 64, filter: LOGO_FILTER }} />
+            : <div style={{ fontWeight: 800, fontSize: 14 }}>{clinicHeader().name}</div>}
+          <div style={{ fontSize: 11, marginTop: 6 }}>Your token</div>
+          <div style={{ fontSize: 72, fontWeight: 900, lineHeight: 1 }}>{a.tokenNo}</div>
+          <div style={{ fontWeight: 700, fontSize: 13, marginTop: 6 }}>{a.clientName}</div>
+          {a.staffName && <div style={{ fontWeight: 700, fontSize: 12 }}>{a.staffName}</div>}
+          {a.serviceNames.length > 0 && <div style={{ fontSize: 11, marginTop: 2 }}><b>Treatment:</b> {a.serviceNames.join(", ")}</div>}
+          <div style={{ fontSize: 10.5, marginTop: 2 }}>{todayKey()} · {hhmm()}</div>
+          <div style={{ fontWeight: 700, fontSize: 12, marginTop: 2 }}>{ahead > 0 ? `${ahead} ahead of you` : "You are next"}</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
+          <button type="button" onClick={() => printSlip(a, ahead)} style={{ ...BTN, flex: "1 1 120px", justifyContent: "center" }}><Printer size={14} /> Print</button>
+          <button type="button" onClick={download} style={{ ...GHOST, flex: "1 1 120px", justifyContent: "center" }}><Download size={14} /> Download</button>
+          {phone && <a href={whatsAppLink(phone, tokenMessage(a, ahead))} target="_blank" rel="noopener noreferrer" style={{ ...GHOST, flex: "1 1 120px", justifyContent: "center", textDecoration: "none", color: "#16a34a" }}><Send size={14} /> WhatsApp</a>}
+          <button type="button" onClick={onClose} style={{ ...GHOST, flex: "1 1 100%", justifyContent: "center" }}>Close</button>
+        </div>
+      </div>
     </div>
   );
 }
