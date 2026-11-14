@@ -13,6 +13,7 @@ import { getStoredAppointments, getStoredClients, getStoredServices, getStoredSt
 import { applyClientCredits, creditsFromAppointments, newGuestClient } from "@/lib/appointment-credit";
 import { autoWhatsApp, clinicHeader, sendClinicWhatsApp, whatsAppLink } from "@/lib/clinic-wa";
 import { settingsStore } from "@/lib/settings-store";
+import { getSalonInvoices } from "@/lib/salon-invoices";
 import { todayKey, withToken } from "@/lib/clinic-core";
 import { newId } from "@/lib/clinic";
 import type { Appointment, AppointmentStatus, Client, Service, Staff } from "@/lib/types";
@@ -82,7 +83,8 @@ export default function QueuePage() {
     return () => { window.clearInterval(tick); off(); };
   }, []);
 
-  function setStatus(id: string, status: AppointmentStatus) {
+  /** `showSlip` is false when arriving from the new-appointment popup: that lands on this page without the token popup. */
+  function setStatus(id: string, status: AppointmentStatus, showSlip = true) {
     // Read the freshest list so a change made on another screen isn't overwritten.
     let list = getStoredAppointments().map((a) => a.id === id ? { ...a, status } : a);
     if (status === "arrived") list = withToken(list, id);
@@ -91,7 +93,7 @@ export default function QueuePage() {
     if (status === "arrived") {
       announce(list, id);
       const a = list.find((x) => x.id === id);
-      if (a?.tokenNo) setSlip({ a, ahead: list.filter((x) => x.date === a.date && x.status === "arrived" && (x.tokenNo ?? 0) < a.tokenNo!).length });
+      if (a?.tokenNo && showSlip) setSlip({ a, ahead: list.filter((x) => x.date === a.date && x.status === "arrived" && (x.tokenNo ?? 0) < a.tokenNo!).length });
     }
     if (status === "completed") { const a = list.find((x) => x.id === id); if (a) setRxPrompt({ clientId: a.clientId, apptId: a.id, name: a.clientName }); }
   }
@@ -141,7 +143,7 @@ export default function QueuePage() {
     checkedInFromLink.current = true;
     window.history.replaceState(null, "", window.location.pathname);
     const appt = getStoredAppointments().find((a) => a.id === id);
-    if (appt && appt.date === todayKey() && ["booked", "confirmed"].includes(appt.status)) queueMicrotask(() => setStatus(id, "arrived"));
+    if (appt && appt.date === todayKey() && ["booked", "confirmed"].includes(appt.status)) queueMicrotask(() => setStatus(id, "arrived", false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [doc, setDoc] = useState("all");
@@ -220,7 +222,8 @@ export default function QueuePage() {
 
       {rxPrompt && (
         <div style={{ margin: "12px 0 0", padding: "9px 12px", background: "#f0fdf4", borderRadius: 10, fontSize: 13, color: "#166534", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ flex: 1 }}>{rxPrompt.name} is done.</span>
+          <span style={{ flex: 1 }}>{rxPrompt.name} is done. Ready to bill?</span>
+          <a href={`/dashboard/pos?appointmentId=${encodeURIComponent(rxPrompt.apptId)}`} style={{ fontWeight: 800, color: "#fff", background: "#16a34a", padding: "5px 12px", borderRadius: 8, textDecoration: "none" }}>Checkout</a>
           <a href={`/dashboard/clients/${rxPrompt.clientId}?rx=${rxPrompt.apptId}`} style={{ fontWeight: 800, color: "#7C3AED", textDecoration: "none" }}>Write prescription</a>
           <button type="button" aria-label="Dismiss" onClick={() => setRxPrompt(null)} style={{ border: "none", background: "none", cursor: "pointer", color: "#166534", display: "flex" }}><X size={15} /></button>
         </div>
@@ -271,11 +274,18 @@ export default function QueuePage() {
         <div style={{ marginTop: 22 }}>
           <div style={SECTION}>Seen today</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {seen.slice(0, 12).map((a) => (
-              <span key={a.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 20, background: "#f0fdfa", color: "#0f766e", fontSize: 12, fontWeight: 700 }}>
-                {a.tokenNo ? <b>#{a.tokenNo}</b> : null} {a.clientName}
-              </span>
-            ))}
+            {seen.slice(0, 12).map((a) => {
+              // Billed visits show a tick; the rest link straight to the POS with this visit loaded.
+              const billed = getSalonInvoices().some((inv) => inv.appointmentId === a.id);
+              return (
+                <span key={a.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 6px 5px 10px", borderRadius: 20, background: "#f0fdfa", color: "#0f766e", fontSize: 12, fontWeight: 700 }}>
+                  <span>{a.tokenNo ? <b>#{a.tokenNo}</b> : null} {a.clientName}</span>
+                  {billed
+                    ? <span style={{ color: "#16a34a" }}>✓ Billed</span>
+                    : <a href={`/dashboard/pos?appointmentId=${encodeURIComponent(a.id)}`} style={{ background: "#16a34a", color: "#fff", padding: "2px 10px", borderRadius: 14, textDecoration: "none" }}>Checkout</a>}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
