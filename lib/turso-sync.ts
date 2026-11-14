@@ -33,10 +33,31 @@ export const DATA_SYNCED_EVENT = "werzio_data_synced";
  * On app load: pull all data from Turso into the user-scoped localStorage slots.
  * Only runs when a user is logged in (getCurrentUser() returns non-null).
  */
+/** `werzio_<thing>_<ownerId>`, optionally followed by `__location_<id>`: which account a cached key belongs to. */
+const ACCOUNT_KEY = /^werzio_.*_(user_\d+_[a-z0-9]+)(__location_.+)?$/;
+
+/**
+ * A browser used for several accounts keeps every account's cached copy, which
+ * is what fills its storage (invoices, expenses and clients of other salons).
+ * Those copies are only caches of what Turso holds, so drop every account's but
+ * the one signed in; they rebuild on that account's next sign-in.
+ */
+export function pruneOtherAccountCaches(currentOwnerId: string): number {
+  let removed = 0;
+  try {
+    for (const key of Object.keys(localStorage)) {
+      const owner = ACCOUNT_KEY.exec(key)?.[1];
+      if (owner && owner !== currentOwnerId) { localStorage.removeItem(key); removed++; }
+    }
+  } catch { /* storage unavailable: nothing to free */ }
+  return removed;
+}
+
 export async function syncFromDB(): Promise<void> {
   const user = getCurrentUser();
   if (!user) return;
   const dataOwnerId = user.salonOwnerId || user.id;
+  pruneOtherAccountCaches(dataOwnerId);
   const locationId = getActiveLocationFilter();
 
   // Sync core entities (clients, appointments, staff, services, inventory)
