@@ -6,7 +6,7 @@
  * appointment statuses as everywhere else, so billing and reports stay in step.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ListOrdered, LogIn, PhoneCall, Check, UserPlus, Printer, Send, Monitor, X, Download, Clock, Users, Stethoscope, CalendarClock, CircleCheck } from "lucide-react";
 import PageTitle from "@/components/page-title";
 import { getStoredAppointments, getStoredClients, getStoredServices, getStoredStaff, saveAppointments, saveClients, subscribeToStoredData } from "@/lib/storage";
@@ -52,7 +52,7 @@ function printSlip(a: Appointment, ahead: number) {
     .s{font-size:14px;font-weight:700;margin:1mm 0}.m{font-size:11px;margin:1mm 0}
     hr{border:0;border-top:1px dashed #000;margin:3mm 0}
   </style>
-    ${slipLogo() ? `<img src="${esc(slipLogo())}" alt="${esc(clinicHeader().name)}" style="max-width:66mm;max-height:24mm;filter:${LOGO_FILTER}">` : `<h1>${esc(clinicHeader().name)}</h1>`}<hr><div class="l">Your token</div><div class="n">${a.tokenNo}</div><hr>
+    ${slipLogo() ? `<img src="${esc(slipLogo())}" alt="${esc(clinicHeader().name)}" style="max-width:46mm;max-height:15mm;filter:${LOGO_FILTER}">` : `<h1>${esc(clinicHeader().name)}</h1>`}<hr><div class="l">Your token</div><div class="n">${a.tokenNo}</div><hr>
     <div class="s">${esc(a.clientName)}</div>${a.staffName ? `<div class="s">${esc(a.staffName)}</div>` : ""}
     ${a.serviceNames.length ? `<div class="m"><b>Treatment:</b> ${esc(a.serviceNames.join(", "))}</div>` : ""}
     <div class="m">${esc(todayKey())} &middot; ${esc(hhmm())}</div><div class="s">${ahead > 0 ? `${ahead} ahead of you` : "You are next"}</div>
@@ -132,6 +132,17 @@ export default function QueuePage() {
     setSlip({ a: given, ahead: list.filter((x) => x.date === today && x.status === "arrived" && (x.tokenNo ?? 0) < (given.tokenNo ?? 0)).length });
     setWalkIn(false);
   }
+
+  // /dashboard/queue?checkin=<appointmentId> (from the "Appointment Created" popup): check that patient in now.
+  const checkedInFromLink = useRef(false);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("checkin");
+    if (!id || checkedInFromLink.current) return;
+    checkedInFromLink.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    const appt = getStoredAppointments().find((a) => a.id === id);
+    if (appt && appt.date === todayKey() && ["booked", "confirmed"].includes(appt.status)) queueMicrotask(() => setStatus(id, "arrived"));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [doc, setDoc] = useState("all");
   const byToken = (a: Appointment, b: Appointment) => (a.tokenNo ?? 0) - (b.tokenNo ?? 0);
@@ -283,7 +294,7 @@ async function slipPng(a: Appointment, ahead: number, useLogo = true): Promise<s
   if (url) {
     logo = await new Promise<HTMLImageElement | null>((ok) => { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = url; });
   }
-  const logoH = logo ? Math.min(150, Math.round(logo.height * Math.min(460 / logo.width, 150 / logo.height))) : 0;
+  const logoH = logo ? Math.min(90, Math.round(logo.height * Math.min(330 / logo.width, 90 / logo.height))) : 0;
   const lines: { t: string; size: number; bold?: boolean; gap: number }[] = [
     ...(logo ? [] : [{ t: clinicHeader().name, size: 34, bold: true, gap: 50 }]), { t: "Your token", size: 26, gap: 40 }, { t: String(a.tokenNo ?? ""), size: 200, bold: true, gap: 210 },
     { t: a.clientName, size: 32, bold: true, gap: 44 }, ...(a.staffName ? [{ t: a.staffName, size: 30, bold: true, gap: 42 }] : []),
@@ -315,7 +326,7 @@ function TokenSlipModal({ a, ahead, phone, onClose }: { a: Appointment; ahead: n
         <div style={{ width: 240, margin: "0 auto", padding: "14px 12px", border: "1px dashed #c8c8e0", borderRadius: 6, textAlign: "center", background: "#fafafa", color: "#000", fontFamily: "Arial, sans-serif" }}>
           {slipLogo()
             // eslint-disable-next-line @next/next/no-img-element -- clinic-chosen logo URL
-            ? <img src={slipLogo()} alt={clinicHeader().name} style={{ maxWidth: "100%", maxHeight: 64, filter: LOGO_FILTER }} />
+            ? <img src={slipLogo()} alt={clinicHeader().name} style={{ maxWidth: "62%", maxHeight: 40, filter: LOGO_FILTER }} />
             : <div style={{ fontWeight: 800, fontSize: 14 }}>{clinicHeader().name}</div>}
           <div style={{ fontSize: 11, marginTop: 6 }}>Your token</div>
           <div style={{ fontSize: 72, fontWeight: 900, lineHeight: 1 }}>{a.tokenNo}</div>

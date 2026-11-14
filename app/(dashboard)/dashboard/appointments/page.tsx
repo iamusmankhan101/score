@@ -7,7 +7,7 @@ import { getStoredAppointments, saveAppointments, getStoredClients, saveClients,
 import { getSalonInvoices, saveSalonInvoices } from "@/lib/salon-invoices";
 import { recordDeletions } from "@/lib/turso-sync";
 import type { Appointment, AppointmentFeedback, AppointmentStatus, Client, Staff, Service } from "@/lib/types";
-import { Search, Filter, X, Clock, User, Users, Scissors, Tag, ChevronDown, Plus, CalendarDays, CheckCircle2, ArrowRight, ShoppingCart, Camera, Trash2, Upload, Download, FileSpreadsheet, Check, Star, AlertTriangle, MessageSquare } from "lucide-react";
+import { Search, Filter, X, Clock, User, Users, Scissors, Tag, ChevronDown, Plus, CalendarDays, CheckCircle2, ArrowRight, ShoppingCart, Camera, Trash2, Upload, Download, FileSpreadsheet, Check, Star, AlertTriangle, MessageSquare, ListOrdered } from "lucide-react";
 import { enqueueWhatsAppConfirmation, enqueueWhatsAppFollowup, enqueueWhatsAppCancellation, sendGroupBookingAlert, purgeQueuedAppointmentMessages, normalizePhone, resendWhatsAppConfirmation } from "@/lib/whatsapp-scheduler";
 import { awardPoints } from "@/lib/loyalty";
 import { settingsStore } from "@/lib/settings-store";
@@ -1369,6 +1369,12 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
             {createdApptId && (
               <a href={checkoutHref(createdApptId, "booked")} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 10, background: "#7C3AED", color: "#fff", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
                 <ShoppingCart size={14} /> Checkout
+              </a>
+            )}
+            {/* Clinics: the patient is here now, so give them a token and put them in the waiting queue. */}
+            {clinic && createdApptId && !isMultiDay && days[0]?.date === new Date().toLocaleDateString("en-CA") && (
+              <a href={`/dashboard/queue?checkin=${createdApptId}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 10, background: "#fff", border: "1.5px solid #7C3AED", color: "#7C3AED", fontSize: 14, fontWeight: 700, textDecoration: "none" }}>
+                <ListOrdered size={14} /> Add to queue
               </a>
             )}
             <button onClick={onClose} style={{ padding: "10px 32px", borderRadius: 10, background: createdApptId ? "#fff" : "#7C3AED", border: createdApptId ? "1px solid #e0e0ea" : "none", color: createdApptId ? "#4a4a6a" : "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Done</button>
