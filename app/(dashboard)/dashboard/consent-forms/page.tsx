@@ -9,11 +9,13 @@
  */
 
 import { useEffect, useState } from "react";
-import { Check, FileSignature, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Check, Download, FileSignature, Plus, Printer, RotateCcw, Trash2 } from "lucide-react";
 import PageTitle from "@/components/page-title";
 import { saveSettings, settingsStore } from "@/lib/settings-store";
 import { getStoredServices } from "@/lib/storage";
 import { DEFAULT_CONSENT_TEMPLATES, consentTemplates, newId, type ConsentTemplate } from "@/lib/clinic";
+import { downloadClinicPdf, printClinicPdf } from "@/lib/clinic-wa";
+import BlankHeaderToggle from "@/components/clinic/blank-header-toggle";
 import type { Service } from "@/lib/types";
 
 const INP: React.CSSProperties = { width: "100%", padding: "9px 11px", borderRadius: 9, border: "1px solid #e4e4ee", fontSize: 13, color: "#1a1a2e", outline: "none", background: "#fff", boxSizing: "border-box" };
@@ -24,6 +26,7 @@ export default function ConsentFormsPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [printError, setPrintError] = useState("");
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
@@ -71,6 +74,10 @@ export default function ConsentFormsPage() {
           <RotateCcw size={14} /> Restore built-in forms
         </button>
       </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", margin: "0 0 4px" }}>
+        <BlankHeaderToggle />
+        {printError && <span style={{ fontSize: 12.5, color: "#dc2626" }}>{printError}</span>}
+      </div>
 
       {templates.map((t) => {
         const open = openId === t.id;
@@ -117,7 +124,15 @@ export default function ConsentFormsPage() {
                     {services.length === 0 && <span style={{ fontSize: 12, color: "#9898b0" }}>Add treatments first.</span>}
                   </div>
                 </div>
-                <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" onClick={() => { setPrintError(""); printClinicPdf({ kind: "consent-blank", template: { title: t.title, body: t.body } }).catch((e: Error) => setPrintError(e.message)); }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 9, border: "none", background: "#7C3AED", color: "#fff", fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>
+                    <Printer size={13} /> Print blank form
+                  </button>
+                  <button type="button" onClick={() => { setPrintError(""); downloadClinicPdf({ kind: "consent-blank", template: { title: t.title, body: t.body } }, `${t.title} - blank`).catch((e: Error) => setPrintError(e.message)); }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 9, border: "1px solid #e4e4ee", background: "#fff", color: "#6b6b8a", fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>
+                    <Download size={13} /> Download PDF
+                  </button>
                   <button type="button" onClick={() => { if (window.confirm(`Delete "${t.title}"? Already-signed copies are kept.`)) { setTemplates((list) => list.filter((x) => x.id !== t.id)); setDirty(true); } }}
                     style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 9, border: "1px solid #fecaca", background: "#fff", color: "#dc2626", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
                     <Trash2 size={13} /> Delete form

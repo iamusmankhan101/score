@@ -170,6 +170,31 @@ function drawPrescriptionPdf(clinic: ClinicPdfHeader, patientName: string, rx: P
   );
 }
 
+function drawBlankConsentPdf(clinic: ClinicPdfHeader, title: string, body: string): Promise<Buffer> {
+  const line = (label: string) => (
+    <View style={{ marginTop: 22 }} wrap={false}>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: "#111111", height: 22 }} />
+      <Text style={s.meta}>{label}</Text>
+    </View>
+  );
+  return renderToBuffer(
+    <Document title={title}>
+      <Page size="A4" style={s.page}>
+        <Header clinic={clinic} />
+        <Text style={s.title}>{title}</Text>
+        <Text style={s.body}>{body}</Text>
+        <View style={s.sigBox} wrap={false}>
+          {line("Patient name")}
+          {line("Patient signature")}
+          {line("Date")}
+          {line("Witness (name and signature)")}
+        </View>
+        <Text style={s.footer} fixed>Please read this form carefully before signing.</Text>
+      </Page>
+    </Document>,
+  );
+}
+
 /**
  * The server fetches the logo itself, so only addresses we trust are accepted
  * (an inline image, our own site, or the image host); anything else is ignored
@@ -194,3 +219,5 @@ async function withLogoFallback(clinic: ClinicPdfHeader, draw: (c: ClinicPdfHead
 
 export const renderConsentPdf = (clinic: ClinicPdfHeader, c: ConsentRecord) => withLogoFallback(clinic, (h) => drawConsentPdf(h, c));
 export const renderPrescriptionPdf = (clinic: ClinicPdfHeader, patientName: string, rx: Prescription) => withLogoFallback(clinic, (h) => drawPrescriptionPdf(h, patientName, rx));
+
+export const renderBlankConsentPdf = (clinic: ClinicPdfHeader, title: string, body: string) => withLogoFallback(clinic, (h) => drawBlankConsentPdf(h, title, body));

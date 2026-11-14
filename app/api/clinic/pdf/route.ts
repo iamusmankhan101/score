@@ -6,7 +6,7 @@
 
 import { NextRequest } from "next/server";
 import { resolveActor } from "@/lib/api-auth";
-import { renderConsentPdf, renderPrescriptionPdf, trustedLogo, type ClinicPdfHeader } from "@/lib/clinic-pdf";
+import { renderBlankConsentPdf, renderConsentPdf, renderPrescriptionPdf, trustedLogo, type ClinicPdfHeader } from "@/lib/clinic-pdf";
 import type { ConsentRecord, Prescription } from "@/lib/clinic";
 
 export async function POST(req: NextRequest) {
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   if (!actor) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => null) as {
-    kind?: "consent" | "prescription"; clinic?: ClinicPdfHeader; patientName?: string; consent?: ConsentRecord; prescription?: Prescription;
+    kind?: "consent" | "consent-blank" | "prescription"; template?: { title?: string; body?: string }; clinic?: ClinicPdfHeader; patientName?: string; consent?: ConsentRecord; prescription?: Prescription;
   } | null;
   if (!body?.clinic?.name) return Response.json({ ok: false, error: "Missing clinic details." }, { status: 400 });
 
@@ -25,6 +25,9 @@ export async function POST(req: NextRequest) {
     if (body.kind === "consent" && body.consent?.signature?.startsWith("data:image/png;base64,")) {
       pdf = await renderConsentPdf(body.clinic, body.consent);
       filename = `${body.consent.title} - ${body.consent.signedName}`;
+    } else if (body.kind === "consent-blank" && body.template?.title && body.template.body && body.template.body.length < 30_000) {
+      pdf = await renderBlankConsentPdf(body.clinic, body.template.title.slice(0, 200), body.template.body);
+      filename = `${body.template.title.slice(0, 120)} - blank`;
     } else if (body.kind === "prescription" && Array.isArray(body.prescription?.items)) {
       pdf = await renderPrescriptionPdf(body.clinic, body.patientName || "Patient", body.prescription!);
       filename = `Prescription - ${body.patientName || "patient"} - ${body.prescription!.date}`;

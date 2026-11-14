@@ -38,3 +38,31 @@ export function blankHeaderOn(): boolean {
 export function setBlankHeader(on: boolean): void {
   try { localStorage.setItem(BLANK_HEADER_KEY, on ? "on" : "off"); } catch { /* choice isn't remembered */ }
 }
+
+/** Asks the server for a PDF (app/api/clinic/pdf) and saves it. */
+export async function downloadClinicPdf(payload: Record<string, unknown>, filename: string) {
+  const res = await fetch("/api/clinic/pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clinic: { ...clinicHeader(), blankHeader: blankHeaderOn() }, ...payload }) });
+  if (!res.ok) throw new Error("Couldn't create the PDF.");
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url; a.download = `${filename.replace(/[^\w .-]/g, "")}.pdf`;
+  document.body.appendChild(a); a.click(); a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+
+/** Opens the same letterhead PDF in the browser's print dialog (falls back to a new tab if the browser won't print it directly). */
+export async function printClinicPdf(payload: Record<string, unknown>) {
+  const res = await fetch("/api/clinic/pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clinic: { ...clinicHeader(), blankHeader: blankHeaderOn() }, ...payload }) });
+  if (!res.ok) throw new Error("Couldn't create the PDF.");
+  const url = URL.createObjectURL(await res.blob());
+  const frame = document.createElement("iframe");
+  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  frame.onload = () => {
+    try { frame.contentWindow?.focus(); frame.contentWindow?.print(); } catch { window.open(url, "_blank"); }
+  };
+  frame.src = url;
+  document.body.appendChild(frame);
+  window.setTimeout(() => { frame.remove(); URL.revokeObjectURL(url); }, 120_000);
+}
+
