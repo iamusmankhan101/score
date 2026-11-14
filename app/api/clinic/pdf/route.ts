@@ -6,7 +6,7 @@
 
 import { NextRequest } from "next/server";
 import { resolveActor } from "@/lib/api-auth";
-import { renderConsentPdf, renderPrescriptionPdf, type ClinicPdfHeader } from "@/lib/clinic-pdf";
+import { renderConsentPdf, renderPrescriptionPdf, trustedLogo, type ClinicPdfHeader } from "@/lib/clinic-pdf";
 import type { ConsentRecord, Prescription } from "@/lib/clinic";
 
 export async function POST(req: NextRequest) {
@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
   } | null;
   if (!body?.clinic?.name) return Response.json({ ok: false, error: "Missing clinic details." }, { status: 400 });
 
+  body.clinic.logo = trustedLogo(body.clinic.logo, req.nextUrl.origin);
   try {
     let pdf: Buffer;
     let filename: string;

@@ -18,7 +18,7 @@ import { loadWhatsAppConfig } from "@/lib/whatsapp-config-server";
 import { activeWhatsAppCredential, sendWhatsAppMessage, ycloudConfigOf, type WhatsAppProviderConfig } from "@/lib/whatsapp-provider";
 import { sendWhatsAppDocument } from "@/lib/whatsapp-invoice-send";
 import { checkWhatsAppSafety, recordWhatsAppSafetySend, type WhatsAppSafetyConfig } from "@/lib/whatsapp-safety";
-import { renderConsentPdf, renderPrescriptionPdf, type ClinicPdfHeader } from "@/lib/clinic-pdf";
+import { renderConsentPdf, renderPrescriptionPdf, trustedLogo, type ClinicPdfHeader } from "@/lib/clinic-pdf";
 import { prescriptionText, type Prescription } from "@/lib/clinic-prescription";
 import type { ConsentRecord } from "@/lib/clinic";
 
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
   const check = checkWhatsAppSafety({ phone, intent: "utility", config: safety });
   if (!check.ok) return Response.json({ ok: false, error: check.error, retryAfter: check.retryAfter }, { status: check.status });
 
-  const clinic: ClinicPdfHeader = { name: body.clinic?.name || billing.salonName || "Clinic", phone: body.clinic?.phone, address: body.clinic?.address };
+  const clinic: ClinicPdfHeader = { name: body.clinic?.name || billing.salonName || "Clinic", phone: body.clinic?.phone, address: body.clinic?.address, logo: trustedLogo(body.clinic?.logo, req.nextUrl.origin) };
 
   try {
     let ok = false;

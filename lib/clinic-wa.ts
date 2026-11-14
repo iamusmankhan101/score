@@ -5,8 +5,11 @@ import { settingsStore } from "@/lib/settings-store";
 import { normalizePhone, whatsAppConnected } from "@/lib/whatsapp-scheduler";
 
 export function clinicHeader() {
-  const salon = settingsStore.salon as { name?: string; phone?: string; address?: string };
-  return { name: salon.name || "Clinic", phone: salon.phone, address: salon.address };
+  const salon = settingsStore.salon as { name?: string; phone?: string; address?: string; logo?: string };
+  // Absolute, because the PDF is drawn on the server, which can't resolve a path like "/logo.png".
+  let logo: string | undefined;
+  try { logo = salon.logo ? new URL(salon.logo, window.location.href).href : undefined; } catch { /* no usable logo */ }
+  return { name: salon.name || "Clinic", phone: salon.phone, address: salon.address, logo };
 }
 
 /**
