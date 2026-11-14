@@ -1372,7 +1372,7 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
               </a>
             )}
             {/* Clinics: the patient is here now, so give them a token and put them in the waiting queue. */}
-            {clinic && createdApptId && !isMultiDay && days[0]?.date === new Date().toLocaleDateString("en-CA") && (
+            {clinic && createdApptId && !isMultiDay && (
               <a href={`/dashboard/queue?checkin=${createdApptId}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 10, background: "#fff", border: "1.5px solid #7C3AED", color: "#7C3AED", fontSize: 14, fontWeight: 700, textDecoration: "none" }}>
                 <ListOrdered size={14} /> Add to queue
               </a>

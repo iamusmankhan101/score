@@ -153,7 +153,8 @@ export default function QueuePage() {
     checkedInFromLink.current = true;
     window.history.replaceState(null, "", window.location.pathname);
     const appt = getStoredAppointments().find((a) => a.id === id);
-    if (appt && appt.date === todayKey() && ["booked", "confirmed"].includes(appt.status)) queueMicrotask(() => setStatus(id, "arrived", false));
+    if (appt && appt.date !== todayKey()) window.alert(`This appointment is on ${appt.date}. A patient can only be added to the queue on the day of the appointment.`);
+    else if (appt && ["booked", "confirmed"].includes(appt.status)) queueMicrotask(() => setStatus(id, "arrived", false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [doc, setDoc] = useState("all");
