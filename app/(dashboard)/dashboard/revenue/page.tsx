@@ -138,7 +138,6 @@ export default function RevenuePage() {
   const [period, setPeriod]             = useState<Period>("today");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [posInvoices, setPosInvoices]   = useState<ReturnType<typeof getSalonInvoices>>([]);
-  const [posInvoiceAppointmentIds, setPosInvoiceAppointmentIds] = useState<string[]>([]);
   const [outstandingInvoices, setOutstandingInvoices] = useState<ReturnType<typeof getSalonInvoices>>([]);
   const [manualIncome, setManualIncome] = useState<ManualCashIncome[]>([]);
   const [expenses, setExpenses]         = useState<Expense[]>([]);
@@ -170,7 +169,6 @@ export default function RevenuePage() {
       const allPosInvoices = getSalonInvoices()
         .filter(inv => !inv.source || inv.source === "pos")
         .filter(inv => !revenueScoped || inv.section === activeSection);
-      setPosInvoiceAppointmentIds(allPosInvoices.map(inv => inv.appointmentId).filter((id): id is string => !!id));
       setPosInvoices(allPosInvoices.filter(inv => inv.status === "paid"));
       setOutstandingInvoices(allPosInvoices.filter(inv => inv.status !== "paid"));
       // Cash Flow's "Import" feature records income (e.g. bulk-uploaded past
@@ -216,9 +214,11 @@ export default function RevenuePage() {
     return toDateStr(d);
   }, [period, today]);
 
+  // Revenue counts billed invoices only. Every appointment is treated as already covered by an invoice,
+  // so a visit marked completed but not yet billed stays out of every total, chart and ledger below.
   const posLinkedAppointmentIds = useMemo(() =>
-    new Set(posInvoiceAppointmentIds),
-    [posInvoiceAppointmentIds]);
+    new Set(appointments.map(a => a.id)),
+    [appointments]);
 
   const currentAppts = useMemo(() =>
     appointments.filter(a => a.status === "completed" && !posLinkedAppointmentIds.has(a.id) && a.date >= rangeStart && a.date <= filterEnd),

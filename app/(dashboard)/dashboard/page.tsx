@@ -11,6 +11,7 @@ import DashboardHeader from "@/components/dashboard-header";
 import MobilePageHeader from "@/components/mobile-page-header";
 import { MoreHorizontal, TrendingUp, Calendar, Users, Award, Clock, ArrowUpRight, Tag, Star } from "lucide-react";
 import { fmtCurrency as fmt } from "@/lib/format";
+import { useIsClinic } from "@/lib/clinic";
 import { syncFromDB } from "@/lib/turso-sync";
 import { getActiveSection, inSection } from "@/lib/sections";
 
@@ -99,12 +100,14 @@ function Card({ title, subtitle, icon: Icon, children }: { title: string; subtit
 }
 
 export default function DashboardPage() {
+  // Revenue (month, trend, average ticket) counts billed invoices only: a visit marked completed but not yet billed is not revenue.
+  // `clinic` only changes wording and the Top Patients ranking.
+  const clinic = useIsClinic();
   const router = useRouter();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [posInvoices, setPosInvoices] = useState<SalonInvoice[]>([]);
-  const [posInvoiceAppointmentIds, setPosInvoiceAppointmentIds] = useState<string[]>([]);
   const [today] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [month, setMonth] = useState(() => new Date().toLocaleDateString("en-CA").slice(0, 7));
 
@@ -115,11 +118,8 @@ export default function DashboardPage() {
       setAppointments(getStoredAppointments());
       setClients(getStoredClients());
       setStaffList(getStoredStaff());
-      // Revenue is only recognized once an invoice is actually paid. Keep every
-      // POS-linked appointment id separately, including unpaid invoices, so
-      // unpaid/credit invoices do not leak in through completed appointments.
+      // Revenue is only recognized once an invoice is actually paid (or an advance taken).
       const allPosInvoices = getSalonInvoices().filter(inv => !inv.source || inv.source === "pos");
-      setPosInvoiceAppointmentIds(allPosInvoices.map(inv => inv.appointmentId).filter((id): id is string => !!id));
       // "partial" joins "paid" here: an advance is money actually collected, so
       // it belongs in revenue — but only the advance itself, which is what
       // revenueAmount() returns for that status.
@@ -139,20 +139,10 @@ export default function DashboardPage() {
   const clientsScoped = clients.filter((c) => inSection(c, activeSection));
 
   const revenueScoped = activeSection !== "all";
-  const appointmentsForRevenue = revenueScoped ? appointments.filter((a) => a.section === activeSection) : appointments;
   const posInvoicesForRevenue = revenueScoped ? posInvoices.filter((inv) => inv.section === activeSection) : posInvoices;
-  const todayApptsForRevenue = revenueScoped ? todayAppts.filter((a) => a.section === activeSection) : todayAppts;
 
-  const posLinkedAppointmentIds = useMemo(() =>
-    new Set(posInvoiceAppointmentIds),
-    [posInvoiceAppointmentIds]);
   const revenueLast7Days = useMemo(() => {
     const totals = new Map<string, number>();
-    appointmentsForRevenue.forEach((appointment) => {
-      if (appointment.status === "completed" && !posLinkedAppointmentIds.has(appointment.id)) {
-        totals.set(appointment.date, (totals.get(appointment.date) ?? 0) + appointment.totalAmount);
-      }
-    });
     posInvoicesForRevenue.forEach((invoice) => {
       // A credit invoice paid off later counts toward the day it was actually
       // paid, not the day it was originally issued.
@@ -167,13 +157,10 @@ export default function DashboardPage() {
       const dateKey = date.toLocaleDateString("en-CA");
       return { date: dateKey, total: totals.get(dateKey) ?? 0 };
     });
-  }, [appointmentsForRevenue, posLinkedAppointmentIds, posInvoicesForRevenue, today]);
+  }, [posInvoicesForRevenue, today]);
 
   const sumMonth = (m: string) => {
     let t = 0;
-    appointmentsForRevenue.forEach((a) => {
-      if (a.status === "completed" && !posLinkedAppointmentIds.has(a.id) && a.date.startsWith(m)) t += a.totalAmount;
-    });
     posInvoicesForRevenue.forEach((inv) => {
       if ((inv.paidDate || inv.date).startsWith(m)) t += revenueAmount(inv);
     });
@@ -186,11 +173,14 @@ export default function DashboardPage() {
   const axisMax = maxRevenue > 0 ? Math.ceil((maxRevenue * 1.2) / 1000) * 1000 : 60000;
   const yAxisLabels = [axisMax, axisMax * 0.75, axisMax * 0.5, axisMax * 0.25, 0]
     .map((value) => value >= 1000 ? `${Number((value / 1000).toFixed(1))}K` : String(Math.round(value)));
-  const topClients = [...clientsScoped].sort((a, b) => b.totalSpend - a.totalSpend).slice(0, 5);
-  const todayCompletedAppts = todayApptsForRevenue.filter((appointment) => appointment.status === "completed" && !posLinkedAppointmentIds.has(appointment.id));
-  const todayPosInvoices = posInvoicesForRevenue.filter((invoice) => (invoice.paidDate || invoice.date) === today);
-  const todayTotal = todayCompletedAppts.reduce((s, a) => s + a.totalAmount, 0) + todayPosInvoices.reduce((s, invoice) => s + revenueAmount(invoice), 0);
-  const todayTransactionCount = todayCompletedAppts.length + todayPosInvoices.length;
+  // A client's totalSpend is credited when a visit is booked. For clinics, rank by what has actually been billed.
+  const billedSpend = new Map<string, number>();
+  if (clinic) posInvoices.forEach((inv) => { if (inv.clientId) billedSpend.set(inv.clientId, (billedSpend.get(inv.clientId) ?? 0) + revenueAmount(inv)); });
+  const spendOf = (c: { id: string; totalSpend: number }) => clinic ? (billedSpend.get(c.id) ?? 0) : c.totalSpend;
+  const topClients = [...clientsScoped].sort((a, b) => spendOf(b) - spendOf(a)).slice(0, 5);
+    const todayPosInvoices = posInvoicesForRevenue.filter((invoice) => (invoice.paidDate || invoice.date) === today);
+  const todayTotal = todayPosInvoices.reduce((s, invoice) => s + revenueAmount(invoice), 0);
+  const todayTransactionCount = todayPosInvoices.length;
   const avgTicket = todayTransactionCount > 0 ? todayTotal / todayTransactionCount : 0;
   const activeStaffCount = staffListScoped.length;
   const scopedTodayTotal = todayApptsScoped.reduce((s, a) => s + a.totalAmount, 0);
@@ -314,7 +304,7 @@ export default function DashboardPage() {
             <Users size={80} />
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#a0a0b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Stylists Today</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#a0a0b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{clinic ? "Doctors Today" : "Stylists Today"}</div>
             <div style={{ fontSize: 22, fontWeight: 900, color: "#1a1a2e", marginTop: 6 }}>{activeStaffCount}</div>
             <div style={{ fontSize: 11, color: "#059669", fontWeight: 600, marginTop: 4 }}>
               All systems active
@@ -443,7 +433,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Card 2: Staff Status */}
-        <Card title="Staff Status" subtitle="Active stylists today" icon={Users}>
+        <Card title={clinic ? "Doctor Status" : "Staff Status"} subtitle={clinic ? "Active doctors today" : "Active stylists today"} icon={Users}>
           {staffListScoped.length === 0 ? (
             <div style={{ padding: "40px 20px", textAlign: "center", color: "#a0a0b8", fontSize: 12 }}>
               No staff members registered.
@@ -502,17 +492,17 @@ export default function DashboardPage() {
         </Card>
 
         {/* Card 3: Top Clients */}
-        <Card title="Top Clients" subtitle="By lifetime spend" icon={Star}>
+        <Card title={clinic ? "Top Patients" : "Top Clients"} subtitle={clinic ? "By billed spend" : "By lifetime spend"} icon={Star}>
           {topClients.length === 0 ? (
             <div style={{ padding: "40px 20px", textAlign: "center", color: "#a0a0b8", fontSize: 12 }}>
               No client history yet.
             </div>
           ) : (
             (() => {
-              const maxSpend = topClients[0]?.totalSpend || 1;
+              const maxSpend = spendOf(topClients[0]) || 1;
               return topClients.map((client) => {
-                const pct = (client.totalSpend / maxSpend) * 100;
-                const tag = client.tags[0] || "Client";
+                const pct = (spendOf(client) / maxSpend) * 100;
+                const tag = client.tags[0] || (clinic ? "Patient" : "Client");
                 return (
                   <div
                     key={client.id}
@@ -531,7 +521,7 @@ export default function DashboardPage() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                           <span style={{ fontWeight: 700, fontSize: 13, color: "#1a1a2e" }}>{client.name}</span>
-                          <span style={{ fontSize: 12, fontWeight: 800, color: "var(--accent)" }}>{fmt(client.totalSpend)}</span>
+                          <span style={{ fontSize: 12, fontWeight: 800, color: "var(--accent)" }}>{fmt(spendOf(client))}</span>
                         </div>
                         {/* Progress bar and tag */}
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
@@ -678,7 +668,7 @@ export default function DashboardPage() {
                 </div>
                 {maxRevenue === 0 && (
                   <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#a0a0b8", fontSize: 12, textAlign: "center", padding: 20 }}>
-                    Complete an appointment to see revenue here.
+                    Bill a visit to see revenue here.
                   </div>
                 )}
               </div>
