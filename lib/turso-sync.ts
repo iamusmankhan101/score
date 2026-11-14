@@ -180,10 +180,10 @@ export async function syncFromDB(): Promise<void> {
         // this check, a just-saved edit (salon name, logo, etc.) gets silently
         // overwritten by the stale row this GET just fetched, which is exactly
         // what "settings revert after refresh" looks like from the outside.
-        const localSavedAt = localStorage.getItem(userKey("werzio_settings_saved_at"));
+        const localSavedAt = cacheGet(userKey("werzio_settings_saved_at"));
         const localIsNewer = !!localSavedAt && !!updatedAt && localSavedAt > updatedAt;
         if (!localIsNewer) {
-          localStorage.setItem(userKey("werzio_settings"), JSON.stringify(data));
+          cacheSet(userKey("werzio_settings"), JSON.stringify(data));
         }
       }
     }

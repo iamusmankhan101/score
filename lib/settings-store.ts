@@ -3,6 +3,7 @@
 import { activeCredential, isProviderField } from "./whatsapp-credentials";
 import { userKey, getCurrentUser } from "./auth";
 import { saveSettingsToDB } from "./turso-sync";
+import { cacheGet, cacheSet } from "./sync-records";
 
 const STORAGE_KEY = "werzio_settings";
 const SAVED_AT_KEY = "werzio_settings_saved_at";
@@ -217,7 +218,7 @@ const defaults = {
 function load() {
   if (typeof window === "undefined") return structuredClone(defaults);
   try {
-    const raw = localStorage.getItem(userKey(STORAGE_KEY));
+    const raw = cacheGet(userKey(STORAGE_KEY));
     const user = getCurrentUser();
     const dynamicDefaults = structuredClone(defaults);
     if (user) {
@@ -293,12 +294,13 @@ function load() {
 
 function persist() {
   if (typeof window === "undefined") return;
-  localStorage.setItem(userKey(STORAGE_KEY), JSON.stringify(settingsStore));
+  // cacheSet never throws: with the browser's storage full the save still reaches Turso (see saveSettings).
+  cacheSet(userKey(STORAGE_KEY), JSON.stringify(settingsStore));
   // Stamped so syncFromDB() can tell a locally-saved edit apart from stale
   // server data — see the settings block in lib/turso-sync.ts for why this
   // matters (the DB push below is fire-and-forget and can still be in flight,
   // or can fail silently, when the next page load's sync runs).
-  localStorage.setItem(userKey(SAVED_AT_KEY), new Date().toISOString());
+  cacheSet(userKey(SAVED_AT_KEY), new Date().toISOString());
 }
 
 export const settingsStore = load();

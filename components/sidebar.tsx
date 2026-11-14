@@ -8,7 +8,7 @@ import {
   UserCog, BarChart3, Package, Globe, Sparkles, CreditCard, Scissors,
   CircleUserRound, Languages, LogOut, Shield, Wand2, ReceiptText, ShoppingCart,
   X, Gift, Banknote, ListOrdered, ChevronRight, ChevronDown, MapPin, Check, Wallet, Star,
-  ClipboardCheck, Store, Landmark, Archive, Smartphone, FileText, FileSignature, Megaphone, DoorOpen, HeartPulse, Hourglass,
+  ClipboardCheck, Store, Landmark, Archive, Smartphone, FileText, FileSignature, Megaphone, DoorOpen, HeartPulse,
 } from "lucide-react";
 import { businessTypeOf, term, useIsClinic } from "@/lib/clinic";
 import { AuthUser, getCurrentUser, signOut } from "@/lib/auth";
@@ -117,7 +117,6 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
       ...(clinic && group.label === "Business" ? [{ href: "/dashboard/clinic-reports", icon: BarChart3, label: "Clinic Reports" }, { href: "/dashboard/cash-closing", icon: Banknote, label: "Cash Closing" }, { href: "/dashboard/rooms", icon: DoorOpen, label: "Rooms & Machines" }] : []),
       ...(clinic && group.label === "Marketing" ? [{ href: "/dashboard/leads", icon: Megaphone, label: "Leads" }, { href: "/dashboard/aftercare", icon: HeartPulse, label: "Aftercare" }] : []),
       ...(clinic && group.label === "Overview" ? [{ href: "/dashboard/queue", icon: ListOrdered, label: "Queue" }] : []),
-      ...(group.label === "Overview" ? [{ href: "/dashboard/waitlist", icon: Hourglass, label: "Waiting List" }] : []),
     ],
   }));
   const [multiLocationEnabled, setMultiLocationEnabled] = useState(false);
