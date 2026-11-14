@@ -9,7 +9,7 @@ import type { AppointmentStatus, Appointment, Client, Staff } from "@/lib/types"
 import type { SalonInvoice } from "@/lib/salon-invoices";
 import DashboardHeader from "@/components/dashboard-header";
 import MobilePageHeader from "@/components/mobile-page-header";
-import { MoreHorizontal, TrendingUp, Calendar, Users, Award, Clock, ArrowUpRight, Tag, Star } from "lucide-react";
+import { MoreHorizontal, TrendingUp, Calendar, Users, Award, Clock, ArrowUpRight, Tag, Star, Wallet } from "lucide-react";
 import { fmtCurrency as fmt } from "@/lib/format";
 import { useIsClinic } from "@/lib/clinic";
 import { syncFromDB } from "@/lib/turso-sync";
@@ -193,8 +193,22 @@ export default function DashboardPage() {
       <MobilePageHeader title="Dashboard" subtitle="Salon Overview" />
 
       {/* Stats Row */}
-      <div className="stats-grid-4 dash-stats" style={{ marginBottom: 4 }}>
-        {/* Stat 1: Today's Revenue */}
+      <div className="stats-grid-4 dash-stats" style={{ marginBottom: 4, gridTemplateColumns: "repeat(5, 1fr)" }}>
+        {/* Stat 0: Today's revenue — billed only (paid invoices and advances taken today) */}
+        <div style={{ background: "#fff", borderRadius: 18, border: "1px solid rgba(226,223,235,.95)", boxShadow: "0 8px 28px rgba(38,25,75,.04)", padding: 20, display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", overflow: "hidden" }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#a0a0b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Today&apos;s Revenue</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#1a1a2e", marginTop: 6 }}>{fmt(todayTotal)}</div>
+            <div style={{ fontSize: 11, color: "#059669", fontWeight: 600, marginTop: 4 }}>
+              {todayPosInvoices.length === 0 ? "Nothing billed yet" : `${todayPosInvoices.length} bill${todayPosInvoices.length === 1 ? "" : "s"} today`}{revenueScoped ? ` · ${activeSection}` : ""}
+            </div>
+          </div>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(5, 150, 105, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "#059669" }}>
+            <Wallet size={20} />
+          </div>
+        </div>
+
+        {/* Stat 1: This month's revenue */}
         <div style={{
           background: "#fff",
           borderRadius: 18,

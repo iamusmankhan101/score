@@ -291,6 +291,8 @@ export default function BillingPage() {
       : isLifetimeTerm(billingTermMonths)
         ? `PKR ${displayPrice.toLocaleString("en-PK")} · lifetime access · one-time payment`
         : `PKR ${displayPrice.toLocaleString("en-PK")} for ${billingTermText} · billed every ${billingTermText}`;
+  // A lifetime deal is paid once and never renews: no plan switching, no comparison, just that one payment.
+  const isLifetime = planLoaded && isLifetimeTerm(billingTermMonths);
   const upgradePlan = showModal ? PLAN_CONFIGS[showModal] : null;
   const latestInvoice = invoices[0];
 
@@ -526,6 +528,8 @@ export default function BillingPage() {
         </div>
       )}
 
+      {!isLifetime && (
+      <>
       {/* Mobile plan cards — horizontal swipeable carousel */}
       <div className="mobile-only">
         <div className="mobile-section-header">Choose Your Plan</div>
@@ -575,6 +579,9 @@ export default function BillingPage() {
           </div>
         </div>
       </div>
+
+      </>
+      )}
 
       {/* Mobile invoice history */}
       {invoices.length > 0 && (
@@ -663,6 +670,8 @@ export default function BillingPage() {
           </div>
         )}
 
+        {!isLifetime && (
+        <>
         {/* Pricing plans */}
         <div>
           <div style={{ fontWeight: 800, fontSize: 17, color: "#1a1a2e", marginBottom: 6 }}>Choose Your Plan</div>
@@ -712,12 +721,15 @@ export default function BillingPage() {
           </div>
         </div>
 
+        </>
+        )}
+
         {/* Invoice history */}
         {invoices.length > 0 && (
           <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #ebebf0", overflow: "hidden" }}>
             <div style={{ padding: "18px 24px 14px", borderBottom: "1px solid #f0f0f8", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ fontWeight: 800, fontSize: 15, color: "#1a1a2e" }}>Invoice History</div>
-              <div style={{ fontSize: 12, color: "#9898b0" }}>Generated every {billingTermText}</div>
+              <div style={{ fontSize: 12, color: "#9898b0" }}>{isLifetime ? "One-time payment" : `Generated every ${billingTermText}`}</div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 110px 100px 48px", padding: "10px 24px", borderBottom: "1px solid #f0f0f8", background: "#fafafa" }}>
               {["INVOICE", "ISSUED", "DUE DATE", "AMOUNT", "STATUS", ""].map(h => (

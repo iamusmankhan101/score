@@ -582,7 +582,7 @@ function InvoicesModal({ row, onClose, onMarkedPaid }: { row: BillingUserRow; on
   function loadInvoices() {
     setLoading(true);
     setError(null);
-    fetch(`/api/billing/invoices?userId=${encodeURIComponent(row.id)}`)
+    fetch(`/api/billing/invoices?userId=${encodeURIComponent(row.id)}&all=1`)
       .then((res) => res.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error || "Failed to load invoices");

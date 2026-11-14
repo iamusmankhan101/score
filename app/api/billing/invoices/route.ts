@@ -19,6 +19,8 @@ export async function GET(req: NextRequest) {
   }
   const requested = req.nextUrl.searchParams.get("userId");
   const userId = actor.role === "admin" && requested ? requested : actor.userId;
+  // Admins can ask for a lifetime account's full history (?all=1); the salon itself only sees its lifetime invoice.
+  const showAll = actor.role === "admin" && req.nextUrl.searchParams.get("all") === "1";
 
   try {
     await ensureBillingTables();
@@ -71,7 +73,8 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return Response.json({ ok: true, invoices });
+    // A lifetime deal has one invoice and never renews: show only that (the newest), not earlier subscription invoices.
+    return Response.json({ ok: true, invoices: isLifetimeTerm(user.billingTermMonths) && !showAll ? invoices.slice(0, 1) : invoices });
   } catch (err) {
     console.error("[billing/invoices] Error fetching invoices:", err);
     return Response.json({ ok: false, error: "Failed to fetch invoices." }, { status: 500 });
