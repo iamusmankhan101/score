@@ -84,7 +84,7 @@ const rxStyles = StyleSheet.create({
   cell: { width: "50%", marginBottom: 8 },
   cellLabel: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: "#6b7a72", textTransform: "uppercase", letterSpacing: 0.6 },
   cellValue: { fontSize: 11, fontFamily: "Helvetica-Bold", marginTop: 2 },
-  rxMark: { fontSize: 26, lineHeight: 1.2, fontFamily: "Helvetica-BoldOblique", color: "#1f3d2b", marginTop: 14, marginBottom: 10 },
+  rxMark: { fontSize: 13, fontFamily: "Helvetica-Bold", color: "#1f3d2b", textTransform: "uppercase", letterSpacing: 0.8, marginTop: 16, marginBottom: 8 },
   thead: { flexDirection: "row", backgroundColor: "#1f3d2b", paddingVertical: 6, paddingHorizontal: 8, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
   th: { color: "#ffffff", fontSize: 8, fontFamily: "Helvetica-Bold", textTransform: "uppercase", letterSpacing: 0.4 },
   tr: { flexDirection: "row", paddingVertical: 7, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: "#e5e9e7" },
@@ -127,7 +127,7 @@ function drawPrescriptionPdf(clinic: ClinicPdfHeader, patientName: string, rx: P
           {col("Prescribed by", rx.practitionerName)}
         </View>
 
-        <Text style={rxStyles.rxMark}>Rx</Text>
+        <Text style={rxStyles.rxMark}>Medicines</Text>
         <View style={rxStyles.thead} fixed>
           <Text style={[rxStyles.th, rxStyles.cNo]}>#</Text>
           <Text style={[rxStyles.th, rxStyles.cMed]}>Medicine / product</Text>

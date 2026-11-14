@@ -40,7 +40,7 @@ import { getActiveLocationFilter } from "@/lib/locations";
 import { WaitlistOffer, waitlistMatches } from "@/components/waitlist-offer";
 import { canAccessHref } from "@/components/sidebar";
 import { getCurrentUser } from "@/lib/auth";
-import { useIsClinic, type WaitlistEntry } from "@/lib/clinic";
+import { term, useIsClinic, type WaitlistEntry } from "@/lib/clinic";
 import { newClientId } from "@/lib/ids";
 
 function fmtDate(s: string) {
@@ -686,7 +686,7 @@ function DetailModal({ appt, onClose, clients, staffList, allServices, onStatusC
         <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
 
           {/* Info rows */}
-          <InfoRow icon={<User size={14} color="#9898b0" />} label={teamStaff.length >= 2 ? "Stylist Team" : bookedStaff.length >= 2 ? "Stylists" : "Stylist"}>
+          <InfoRow icon={<User size={14} color="#9898b0" />} label={term(teamStaff.length >= 2 ? "Stylist Team" : bookedStaff.length >= 2 ? "Stylists" : "Stylist", clinic)}>
             {teamStaff.length >= 2 ? (
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
                 {teamStaff.map((s) => (
@@ -714,7 +714,7 @@ function DetailModal({ appt, onClose, clients, staffList, allServices, onStatusC
             )}
           </InfoRow>
 
-          <InfoRow icon={<Scissors size={14} color="#9898b0" />} label="Services">
+          <InfoRow icon={<Scissors size={14} color="#9898b0" />} label={term("Services", clinic)}>
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               {services.length > 0 ? (() => {
                 // Split appt.totalAmount (the actual amount charged at booking
@@ -1008,6 +1008,7 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
   const [createdApptId, setCreatedApptId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [resourceError, setResourceError] = useState("");
+  const clinic = useIsClinic();
   // Recurring: repeat a single-day booking every N days, `repeatCount` more times.
   const [repeatEvery, setRepeatEvery] = useState(0);
   const [repeatCount, setRepeatCount] = useState(4);
@@ -1400,7 +1401,7 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
         {/* Form */}
         <div style={{ padding: "22px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
 
-          <FormField label="Client">
+          <FormField label={term("Client", clinic)}>
             {!newClient ? (
               <div style={{ display: "flex", gap: 8 }}>
                 <div ref={clientBoxRef} style={{ position: "relative", flex: 1 }}>
@@ -1419,7 +1420,7 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
                       else if (form.clientId) set("clientId", "");
                     }}
                     onFocus={() => setClientDropdownOpen(true)}
-                    placeholder="Select a client…"
+                    placeholder={`Select a ${term("client", clinic)}…`}
                     style={{ ...selectStyle, width: "100%", boxSizing: "border-box", paddingRight: 32 }}
                   />
                   <ChevronDown size={15} color="#9898b0" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
@@ -1453,7 +1454,7 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
             ) : (
               <div style={{ border: "1px solid #EDE9FE", borderRadius: 10, padding: "14px", background: "#F5F3FF", display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#7C3AED" }}>New Client</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#7C3AED" }}>New {term("Client", clinic)}</span>
                   <button type="button" onClick={() => { setNewClient(false); setNewClientSaved(false); set("clientId", ""); }} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 0 }}>
                     <X size={14} color="#9898b0" />
                   </button>
@@ -1509,6 +1510,7 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
             )}
           </FormField>
 
+          {!clinic && (
           <FormField label="Number of days">
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ display: "inline-flex", alignItems: "center", border: "1px solid #e8e8f0", borderRadius: 10, overflow: "hidden" }}>
@@ -1519,9 +1521,10 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
                 <button type="button" aria-label="One more day" onClick={() => changeDayCount(days.length + 1)} disabled={days.length >= MAX_BOOKING_DAYS}
                   style={{ width: 38, height: 38, border: "none", background: "#fff", fontSize: 18, color: "#7C3AED", cursor: "pointer" }}>+</button>
               </div>
-              <span style={{ fontSize: 12, color: "#9898b0" }}>{isMultiDay ? "Set the date, stylist, services and prices for each day." : "Single-day appointment"}</span>
+              <span style={{ fontSize: 12, color: "#9898b0" }}>{isMultiDay ? `Set the date, ${term("stylist", clinic)}, ${term("services", clinic)} and prices for each day.` : "Single-day appointment"}</span>
             </div>
           </FormField>
+          )}
 
           {isMultiDay && (
             <div role="tablist" aria-label="Booking days" style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
@@ -1533,7 +1536,7 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
                     style={{ flexShrink: 0, textAlign: "left", padding: "8px 12px", borderRadius: 10, cursor: "pointer", border: `1px solid ${active ? "#7C3AED" : "#e8e8f0"}`, background: active ? "#F5F3FF" : "#fff" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: active ? "#7C3AED" : "#1a1a2e" }}>
                       Day {i + 1}
-                      <span title={complete ? "Complete" : "Needs date, time, stylist and a service"} style={{ width: 6, height: 6, borderRadius: "50%", background: complete ? "#059669" : "#f59e0b" }} />
+                      <span title={complete ? "Complete" : `Needs date, time, ${clinic ? "doctor and a treatment" : "stylist and a service"}`} style={{ width: 6, height: 6, borderRadius: "50%", background: complete ? "#059669" : "#f59e0b" }} />
                     </div>
                     <div style={{ fontSize: 11, color: "#9898b0", whiteSpace: "nowrap" }}>
                       {d.date || "No date"} · {fmt(dayTotal(d))}
@@ -1544,7 +1547,7 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
             </div>
           )}
 
-          <FormField label={isTeamBooking ? "Stylist Team" : "Stylist"}>
+          <FormField label={term(isTeamBooking ? "Stylist Team" : "Stylist", clinic)}>
             {isTeamBooking ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, border: "1px solid #EDE9FE", background: "#F5F3FF", borderRadius: 10, padding: "10px 12px" }}>
@@ -1556,7 +1559,7 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
                   ))}
                   <span style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: "#7C3AED", background: "#fff", padding: "2px 7px", borderRadius: 20, letterSpacing: "0.04em" }}>Team</span>
                 </div>
-                <div style={{ fontSize: 11, color: "#9898b0" }}>Auto-assigned — this service is done together by the full stylist team.</div>
+                <div style={{ fontSize: 11, color: "#9898b0" }}>Auto-assigned — this service is done together by the full {clinic ? "doctor" : "stylist"} team.</div>
               </div>
             ) : (
               <select
@@ -1564,7 +1567,7 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
                 onChange={(e) => set("staffId", e.target.value)}
                 style={selectStyle}
               >
-                <option value="">Select a stylist…</option>
+                <option value="">{`Select a ${term("stylist", clinic)}…`}</option>
                 {/* Every active stylist can be picked — assignment to a service is a
                     hint for auto-selecting one when it's unambiguous, not a lock on
                     who's allowed to do the work. A stylist not usually assigned to
@@ -1580,7 +1583,7 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
           </FormField>
 
           {!isTeamBooking && day.staffId && (
-            <FormField label={`Additional stylists${day.extraStaffIds.length > 0 ? ` (${day.extraStaffIds.length})` : " (optional)"}`}>
+            <FormField label={`Additional ${term("stylists", clinic)}${day.extraStaffIds.length > 0 ? ` (${day.extraStaffIds.length})` : " (optional)"}`}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {staffList.filter((s) => s.isActive && s.id !== day.staffId).map((s) => {
                   const on = day.extraStaffIds.includes(s.id);
@@ -1595,12 +1598,13 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
                 })}
               </div>
               {day.extraStaffIds.length > 0 && (
-                <div style={{ fontSize: 11, color: "#9898b0", marginTop: 6 }}>The booking shows on each stylist&apos;s calendar, and its revenue is split evenly between them for commission.</div>
+                <div style={{ fontSize: 11, color: "#9898b0", marginTop: 6 }}>The booking shows on each {clinic ? "doctor" : "stylist"}&apos;s calendar, and its revenue is split evenly between them for commission.</div>
               )}
             </FormField>
           )}
 
           {/* People sharing this appointment and its bill */}
+          {!clinic && (
           <FormField label="People in this appointment">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {[{ key: "", label: `${clientDisplayName || "Main client"} (main)`, count: day.serviceIds.length },
@@ -1660,8 +1664,9 @@ function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onCl
               </div>
             )}
           </FormField>
+          )}
 
-          <FormField label={`Services${activeGuest ? ` for ${activeGuest.name.trim() || "this person"}` : ""}${activeServiceIds.length > 0 ? ` (${activeServiceIds.length} selected)` : ""}`}>
+          <FormField label={`${term("Services", clinic)}${activeGuest ? ` for ${activeGuest.name.trim() || "this person"}` : ""}${activeServiceIds.length > 0 ? ` (${activeServiceIds.length} selected)` : ""}`}>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {availableServices.length > 0 && (
                 <div style={{ position: "relative", marginBottom: 2 }}>
@@ -1814,6 +1819,7 @@ function CancellationsTab({ appointments, staffList, onReschedule, onSelect }: {
   onReschedule: () => void;
   onSelect: (a: Appointment) => void;
 }) {
+  const clinic = useIsClinic();
   const cancelled = appointments
     .filter((a) => a.status === "cancelled" || a.status === "no-show")
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -1863,7 +1869,7 @@ function CancellationsTab({ appointments, staffList, onReschedule, onSelect }: {
           borderBottom: "1px solid #f0f0f5",
           background: "#faf9fd"
         }}>
-          {["CLIENT", "DATE", "SERVICE", "STYLIST", "STATUS", "ACTIONS"].map((h) => (
+          {["CLIENT", "DATE", "SERVICE", "STYLIST", "STATUS", "ACTIONS"].map((h) => term(h, clinic)).map((h) => (
             <div key={h} style={{ fontSize: 10, fontWeight: 800, color: "#8e89a3", letterSpacing: "0.08em" }}>{h}</div>
           ))}
         </div>
@@ -2025,6 +2031,7 @@ function CancellationsTab({ appointments, staffList, onReschedule, onSelect }: {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AppointmentsPage() {
+  const clinic = useIsClinic();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "all">("all");
   const [staffFilter, setStaffFilter] = useState<string>("all");
@@ -2479,7 +2486,7 @@ export default function AppointmentsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by client, service, or stylist…"
+            placeholder={clinic ? "Search by patient, treatment, or doctor…" : "Search by client, service, or stylist…"}
             style={{ flex: 1, border: "none", outline: "none", fontSize: 13, color: "#1a1a2e", background: "transparent" }}
           />
           {search && (
@@ -2534,8 +2541,8 @@ export default function AppointmentsPage() {
             <option value="all">All Statuses</option>
             {ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS[s].label}</option>)}
           </FilterSelect>
-          <FilterSelect label="Stylist" value={staffFilter} onChange={setStaffFilter}>
-            <option value="all">All Stylists</option>
+          <FilterSelect label={term("Stylist", clinic)} value={staffFilter} onChange={setStaffFilter}>
+            <option value="all">{term("All Stylists", clinic)}</option>
             {staffList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </FilterSelect>
           {/* Locked to the active dashboard section when one is set — switch
@@ -2609,7 +2616,7 @@ export default function AppointmentsPage() {
               style={{ width: 15, height: 15, cursor: "pointer", accentColor: "#7C3AED" }}
             />
           </div>
-          {["CLIENT", "DATE", "CREATED", "SERVICE", "STYLIST", "STATUS", "AMOUNT", ""].map((h) => (
+          {["CLIENT", "DATE", "CREATED", "SERVICE", "STYLIST", "STATUS", "AMOUNT", ""].map((h) => term(h, clinic)).map((h) => (
             <div key={h} style={{ fontSize: 10, fontWeight: 800, color: "#8e89a3", letterSpacing: "0.08em" }}>{h}</div>
           ))}
         </div>

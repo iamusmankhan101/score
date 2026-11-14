@@ -54,6 +54,9 @@ const CLINIC_TERMS: Record<string, string> = {
   Clients: "Patients", Client: "Patient", clients: "patients", client: "patient",
   Services: "Treatments", Service: "Treatment", services: "treatments", service: "treatment",
   "Salon Floor": "Clinic Floor", Staff: "Doctors",
+  Stylist: "Doctor", Stylists: "Doctors", "Stylist Team": "Doctor Team", "All Stylists": "All Doctors",
+  stylist: "doctor", stylists: "doctors",
+  CLIENT: "PATIENT", SERVICE: "TREATMENT", STYLIST: "DOCTOR",
 };
 
 /** The clinic's word for a salon word, when in clinic mode. */
