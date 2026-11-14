@@ -7,7 +7,7 @@ import { Document, Image, Page, StyleSheet, Text, View, renderToBuffer } from "@
 import type { ConsentRecord, Prescription } from "@/lib/clinic";
 
 /** `logo` is an absolute URL or a data URL; the clinic name is printed instead when it's missing or can't be loaded. */
-export interface ClinicPdfHeader { name: string; phone?: string; address?: string; logo?: string }
+export interface ClinicPdfHeader { name: string; phone?: string; address?: string; logo?: string; /** Printing on pre-printed letterhead paper: leave the top of the page empty instead of drawing the header. */ blankHeader?: boolean }
 
 const s = StyleSheet.create({
   page: { padding: 48, fontFamily: "Helvetica", fontSize: 10, color: "#111111", lineHeight: 1.45 },
@@ -32,6 +32,7 @@ const s = StyleSheet.create({
 });
 
 function Header({ clinic }: { clinic: ClinicPdfHeader }) {
+  if (clinic.blankHeader) return <View style={{ height: 96 }} />;
   return (
     <View>
       <View style={s.head}>

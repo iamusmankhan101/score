@@ -29,3 +29,12 @@ export async function sendClinicWhatsApp(payload: Record<string, unknown>): Prom
 
 /** wa.me link with the message filled in, for the patient's number. */
 export const whatsAppLink = (phone: string, text: string) => `https://wa.me/${normalizePhone(phone)}?text=${encodeURIComponent(text)}`;
+
+// Printing on pre-printed letterhead paper: the PDF leaves the header area empty. A per-device choice.
+const BLANK_HEADER_KEY = "werzio_pdf_blank_header";
+export function blankHeaderOn(): boolean {
+  try { return localStorage.getItem(BLANK_HEADER_KEY) === "on"; } catch { return false; }
+}
+export function setBlankHeader(on: boolean): void {
+  try { localStorage.setItem(BLANK_HEADER_KEY, on ? "on" : "off"); } catch { /* choice isn't remembered */ }
+}

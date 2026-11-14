@@ -21,7 +21,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { canAccessHref } from "@/components/sidebar";
 import SignaturePad from "@/components/clinic/signature-pad";
 import { uploadDocument, uploadImage } from "@/lib/image";
-import { autoWhatsApp, clinicHeader, sendClinicWhatsApp, whatsAppLink } from "@/lib/clinic-wa";
+import { autoWhatsApp, blankHeaderOn, clinicHeader, sendClinicWhatsApp, setBlankHeader, whatsAppLink } from "@/lib/clinic-wa";
 import {
   CONCERNS, PHOTO_ANGLES, PHOTO_STAGES, consentIsValid, consentTemplates, getClinicPhotos, getConsents,
   getConsultations, getTreatmentPlans, newId, packagesForClient, patientTimeline, planProgress, removeRecord,
@@ -71,9 +71,20 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
 
 const fmtDate = (d: string) => new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString("en-PK", { day: "numeric", month: "short", year: "numeric" });
 
+/** "Pre-printed paper" switch: PDFs you print or download leave the header empty. WhatsApp copies always keep the letterhead. */
+function BlankHeaderToggle() {
+  const [on, setOn] = useState(() => blankHeaderOn());
+  return (
+    <label title="Tick this if you print on paper that already has the clinic letterhead" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b6b8a", cursor: "pointer", userSelect: "none" }}>
+      <input type="checkbox" checked={on} onChange={(e) => { setOn(e.target.checked); setBlankHeader(e.target.checked); }} style={{ accentColor: ACCENT }} />
+      Pre-printed letterhead paper (leave the header blank)
+    </label>
+  );
+}
+
 /** Asks the server for a PDF (app/api/clinic/pdf) and saves it. */
 async function downloadClinicPdf(payload: Record<string, unknown>, filename: string) {
-  const res = await fetch("/api/clinic/pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clinic: clinicHeader(), ...payload }) });
+  const res = await fetch("/api/clinic/pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clinic: { ...clinicHeader(), blankHeader: blankHeaderOn() }, ...payload }) });
   if (!res.ok) throw new Error("Couldn't create the PDF.");
   const url = URL.createObjectURL(await res.blob());
   const a = document.createElement("a");
@@ -84,7 +95,7 @@ async function downloadClinicPdf(payload: Record<string, unknown>, filename: str
 
 /** Opens the same letterhead PDF in the browser's print dialog (falls back to a new tab if the browser won't print it directly). */
 async function printClinicPdf(payload: Record<string, unknown>) {
-  const res = await fetch("/api/clinic/pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clinic: clinicHeader(), ...payload }) });
+  const res = await fetch("/api/clinic/pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clinic: { ...clinicHeader(), blankHeader: blankHeaderOn() }, ...payload }) });
   if (!res.ok) throw new Error("Couldn't create the PDF.");
   const url = URL.createObjectURL(await res.blob());
   const frame = document.createElement("iframe");
@@ -690,6 +701,7 @@ function ConsentTab({ client, data, onChange }: { client: Client; data: Data; on
             onClick={() => { setPdfError(""); audit("download", "consent", client.id, `print: ${viewing.title}`); printClinicPdf({ kind: "consent", consent: viewing }).catch((e) => setPdfError(e.message)); }}>
             <Printer size={14} /> Print
           </button>
+          <div style={{ marginTop: 10 }}><BlankHeaderToggle /></div>
           {autoWhatsApp() && client.phone && (
             <button type="button" style={{ ...BTN, marginTop: 14, marginLeft: 8, background: "#16a34a" }} disabled={sendState[viewing.id] === "sending" || sendState[viewing.id] === "sent"}
               onClick={() => { audit("send", "consent", client.id, viewing.title); runSend(viewing.id, () => sendClinicWhatsApp({ kind: "consent", phone: client.phone, consent: viewing })); }}>
@@ -823,7 +835,8 @@ function PrescriptionsTab({ client, data, onChange, rxFor, onRxStarted }: { clie
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        <BlankHeaderToggle />
         <button type="button" onClick={() => setEditing(blank())} style={BTN}><Plus size={14} /> New prescription</button>
       </div>
       {error && <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 8 }}>{error}</div>}
