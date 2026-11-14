@@ -171,11 +171,13 @@ export interface PrescriptionTemplate {
   name: string;
   items: PrescriptionItem[];
   notes?: string;
+  /** The condition it's for; picking that diagnosis on a prescription lists these first. */
+  condition?: string;
 }
 
 /** Starting regimes; the clinic saves its own from any prescription. */
 export const DEFAULT_PRESCRIPTION_TEMPLATES: PrescriptionTemplate[] = [
-  { id: "rx-basic", name: "Basic skincare", items: [
+  { id: "rx-basic", name: "Basic skincare", condition: "General skincare", items: [
     { time: "Morning", product: "Gentle cleanser", frequency: "Daily" },
     { time: "Morning", product: "Vitamin C serum", frequency: "Daily", instructions: "2–3 drops on dry skin" },
     { time: "Morning", product: "Sunscreen SPF 50", frequency: "Daily", instructions: "Reapply every 2–3 hours outdoors" },
@@ -183,21 +185,21 @@ export const DEFAULT_PRESCRIPTION_TEMPLATES: PrescriptionTemplate[] = [
     { time: "Night", product: "Retinol 0.3%", frequency: "Alternate nights", duration: "4 weeks, then nightly", instructions: "Pea-sized amount; stop if irritated" },
     { time: "Night", product: "Moisturiser", frequency: "Daily" },
   ] },
-  { id: "rx-acne", name: "Acne regime", items: [
+  { id: "rx-acne", name: "Acne regime", condition: "Acne", items: [
     { time: "Morning", product: "Salicylic acid cleanser", frequency: "Daily" },
     { time: "Morning", product: "Oil-free sunscreen SPF 50", frequency: "Daily" },
     { time: "Night", product: "Salicylic acid cleanser", frequency: "Daily" },
     { time: "Night", product: "Adapalene 0.1% gel", frequency: "Nightly", duration: "12 weeks", instructions: "Thin layer on affected areas only" },
     { time: "Night", product: "Non-comedogenic moisturiser", frequency: "Daily" },
   ] },
-  { id: "rx-pigment", name: "Pigmentation regime", items: [
+  { id: "rx-pigment", name: "Pigmentation regime", condition: "Pigmentation", items: [
     { time: "Morning", product: "Gentle cleanser", frequency: "Daily" },
     { time: "Morning", product: "Niacinamide 10% serum", frequency: "Daily" },
     { time: "Morning", product: "Tinted sunscreen SPF 50", frequency: "Daily", instructions: "Essential — pigmentation returns without it" },
     { time: "Night", product: "Azelaic acid 15%", frequency: "Nightly", duration: "8–12 weeks" },
     { time: "Night", product: "Moisturiser", frequency: "Daily" },
   ] },
-  { id: "rx-post", name: "Post-procedure care", items: [
+  { id: "rx-post", name: "Post-procedure care", condition: "Post-procedure", items: [
     { time: "Morning", product: "Gentle cleanser", frequency: "Daily", duration: "7 days", instructions: "Lukewarm water, pat dry" },
     { time: "Morning", product: "Sunscreen SPF 50", frequency: "Daily", instructions: "Avoid direct sun for 2 weeks" },
     { time: "Night", product: "Barrier repair cream", frequency: "Twice daily", duration: "7 days" },

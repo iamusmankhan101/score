@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       patientName: clients.find((c) => c.id === clientId)?.name ?? "",
       appointments: mine(appts).map((a) => ({ id: a.id, date: a.date, startTime: a.startTime, services: a.serviceNames, doctor: a.staffName, status: a.status }))
         .sort((a, b) => b.date.localeCompare(a.date)),
-      prescriptions: mine(rxs).map((p) => ({ id: p.id, date: p.date, doctor: p.practitionerName, items: p.items, notes: p.notes })).sort((a, b) => b.date.localeCompare(a.date)),
+      prescriptions: mine(rxs).map((p) => ({ id: p.id, date: p.date, doctor: p.practitionerName, diagnosis: p.diagnosis, items: p.items, notes: p.notes })).sort((a, b) => b.date.localeCompare(a.date)),
       records: mine(consultations).map((c) => ({ id: c.id, date: c.date, doctor: c.practitionerName, concerns: c.concerns, advice: c.recommendation?.notes })).sort((a, b) => b.date.localeCompare(a.date)),
       consents: mine(consents).map((c) => ({ id: c.id, title: c.title, signedAt: c.signedAt })).sort((a, b) => b.signedAt.localeCompare(a.signedAt)),
       plans: mine(plans).map((p) => ({ id: p.id, title: p.title, closed: !!p.closed, total: p.sessions, ...planProgress(p, myInvoices, mine(appts), services) }))

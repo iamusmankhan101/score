@@ -67,9 +67,10 @@ export function renderPrescriptionPdf(clinic: ClinicPdfHeader, patientName: stri
     <Document title={`Prescription — ${patientName}`}>
       <Page size="A4" style={s.page}>
         <Header clinic={clinic} />
-        <Text style={s.title}>Prescription &amp; Skincare Plan</Text>
+        <Text style={s.title}>Prescription</Text>
         <Text style={s.meta}>Patient: {patientName}</Text>
         <Text style={s.meta}>Date: {rx.date}</Text>
+        {rx.diagnosis ? <Text style={s.meta}>Diagnosis: {rx.diagnosis}</Text> : null}
         {rx.practitionerName ? <Text style={s.meta}>Prescribed by: {rx.practitionerName}</Text> : null}
         {times.map((time) => (
           <View key={time} wrap={false}>

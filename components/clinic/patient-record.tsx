@@ -813,11 +813,11 @@ function PrescriptionsTab({ client, data, onChange }: { client: Client; data: Da
         <button type="button" onClick={() => setEditing(blank())} style={BTN}><Plus size={14} /> New prescription</button>
       </div>
       {error && <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 8 }}>{error}</div>}
-      {mine.length === 0 ? <Empty>No prescriptions yet. Start from a template (Basic, Acne, Pigmentation, Post-procedure) or write your own.</Empty> : mine.map((rx) => (
+      {mine.length === 0 ? <Empty>No prescriptions yet. Pick the diagnosis, start from a matching template, or write your own.</Empty> : mine.map((rx) => (
         <div key={rx.id} style={{ border: "1px solid #ececf4", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <Pill size={15} color="#0891b2" />
-            <div style={{ flex: 1, fontSize: 13.5, fontWeight: 800, color: "#1a1a2e" }}>{fmtDate(rx.date)}{rx.practitionerName ? ` · ${rx.practitionerName}` : ""}</div>
+            <div style={{ flex: 1, fontSize: 13.5, fontWeight: 800, color: "#1a1a2e" }}>{fmtDate(rx.date)}{rx.diagnosis ? ` · ${rx.diagnosis}` : ""}{rx.practitionerName ? ` · ${rx.practitionerName}` : ""}</div>
             <button type="button" onClick={() => { setError(""); audit("download", "prescription", client.id); downloadClinicPdf({ kind: "prescription", prescription: rx, patientName: client.name }, `Prescription - ${client.name} - ${rx.date}`).catch((e) => setError(e.message)); }}
               style={{ ...BTN_GHOST, padding: "6px 10px", fontSize: 11.5 }}><FileDown size={13} /> PDF</button>
             {client.phone && auto && (
@@ -842,7 +842,7 @@ function PrescriptionsTab({ client, data, onChange }: { client: Client; data: Da
         </div>
       ))}
       {editing && (
-        <PrescriptionForm initial={editing} staff={data.staff} onClose={() => setEditing(null)}
+        <PrescriptionForm initial={editing} staff={data.staff} client={client} concerns={data.consultations.filter((c) => c.clientId === client.id).flatMap((c) => c.concerns)} onClose={() => setEditing(null)}
           onDelete={mine.some((p) => p.id === editing.id) ? () => { removeRecord(getPrescriptions, savePrescriptions, editing.id); setEditing(null); onChange(); } : undefined}
           onSave={(rx) => { upsertRecord(getPrescriptions, savePrescriptions, rx); setEditing(null); onChange(); }} />
       )}
@@ -850,30 +850,46 @@ function PrescriptionsTab({ client, data, onChange }: { client: Client; data: Da
   );
 }
 
-function PrescriptionForm({ initial, staff, onClose, onSave, onDelete }: {
-  initial: Prescription; staff: Staff[]; onClose: () => void; onSave: (rx: Prescription) => void; onDelete?: () => void;
+function PrescriptionForm({ initial, staff, client, concerns, onClose, onSave, onDelete }: {
+  initial: Prescription; staff: Staff[]; client: Client; concerns: string[]; onClose: () => void; onSave: (rx: Prescription) => void; onDelete?: () => void;
 }) {
   const [rx, setRx] = useState(initial);
   const [templates, setTemplates] = useState<PrescriptionTemplate[]>(() => prescriptionTemplates());
   const setItem = (i: number, patch: Partial<PrescriptionItem>) => setRx((r) => ({ ...r, items: r.items.map((it, idx) => idx === i ? { ...it, ...patch } : it) }));
   const items = rx.items.filter((i) => i.product.trim());
+  // Warn when a medicine matches something the patient is allergic to.
+  const allergens = (client.medical?.allergies ?? "").split(/[,;\n]/).map((a) => a.trim().toLowerCase()).filter((a) => a.length >= 3);
+  const clashes = (product: string) => allergens.filter((a) => product.toLowerCase().includes(a));
+  const diag = (rx.diagnosis ?? "").trim().toLowerCase();
+  const matching = diag ? templates.filter((t) => t.condition?.toLowerCase() === diag) : [];
+  const suggestions = [...new Set([...concerns, ...CONCERNS, ...templates.map((t) => t.condition ?? "").filter(Boolean)])];
 
   function saveAsTemplate() {
     const name = window.prompt("Name this template (e.g. Melasma regime):");
     if (!name?.trim()) return;
     const clinic = settingsStore.clinic as { prescriptionTemplates?: PrescriptionTemplate[] };
-    clinic.prescriptionTemplates = [...(clinic.prescriptionTemplates ?? []), { id: newId("rxt"), name: name.trim(), items, notes: rx.notes }];
+    clinic.prescriptionTemplates = [...(clinic.prescriptionTemplates ?? []), { id: newId("rxt"), name: name.trim(), items, notes: rx.notes, condition: rx.diagnosis?.trim() || undefined }];
     saveSettings();
     setTemplates(prescriptionTemplates());
   }
 
   return (
-    <Modal title="Prescription & skincare plan" onClose={onClose} wide>
+    <Modal title="Prescription" onClose={onClose} wide>
+      {allergens.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", marginBottom: 12, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, fontSize: 12.5, fontWeight: 700, color: "#b91c1c" }}>
+          <AlertTriangle size={14} /> Allergies: {client.medical?.allergies}
+        </div>
+      )}
+      <Field label="Diagnosis / condition">
+        <input list="rx-diagnoses" value={rx.diagnosis ?? ""} onChange={(e) => setRx({ ...rx, diagnosis: e.target.value })} placeholder="e.g. Acne, Melasma, Eczema — type or pick" style={{ ...INP, marginBottom: 12 }} />
+        <datalist id="rx-diagnoses">{suggestions.map((d) => <option key={d} value={d} />)}</datalist>
+      </Field>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 14 }}>
         <Field label="Start from template">
           <select value="" onChange={(e) => { const t = templates.find((x) => x.id === e.target.value); if (t) setRx({ ...rx, items: t.items.map((i) => ({ ...i })), notes: t.notes ?? rx.notes }); }} style={INP}>
             <option value="">Choose…</option>
-            {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {matching.length > 0 && <optgroup label={`For ${rx.diagnosis}`}>{matching.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>}
+            <optgroup label="All templates">{templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>
           </select>
         </Field>
         <Field label="Date"><input type="date" value={rx.date} onChange={(e) => setRx({ ...rx, date: e.target.value })} style={INP} /></Field>
@@ -889,7 +905,8 @@ function PrescriptionForm({ initial, staff, onClose, onSave, onDelete }: {
           <select value={it.time} onChange={(e) => setItem(i, { time: e.target.value })} style={{ ...INP, padding: "8px 6px" }} aria-label="When">
             {REGIME_TIMES.map((t) => <option key={t}>{t}</option>)}
           </select>
-          <input value={it.product} onChange={(e) => setItem(i, { product: e.target.value })} placeholder="Product / medicine" style={INP} />
+          <input value={it.product} onChange={(e) => setItem(i, { product: e.target.value })} placeholder="Product / medicine" title={clashes(it.product).length ? `Patient is allergic to: ${clashes(it.product).join(", ")}` : undefined}
+            style={{ ...INP, ...(clashes(it.product).length ? { borderColor: "#dc2626", background: "#fef2f2" } : {}) }} />
           <input value={it.dosage ?? ""} onChange={(e) => setItem(i, { dosage: e.target.value })} placeholder="Dosage" style={INP} />
           <input value={it.frequency ?? ""} onChange={(e) => setItem(i, { frequency: e.target.value })} placeholder="Frequency" style={INP} />
           <input value={it.duration ?? ""} onChange={(e) => setItem(i, { duration: e.target.value })} placeholder="Duration" style={INP} />

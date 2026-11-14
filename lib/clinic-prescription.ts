@@ -22,6 +22,8 @@ export interface Prescription {
   date: string;
   practitionerId?: string;
   practitionerName?: string;
+  /** The condition this prescription treats ("Acne", "Melasma"…). */
+  diagnosis?: string;
   items: PrescriptionItem[];
   notes?: string;
   createdAt: string;
@@ -29,7 +31,8 @@ export interface Prescription {
 
 /** A prescription as a WhatsApp-ready message. */
 export function prescriptionText(rx: Prescription, patientName: string, clinicName: string): string {
-  const lines = [`*${clinicName}* — Skincare plan for ${patientName} (${rx.date})`];
+  const lines = [`*${clinicName}* — Prescription for ${patientName} (${rx.date})`];
+  if (rx.diagnosis) lines.push(`Diagnosis: ${rx.diagnosis}`);
   for (const time of [...new Set(rx.items.map((i) => i.time))]) {
     lines.push("", `*${time}*`);
     for (const i of rx.items.filter((x) => x.time === time)) {
