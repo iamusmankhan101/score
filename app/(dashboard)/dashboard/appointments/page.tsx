@@ -34,6 +34,7 @@ import { fmtCurrency as fmt } from "@/lib/format";
 import { TimeSelect } from "@/components/time-select";
 import { returnToStock, settleServiceConsumption, settledConsumption } from "@/lib/inventory-consumption";
 import { isWeeklyOff } from "@/lib/attendance";
+import { withToken } from "@/lib/clinic-core";
 import { assignResources, resourceClash, resourcesAt, type ClinicResource } from "@/lib/clinic-resources";
 import { getActiveLocationFilter } from "@/lib/locations";
 import { WaitlistOffer, waitlistMatches } from "@/components/waitlist-offer";
@@ -2222,7 +2223,8 @@ export default function AppointmentsPage() {
               // The first completion time is kept: re-completing must not
               // re-time the visit after stock was settled, or it deducts twice.
               const completedAt = newStatus === "completed" ? new Date().toISOString() : undefined;
-              const updated = prev.map((a) => a.id === apptId ? { ...a, status: newStatus, completedAt: a.completedAt ?? completedAt } : a);
+              let updated = prev.map((a) => a.id === apptId ? { ...a, status: newStatus, completedAt: a.completedAt ?? completedAt } : a);
+              if (newStatus === "arrived") updated = withToken(updated, apptId); // waiting-room token
               saveAppointments(updated);
               return updated;
             });

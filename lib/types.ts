@@ -294,6 +294,10 @@ export interface Appointment {
   completedAt?: string;
   /** Rooms/machines it holds (aesthetic clinics, lib/clinic-resources.ts). */
   resourceIds?: string[];
+  /** Waiting-room token, given when the patient arrives; counts up from 1 each day (lib/clinic-core.ts withToken). */
+  tokenNo?: number;
+  /** ISO time the patient arrived, for the waiting time. */
+  arrivedAt?: string;
 }
 
 export interface AppointmentGuest {

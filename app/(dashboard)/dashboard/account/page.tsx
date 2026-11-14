@@ -2219,6 +2219,7 @@ const PERMISSION_OPTIONS = [
   { key: "rooms", label: "Rooms & Machines (clinic)" },
   { key: "aftercare", label: "Aftercare (clinic)" },
   { key: "waitlist", label: "Waiting List" },
+  { key: "queue", label: "Queue / Tokens (clinic)" },
   { key: "clinic-reports", label: "Clinic Reports (clinic)" },
   { key: "cash-closing", label: "Daily Cash Closing" },
   // Not a page: lets this login delete invoices/sales, clients, staff and services.
@@ -2227,8 +2228,8 @@ const PERMISSION_OPTIONS = [
 
 /** One-tap starting points for common clinic and salon jobs; ticks can still be changed after. */
 const ROLE_PRESETS: { label: string; permissions: string[] }[] = [
-  { label: "Doctor / Practitioner", permissions: ["dashboard", "calendar", "appointments", "clients", "medical", "consent-forms", "services", "waitlist"] },
-  { label: "Receptionist", permissions: ["dashboard", "calendar", "floor", "appointments", "clients", "pos", "invoices", "loyalty", "waitlist", "leads", "messages"] },
+  { label: "Doctor / Practitioner", permissions: ["dashboard", "calendar", "appointments", "clients", "medical", "consent-forms", "services", "waitlist", "queue"] },
+  { label: "Receptionist", permissions: ["dashboard", "calendar", "floor", "appointments", "clients", "pos", "invoices", "loyalty", "waitlist", "queue", "leads", "messages"] },
   { label: "Inventory Manager", permissions: ["dashboard", "inventory", "vendor-bills", "services", "cash-flow"] },
   { label: "Stylist", permissions: DEFAULT_STAFF_PERMISSIONS },
 ];

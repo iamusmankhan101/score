@@ -178,3 +178,17 @@ export function planProgress(
   return { done: doneDates.length, remaining: plan.sessions - doneDates.length, sessions };
 }
 
+
+// ─── Waiting-room tokens ─────────────────────────────────────────────────────
+
+/**
+ * Marks an appointment as arrived and gives it the next token for its day
+ * (1, 2, 3… across the whole clinic). Keeps the token it already has, so
+ * arriving twice never re-numbers a patient.
+ */
+export function withToken(list: Appointment[], apptId: string, nowIso = new Date().toISOString()): Appointment[] {
+  const target = list.find((a) => a.id === apptId);
+  if (!target || target.tokenNo) return list;
+  const next = Math.max(0, ...list.filter((a) => a.date === target.date).map((a) => a.tokenNo ?? 0)) + 1;
+  return list.map((a) => a.id === apptId ? { ...a, tokenNo: next, arrivedAt: a.arrivedAt ?? nowIso } : a);
+}

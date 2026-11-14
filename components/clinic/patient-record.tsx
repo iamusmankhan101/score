@@ -13,8 +13,6 @@ import {
   Package, Plus, Stethoscope, Trash2, X, Columns2, Receipt, Images, Clock, Pill, Send, FileDown, Crown, Copy, Syringe, ShieldCheck, FileText,
 } from "lucide-react";
 import ChartsTab from "@/components/clinic/charting";
-import { normalizePhone, whatsAppConnected } from "@/lib/whatsapp-scheduler";
-import { getCurrentPlan } from "@/lib/plan-limits";
 import { getActiveLocationFilter } from "@/lib/locations";
 import { saveSettings, settingsStore } from "@/lib/settings-store";
 import { getStoredAppointments, getStoredClients, getStoredInventory, getStoredServices, getStoredStaff, saveClients, subscribeToStoredData } from "@/lib/storage";
@@ -23,6 +21,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { canAccessHref } from "@/components/sidebar";
 import SignaturePad from "@/components/clinic/signature-pad";
 import { uploadDocument, uploadImage } from "@/lib/image";
+import { autoWhatsApp, clinicHeader, sendClinicWhatsApp, whatsAppLink } from "@/lib/clinic-wa";
 import {
   CONCERNS, PHOTO_ANGLES, PHOTO_STAGES, consentIsValid, consentTemplates, getClinicPhotos, getConsents,
   getConsultations, getTreatmentPlans, newId, packagesForClient, patientTimeline, planProgress, removeRecord,
@@ -72,11 +71,6 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
 
 const fmtDate = (d: string) => new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString("en-PK", { day: "numeric", month: "short", year: "numeric" });
 
-function clinicHeader() {
-  const salon = settingsStore.salon as { name?: string; phone?: string; address?: string };
-  return { name: salon.name || "Clinic", phone: salon.phone, address: salon.address };
-}
-
 /** Asks the server for a PDF (app/api/clinic/pdf) and saves it. */
 async function downloadClinicPdf(payload: Record<string, unknown>, filename: string) {
   const res = await fetch("/api/clinic/pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clinic: clinicHeader(), ...payload }) });
@@ -86,21 +80,6 @@ async function downloadClinicPdf(payload: Record<string, unknown>, filename: str
   a.href = url; a.download = `${filename.replace(/[^\w .-]/g, "")}.pdf`;
   document.body.appendChild(a); a.click(); a.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-/**
- * Pro/Premium with WhatsApp connected: documents go straight to the patient
- * through the clinic's own number (app/api/clinic/whatsapp-send). Otherwise
- * the buttons fall back to opening WhatsApp with the message ready.
- */
-function autoWhatsApp(): boolean {
-  return getCurrentPlan().whatsapp && whatsAppConnected(settingsStore.wasender as Parameters<typeof whatsAppConnected>[0]);
-}
-
-async function sendClinicWhatsApp(payload: Record<string, unknown>): Promise<void> {
-  const res = await fetch("/api/clinic/whatsapp-send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clinic: clinicHeader(), ...payload }) });
-  const d = await res.json().catch(() => ({})) as { ok?: boolean; error?: string };
-  if (!d.ok) throw new Error(d.error || "WhatsApp send failed.");
 }
 
 /** Button state for an automatic send: idle → sending → sent / error. */
@@ -113,8 +92,6 @@ function useSendState() {
   return [state, run] as const;
 }
 
-/** wa.me link with the message filled in, for the patient's number. */
-const whatsAppLink = (phone: string, text: string) => `https://wa.me/${normalizePhone(phone)}?text=${encodeURIComponent(text)}`;
 
 /** Multi-select of treatments as removable chips plus a picker. */
 function TreatmentPicker({ services, value, onChange }: { services: Service[]; value: string[]; onChange: (ids: string[]) => void }) {
