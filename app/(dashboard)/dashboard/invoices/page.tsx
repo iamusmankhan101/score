@@ -22,6 +22,7 @@ import SalonInvoiceEdit from "@/components/salon-invoice-edit";
 import { queueInvoiceReceipt } from "@/lib/whatsapp-receipt";
 import MobilePageHeader from "@/components/mobile-page-header";
 import PageTitle from "@/components/page-title";
+import InvoiceDiagnostics from "@/components/invoice-diagnostics";
 import { fmtCurrency as fmt } from "@/lib/format";
 import { getActiveSection } from "@/lib/sections";
 
@@ -421,6 +422,7 @@ export default function InvoicesPage() {
             <div className="mobile-empty-icon"><ShoppingCart size={26} color="#c8c8e0" /></div>
             <div className="mobile-empty-title">No POS transactions yet</div>
             <div className="mobile-empty-sub">Complete a sale through the POS to see it here.</div>
+            <InvoiceDiagnostics month={month} section={activeSection} />
           </div>
         ) : filtered.map((inv) => {
           const sm = STATUS_META[inv.status];
@@ -708,6 +710,7 @@ export default function InvoicesPage() {
                   <div style={{ fontSize: 13, color: "#9898b0", fontWeight: 500 }}>
                     Complete a sale through the <strong style={{ color: "var(--accent)", fontWeight: 700 }}>POS</strong> to see invoices here.
                   </div>
+                  <InvoiceDiagnostics month={month} section={activeSection} />
                 </div>
               ) : filtered.map((inv, i) => {
                 const sm = STATUS_META[inv.status];
