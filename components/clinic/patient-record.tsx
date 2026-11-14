@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, CalendarDays, Camera, Check, ClipboardList, FileSignature, ListChecks,
-  Package, Plus, Stethoscope, Trash2, X, Columns2, Receipt, Images, Clock, Pill, Send, FileDown, Crown, Copy, Syringe, ShieldCheck, FileText,
+  Package, Plus, Stethoscope, Trash2, X, Columns2, Receipt, Images, Clock, Pill, Send, FileDown, Crown, Copy, Syringe, ShieldCheck, FileText, Printer,
 } from "lucide-react";
 import ChartsTab from "@/components/clinic/charting";
 import { getActiveLocationFilter } from "@/lib/locations";
@@ -80,6 +80,21 @@ async function downloadClinicPdf(payload: Record<string, unknown>, filename: str
   a.href = url; a.download = `${filename.replace(/[^\w .-]/g, "")}.pdf`;
   document.body.appendChild(a); a.click(); a.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Opens the same letterhead PDF in the browser's print dialog (falls back to a new tab if the browser won't print it directly). */
+async function printClinicPdf(payload: Record<string, unknown>) {
+  const res = await fetch("/api/clinic/pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clinic: clinicHeader(), ...payload }) });
+  if (!res.ok) throw new Error("Couldn't create the PDF.");
+  const url = URL.createObjectURL(await res.blob());
+  const frame = document.createElement("iframe");
+  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  frame.onload = () => {
+    try { frame.contentWindow?.focus(); frame.contentWindow?.print(); } catch { window.open(url, "_blank"); }
+  };
+  frame.src = url;
+  document.body.appendChild(frame);
+  window.setTimeout(() => { frame.remove(); URL.revokeObjectURL(url); }, 120_000);
 }
 
 /** Button state for an automatic send: idle → sending → sent / error. */
@@ -671,6 +686,10 @@ function ConsentTab({ client, data, onChange }: { client: Client; data: Data; on
             onClick={() => { setPdfError(""); audit("download", "consent", client.id, viewing.title); downloadClinicPdf({ kind: "consent", consent: viewing }, `${viewing.title} - ${viewing.signedName}`).catch((e) => setPdfError(e.message)); }}>
             <FileDown size={14} /> Download PDF
           </button>
+          <button type="button" style={{ ...BTN_GHOST, marginTop: 14, marginLeft: 8 }} title="Print on the clinic letterhead"
+            onClick={() => { setPdfError(""); audit("download", "consent", client.id, `print: ${viewing.title}`); printClinicPdf({ kind: "consent", consent: viewing }).catch((e) => setPdfError(e.message)); }}>
+            <Printer size={14} /> Print
+          </button>
           {autoWhatsApp() && client.phone && (
             <button type="button" style={{ ...BTN, marginTop: 14, marginLeft: 8, background: "#16a34a" }} disabled={sendState[viewing.id] === "sending" || sendState[viewing.id] === "sent"}
               onClick={() => { audit("send", "consent", client.id, viewing.title); runSend(viewing.id, () => sendClinicWhatsApp({ kind: "consent", phone: client.phone, consent: viewing })); }}>
@@ -815,6 +834,8 @@ function PrescriptionsTab({ client, data, onChange, rxFor, onRxStarted }: { clie
             <div style={{ flex: 1, fontSize: 13.5, fontWeight: 800, color: "#1a1a2e" }}>{fmtDate(rx.date)}{rx.treatment ? ` · after ${rx.treatment}` : ""}{rx.diagnosis ? ` · ${rx.diagnosis}` : ""}{rx.practitionerName ? ` · ${rx.practitionerName}` : ""}</div>
             <button type="button" onClick={() => { setError(""); audit("download", "prescription", client.id); downloadClinicPdf({ kind: "prescription", prescription: rx, patientName: client.name }, `Prescription - ${client.name} - ${rx.date}`).catch((e) => setError(e.message)); }}
               style={{ ...BTN_GHOST, padding: "6px 10px", fontSize: 11.5 }}><FileDown size={13} /> PDF</button>
+            <button type="button" title="Print on the clinic letterhead" onClick={() => { setError(""); audit("download", "prescription", client.id, "print"); printClinicPdf({ kind: "prescription", prescription: rx, patientName: client.name }).catch((e) => setError(e.message)); }}
+              style={{ ...BTN_GHOST, padding: "6px 10px", fontSize: 11.5 }}><Printer size={13} /> Print</button>
             {client.phone && auto && (
               <button type="button" disabled={sendState[rx.id] === "sending" || sendState[rx.id] === "sent"} title="Send the PDF and the plan to the patient's WhatsApp"
                 onClick={() => { audit("send", "prescription", client.id); runSend(rx.id, () => sendClinicWhatsApp({ kind: "prescription", phone: client.phone, patientName: client.name, prescription: rx })); }}

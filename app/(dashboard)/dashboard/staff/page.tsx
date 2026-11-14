@@ -8,7 +8,7 @@ import type { Staff, Service, StaffRole, StaffRoleValue, StaffPayType, Appointme
 import { X, Plus, Check, ChevronRight, Trash2, UserCog, Pencil, Lock, Upload, Download, FileSpreadsheet, ChevronDown } from "lucide-react";
 import { getCurrentPlan, isAtLimit } from "@/lib/plan-limits";
 import { getSectionOptions, getActiveSection, inSection, defaultSectionForNewRecord } from "@/lib/sections";
-import { term, useIsClinic } from "@/lib/clinic";
+import { businessType, term, useIsClinic } from "@/lib/clinic";
 import PageTitle from "@/components/page-title";
 import MobilePageHeader from "@/components/mobile-page-header";
 
@@ -174,8 +174,10 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
     if (staff) {
       return servicesList.filter(s => s.assignedStaffIds.includes(staff.id)).map(s => s.id);
     }
-    return [];
+    // A new doctor starts able to perform every active treatment (untick any they don't do); a new salon staff member starts with none.
+    return businessType() === "clinic" ? servicesList.filter(s => s.isActive !== false).map(s => s.id) : [];
   });
+  const clinicForm = businessType() === "clinic";
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const canSubmit = form.name && form.phone && form.role
@@ -358,7 +360,7 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Assign Services (Dropdown Selection)</label>
+            <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>{clinicForm ? "Assign Treatments" : "Assign Services (Dropdown Selection)"}</label>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 150, overflowY: "auto", border: "1px solid #e8e8f0", borderRadius: 8, padding: 8 }}>
               {servicesList.length > 0 ? servicesList.map((sv) => {
                 const checked = selectedServiceIds.includes(sv.id);
@@ -374,12 +376,13 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
                 );
               }) : <div style={{ fontSize: 12, color: "#9898b0", fontStyle: "italic", padding: "8px 0" }}>No salon services found. Please add services first.</div>}
             </div>
+            {clinicForm && !staff && <div style={{ fontSize: 11, color: "#9898b0" }}>All treatments are ticked for a new doctor so they can be booked straight away. Untick any they don&apos;t perform.</div>}
           </div>
 
           <div style={{ display: "flex", gap: 10, paddingTop: 4 }}>
             <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid #e8e8f0", background: "#fff", fontSize: 13, fontWeight: 600, color: "#6b6b8a", cursor: "pointer" }}>Cancel</button>
             <button onClick={handleSave} disabled={!canSubmit} style={{ flex: 2, padding: "11px 0", borderRadius: 10, border: "none", background: canSubmit ? "#7C3AED" : "#e8e8f0", fontSize: 13, fontWeight: 600, color: canSubmit ? "#fff" : "#b0b0c8", cursor: canSubmit ? "pointer" : "not-allowed" }}>
-              {staff ? "Save Changes" : "Add Staff"}
+              {staff ? "Save Changes" : clinicForm ? "Add Doctor" : "Add Staff"}
             </button>
           </div>
         </div>
