@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { ListOrdered, LogIn, PhoneCall, Check, UserPlus, Printer, Send, Monitor, X } from "lucide-react";
+import { ListOrdered, LogIn, PhoneCall, Check, UserPlus, Printer, Send, Monitor, X, Clock, Users, Stethoscope, CalendarClock, CircleCheck } from "lucide-react";
 import PageTitle from "@/components/page-title";
 import { getStoredAppointments, getStoredClients, getStoredServices, getStoredStaff, saveAppointments, saveClients, subscribeToStoredData } from "@/lib/storage";
 import { applyClientCredits, creditsFromAppointments, newGuestClient } from "@/lib/appointment-credit";
@@ -105,53 +105,130 @@ export default function QueuePage() {
     setWalkIn(false);
   }
 
-  const mine = appts.filter((a) => a.date === today);
-  const serving = mine.filter((a) => a.status === "in-progress").sort((a, b) => (a.tokenNo ?? 0) - (b.tokenNo ?? 0));
-  const waiting = mine.filter((a) => a.status === "arrived").sort((a, b) => (a.tokenNo ?? 0) - (b.tokenNo ?? 0));
+  const [doc, setDoc] = useState("all");
+  const byToken = (a: Appointment, b: Appointment) => (a.tokenNo ?? 0) - (b.tokenNo ?? 0);
+  const todays = appts.filter((a) => a.date === today);
+  const doctors = [...new Map(todays.filter((a) => a.staffId).map((a) => [a.staffId, a.staffName])).entries()];
+  const mine = doc === "all" ? todays : todays.filter((a) => a.staffId === doc);
+  const serving = mine.filter((a) => a.status === "in-progress").sort(byToken);
+  const waiting = mine.filter((a) => a.status === "arrived").sort(byToken);
   const expected = mine.filter((a) => a.status === "booked" || a.status === "confirmed").sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const seen = mine.filter((a) => a.status === "completed").sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""));
   const waited = (a: Appointment) => a.arrivedAt ? Math.max(0, Math.round((now - new Date(a.arrivedAt).getTime()) / 60000)) : null;
-  const token = (a: Appointment, color: string) => (
-    <div style={{ width: 54, height: 54, borderRadius: 12, background: color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, flexShrink: 0 }}>{a.tokenNo ?? "–"}</div>
-  );
-  const row = (a: Appointment, left: React.ReactNode, action?: React.ReactNode, sub?: string) => (
-    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", border: "1px solid #ececf4", borderRadius: 12, background: "#fff", marginBottom: 8 }}>
-      {left}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 800, fontSize: 14, color: "#1a1a2e" }}>{a.clientName}</div>
-        <div style={{ fontSize: 12, color: "#6b6b8a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.serviceNames.join(", ")} · {a.staffName}{sub ? ` · ${sub}` : ""}</div>
-      </div>
-      {action}
+  const waits = waiting.map(waited).filter((m): m is number => m !== null);
+  const longest = waits.length ? Math.max(...waits) : 0;
+  const longestColor = longest >= 30 ? "#dc2626" : longest >= 15 ? "#d97706" : "#16a34a";
+  const waitPill = (m: number | null) => {
+    if (m === null) return null;
+    const c = m >= 30 ? ["#fef2f2", "#dc2626"] : m >= 15 ? ["#fffbeb", "#d97706"] : ["#f0fdf4", "#16a34a"];
+    return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 20, background: c[0], color: c[1], fontSize: 11.5, fontWeight: 800 }}><Clock size={11} /> {m} min</span>;
+  };
+
+  const tile = (label: string, value: React.ReactNode, color: string, icon: React.ReactNode) => (
+    <div style={{ flex: "1 1 150px", background: "#fff", border: "1px solid #ececf4", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ width: 40, height: 40, borderRadius: 11, background: `${color}18`, color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</div>
+      <div><div style={{ fontSize: 24, fontWeight: 900, color: "#1a1a2e", lineHeight: 1.1 }}>{value}</div><div style={{ fontSize: 12, color: "#8a8aa3", fontWeight: 700 }}>{label}</div></div>
     </div>
   );
 
+  const card = (a: Appointment, lead: React.ReactNode, meta: React.ReactNode, actions?: React.ReactNode) => (
+    <div key={a.id} style={{ background: "#fff", border: "1px solid #ececf4", borderRadius: 14, padding: 12, marginBottom: 10, boxShadow: "0 1px 2px rgba(20,20,60,0.04)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {lead}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 800, fontSize: 14.5, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.clientName}</div>
+          <div style={{ fontSize: 12, color: "#6b6b8a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.serviceNames.join(", ")}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap", fontSize: 11.5, color: "#8a8aa3", fontWeight: 600 }}>
+            <Stethoscope size={11} /> {a.staffName || "Unassigned"} {meta}
+          </div>
+        </div>
+      </div>
+      {actions && <div style={{ display: "flex", gap: 6, marginTop: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>{actions}</div>}
+    </div>
+  );
+  const chip = (a: Appointment, color: string) => (
+    <div style={{ minWidth: 52, height: 52, borderRadius: 14, background: color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 900, flexShrink: 0, padding: "0 6px" }}>{a.tokenNo ?? "–"}</div>
+  );
+  const column = (title: string, count: number, color: string, icon: React.ReactNode, children: React.ReactNode, empty: { text: string; hint?: string }) => (
+    <section style={{ background: "#f7f7fb", borderRadius: 16, padding: 12, minWidth: 0, borderTop: `3px solid ${color}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 4px 10px", fontWeight: 900, fontSize: 14, color: "#1a1a2e" }}>
+        <span style={{ color, display: "flex" }}>{icon}</span> {title}
+        <span style={{ marginLeft: "auto", minWidth: 24, textAlign: "center", padding: "1px 8px", borderRadius: 20, background: `${color}1a`, color, fontSize: 12, fontWeight: 900 }}>{count}</span>
+      </div>
+      {count === 0 ? (
+        <div style={{ textAlign: "center", padding: "26px 10px", color: "#8a8aa3" }}>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>{empty.text}</div>
+          {empty.hint && <div style={{ fontSize: 12, marginTop: 4 }}>{empty.hint}</div>}
+        </div>
+      ) : children}
+    </section>
+  );
+
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", padding: 16 }}>
-      <PageTitle icon={<ListOrdered size={24} />} title="Queue" subtitle={`${waiting.length} waiting · ${serving.length} with the doctor`}
+    <div style={{ maxWidth: 1180, margin: "0 auto", padding: 16 }}>
+      <PageTitle icon={<ListOrdered size={24} />} title="Queue" subtitle={new Date().toLocaleDateString("en-PK", { weekday: "long", day: "numeric", month: "long" })}
         right={<div style={{ display: "flex", gap: 8 }}>
           <a href="/dashboard/queue/display" target="_blank" rel="noopener noreferrer" style={{ ...GHOST, textDecoration: "none" }}><Monitor size={14} /> Waiting-room screen</a>
           <button type="button" onClick={() => setWalkIn(true)} style={BTN}><UserPlus size={14} /> Walk-in</button>
         </div>} />
-      {notice && <div style={{ margin: "10px 0 0", padding: "8px 12px", background: "#f5f3ff", borderRadius: 9, fontSize: 13, color: "#5b21b6" }}>{notice}</div>}
 
-      <div style={SECTION}>Now serving</div>
-      {serving.length === 0 ? <div style={{ color: "#8a8aa3", fontSize: 13 }}>Nobody is in with a doctor.</div> :
-        serving.map((a) => row(a, token(a, "#16a34a"),
-          <button type="button" onClick={() => setStatus(a.id, "completed")} style={{ ...BTN, background: "#16a34a" }}><Check size={14} /> Done</button>))}
+      {notice && (
+        <div style={{ margin: "12px 0 0", padding: "9px 12px", background: "#f5f3ff", borderRadius: 10, fontSize: 13, color: "#5b21b6", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ flex: 1 }}>{notice}</span>
+          <button type="button" aria-label="Dismiss" onClick={() => setNotice("")} style={{ border: "none", background: "none", cursor: "pointer", color: "#5b21b6", display: "flex" }}><X size={15} /></button>
+        </div>
+      )}
 
-      <div style={SECTION}>Waiting ({waiting.length})</div>
-      {waiting.length === 0 ? <div style={{ color: "#8a8aa3", fontSize: 13 }}>No one waiting. Patients get a token when you check them in below.</div> :
-        waiting.map((a, i) => row(a, token(a, "#7C3AED"),
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <button type="button" title="Print token slip" aria-label="Print token slip" onClick={() => printSlip(a, i)} style={GHOST}><Printer size={13} /></button>
-            {!auto && (() => { const ph = getStoredClients().find((c) => c.id === a.clientId)?.phone; return ph ? <a href={whatsAppLink(ph, tokenMessage(a, i))} target="_blank" rel="noopener noreferrer" title="Send the token on WhatsApp" style={{ ...GHOST, textDecoration: "none", color: "#16a34a" }}><Send size={13} /></a> : null; })()}
-            <button type="button" onClick={() => setStatus(a.id, "in-progress")} style={BTN}><PhoneCall size={14} /> {i === 0 ? "Call next" : "Call"}</button>
-          </div>,
-          waited(a) !== null ? `waiting ${waited(a)} min` : undefined))}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", margin: "16px 0" }}>
+        {tile("Waiting", waiting.length, "#7C3AED", <Users size={19} />)}
+        {tile("With the doctor", serving.length, "#16a34a", <Stethoscope size={19} />)}
+        {tile("Seen today", seen.length, "#0891b2", <CircleCheck size={19} />)}
+        {tile("Longest wait", waits.length ? `${longest} min` : "–", longestColor, <Clock size={19} />)}
+      </div>
 
-      <div style={SECTION}>Expected today ({expected.length})</div>
-      {expected.length === 0 ? <div style={{ color: "#8a8aa3", fontSize: 13 }}>No more booked appointments today. Use Walk-in for patients without a booking.</div> :
-        expected.map((a) => row(a, <div style={{ width: 54, textAlign: "center", fontWeight: 800, fontSize: 13, color: "#6b6b8a" }}>{a.startTime}</div>,
-          <button type="button" onClick={() => setStatus(a.id, "arrived")} style={{ ...BTN, background: "#fff", color: "#7C3AED", border: "1px solid #ddd6fe" }}><LogIn size={14} /> Check in</button>))}
+      {doctors.length > 1 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }} role="tablist" aria-label="Filter by doctor">
+          {[["all", "All doctors"] as const, ...doctors].map(([id, name]) => (
+            <button key={id} type="button" role="tab" aria-selected={doc === id} onClick={() => setDoc(id)}
+              style={{ padding: "6px 14px", borderRadius: 20, border: `1px solid ${doc === id ? "#7C3AED" : "#e4e4ee"}`, background: doc === id ? "#7C3AED" : "#fff", color: doc === id ? "#fff" : "#6b6b8a", fontSize: 12.5, fontWeight: 800, cursor: "pointer" }}>{name}</button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14, alignItems: "start" }}>
+        {column("Expected today", expected.length, "#6b6b8a", <CalendarClock size={17} />,
+          expected.map((a) => card(a,
+            <div style={{ minWidth: 52, height: 52, borderRadius: 14, background: "#ececf4", color: "#4b4b6b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, flexShrink: 0 }}>{a.startTime}</div>, null,
+            <button type="button" onClick={() => setStatus(a.id, "arrived")} style={{ ...BTN, background: "#fff", color: "#7C3AED", border: "1px solid #ddd6fe" }}><LogIn size={14} /> Check in</button>)),
+          { text: "No booked appointments left today", hint: "Patients without a booking? Use Walk-in." })}
+
+        {column("Waiting", waiting.length, "#7C3AED", <Users size={17} />,
+          waiting.map((a, i) => card(a, chip(a, "#7C3AED"), waitPill(waited(a)),
+            <>
+              <button type="button" title="Print token slip" aria-label="Print token slip" onClick={() => printSlip(a, i)} style={GHOST}><Printer size={13} /></button>
+              {!auto && (() => { const ph = getStoredClients().find((c) => c.id === a.clientId)?.phone; return ph ? <a href={whatsAppLink(ph, tokenMessage(a, i))} target="_blank" rel="noopener noreferrer" title="Send the token on WhatsApp" style={{ ...GHOST, textDecoration: "none", color: "#16a34a" }}><Send size={13} /></a> : null; })()}
+              <button type="button" onClick={() => setStatus(a.id, "in-progress")} style={BTN}><PhoneCall size={14} /> {i === 0 ? "Call next" : "Call"}</button>
+            </>)),
+          { text: "No one is waiting", hint: "Check in an expected patient or add a walk-in." })}
+
+        {column("With the doctor", serving.length, "#16a34a", <Stethoscope size={17} />,
+          serving.map((a) => card(a, chip(a, "#16a34a"), null,
+            <button type="button" onClick={() => setStatus(a.id, "completed")} style={{ ...BTN, background: "#16a34a" }}><Check size={14} /> Done</button>)),
+          { text: "No one is in with a doctor" })}
+      </div>
+
+      {seen.length > 0 && (
+        <div style={{ marginTop: 22 }}>
+          <div style={SECTION}>Seen today</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {seen.slice(0, 12).map((a) => (
+              <span key={a.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 20, background: "#f0fdfa", color: "#0f766e", fontSize: 12, fontWeight: 700 }}>
+                {a.tokenNo ? <b>#{a.tokenNo}</b> : null} {a.clientName}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       {walkIn && <WalkInModal onClose={() => setWalkIn(false)} onSave={addWalkIn} />}
     </div>
   );
