@@ -1028,6 +1028,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   // The Salon Floor is a full-width live map: a top header replaces the left
   // sidebar there, and the sidebar only opens as a drawer from its ☰ button.
   const isFloorPage = pathname === "/dashboard/floor";
+  // The waiting-room screen runs on a TV: no sidebar, switchers, banners or bottom bar around it.
+  const isQueueDisplay = pathname === "/dashboard/queue/display";
 
   const bottomTabs = [
     { href: "/dashboard",             icon: LayoutDashboard, label: "Dashboard"    },
@@ -1048,8 +1050,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         style={isFloorPage && sidebarOpen ? { display: "block" } : undefined}
       />
 
-      {(!isFloorPage || sidebarOpen) && <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />}
-      <main className={isPosPage ? "pos-page-main" : ""} style={isFloorPage ? {
+      {!isQueueDisplay && (!isFloorPage || sidebarOpen) && <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />}
+      <main className={isPosPage ? "pos-page-main" : ""} style={isQueueDisplay ? {
+        marginLeft: 0, flex: 1, minWidth: 0, minHeight: "100vh", background: "#1d1442",
+      } : isFloorPage ? {
         marginLeft: 0,
         flex: 1,
         minWidth: 0,
@@ -1072,7 +1076,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           />
         )}
         {/* WhatsApp disconnection banner */}
-        {waStatus === "disconnected" && !waBannerDismissed && (
+        {waStatus === "disconnected" && !waBannerDismissed && !isQueueDisplay && (
           <div style={{
             display: "flex", alignItems: "center", gap: 12,
             padding: "11px 20px",
@@ -1104,15 +1108,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             resolveActor()), so showing them a switcher that can't actually
             move their data anywhere would just be a dead, confusing control.
             Admins have no salon at all, so neither switcher is shown to them. */}
-        {!isFloorPage && getCurrentUser()?.role === "owner" && getCurrentPlanId() === "premium" && (
+        {!isFloorPage && !isQueueDisplay && getCurrentUser()?.role === "owner" && getCurrentPlanId() === "premium" && (
           <DashboardLocationSwitcher onLocationChange={handleLocationChange} />
         )}
-        {!isAdmin && !isFloorPage && <DashboardSectionSwitcher onSectionChange={handleSectionChange} />}
+        {!isAdmin && !isFloorPage && !isQueueDisplay && <DashboardSectionSwitcher onSectionChange={handleSectionChange} />}
         <div key={`${locationRenderKey}::${sectionRenderKey}`}>{children}</div>
       </main>
 
       {/* Mobile Bottom Navigation Bar */}
-      {!isPosPage && !isAdmin && (
+      {!isPosPage && !isAdmin && !isQueueDisplay && (
       <nav className="bottom-nav">
         {/* Left tabs */}
         {leftTabs.map((tab) => {

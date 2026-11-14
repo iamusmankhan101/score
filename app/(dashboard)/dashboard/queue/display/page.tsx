@@ -28,7 +28,7 @@ export default function QueueDisplayPage() {
   const next = today.filter((a) => a.status === "arrived").sort(byToken).slice(0, 8);
 
   return (
-    <div ref={box} style={{ minHeight: "80vh", background: "#1d1442", color: "#fff", borderRadius: 16, padding: "28px 28px 36px", position: "relative" }}>
+    <div ref={box} style={{ minHeight: "100vh", background: "#1d1442", color: "#fff", padding: "32px 40px 44px", position: "relative" }}>
       <button type="button" aria-label="Full screen" onClick={() => box.current?.requestFullscreen?.().catch(() => {})}
         style={{ position: "absolute", top: 14, right: 14, border: "none", background: "rgba(255,255,255,0.12)", color: "#fff", borderRadius: 8, padding: 8, cursor: "pointer" }}><Maximize2 size={16} /></button>
       <div style={{ fontSize: 20, fontWeight: 800, opacity: 0.8 }}>{name}</div>
