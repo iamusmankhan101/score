@@ -270,25 +270,42 @@ export default function QueuePage() {
           { text: "No one is in with a doctor" })}
       </div>
 
-      {seen.length > 0 && (
-        <div style={{ marginTop: 22 }}>
-          <div style={SECTION}>Seen today</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {seen.slice(0, 12).map((a) => {
-              // Billed visits show a tick; the rest link straight to the POS with this visit loaded.
-              const billed = getSalonInvoices().some((inv) => inv.appointmentId === a.id);
+      {seen.length > 0 && (() => {
+        // Billed = the visit already has an invoice. Anyone else still needs checkout.
+        const invoiced = new Set(getSalonInvoices().map((inv) => inv.appointmentId).filter(Boolean));
+        const unbilled = seen.filter((a) => !invoiced.has(a.id)).length;
+        const seenAt = (a: Appointment) => a.completedAt ? new Date(a.completedAt).toLocaleTimeString("en-PK", { hour: "numeric", minute: "2-digit" }) : "";
+        return (
+          <section style={{ marginTop: 22, background: "#fff", border: "1px solid #ececf4", borderRadius: 16, overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid #f0f0f8", flexWrap: "wrap" }}>
+              <span style={{ color: "#0891b2", display: "flex" }}><CircleCheck size={17} /></span>
+              <b style={{ fontSize: 14, color: "#1a1a2e" }}>Seen today</b>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "#0891b2", background: "#0891b21a", padding: "1px 9px", borderRadius: 20 }}>{seen.length}</span>
+              <span style={{ marginLeft: "auto", fontSize: 12.5, fontWeight: 700, color: unbilled ? "#d97706" : "#16a34a" }}>
+                {unbilled ? `${unbilled} waiting to be billed` : "All billed ✓"}
+              </span>
+            </div>
+            {seen.slice(0, 15).map((a, i) => {
+              const billed = invoiced.has(a.id);
               return (
-                <span key={a.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 6px 5px 10px", borderRadius: 20, background: "#f0fdfa", color: "#0f766e", fontSize: 12, fontWeight: 700 }}>
-                  <span>{a.tokenNo ? <b>#{a.tokenNo}</b> : null} {a.clientName}</span>
+                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderTop: i ? "1px solid #f4f4fa" : "none", flexWrap: "wrap" }}>
+                  <div style={{ minWidth: 38, height: 38, borderRadius: 10, background: "#ecfeff", color: "#0e7490", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 15, flexShrink: 0 }}>{a.tokenNo ?? "–"}</div>
+                  <div style={{ flex: "1 1 180px", minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: 13.5, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.clientName}</div>
+                    <div style={{ fontSize: 12, color: "#6b6b8a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {a.serviceNames.join(", ")}{a.staffName ? ` · ${a.staffName}` : ""}{seenAt(a) ? ` · seen ${seenAt(a)}` : ""}
+                    </div>
+                  </div>
+                  <a href={`/dashboard/clients/${a.clientId}?rx=${a.id}`} style={{ ...GHOST, textDecoration: "none", color: "#7C3AED" }}>Prescription</a>
                   {billed
-                    ? <span style={{ color: "#16a34a" }}>✓ Billed</span>
-                    : <a href={`/dashboard/pos?appointmentId=${encodeURIComponent(a.id)}`} style={{ background: "#16a34a", color: "#fff", padding: "2px 10px", borderRadius: 14, textDecoration: "none" }}>Checkout</a>}
-                </span>
+                    ? <span style={{ fontSize: 12, fontWeight: 800, color: "#16a34a", background: "#f0fdf4", padding: "6px 12px", borderRadius: 9 }}>✓ Billed</span>
+                    : <a href={`/dashboard/pos?appointmentId=${encodeURIComponent(a.id)}`} style={{ ...BTN, background: "#16a34a", textDecoration: "none", padding: "7px 14px" }}>Checkout</a>}
+                </div>
               );
             })}
-          </div>
-        </div>
-      )}
+          </section>
+        );
+      })()}
       {slip && <TokenSlipModal a={slip.a} ahead={slip.ahead} phone={getStoredClients().find((c) => c.id === slip.a.clientId)?.phone} onClose={() => setSlip(null)} />}
       {walkIn && <WalkInModal onClose={() => setWalkIn(false)} onSave={addWalkIn} />}
     </div>
