@@ -40,7 +40,7 @@ import { getActiveLocationFilter } from "@/lib/locations";
 import { WaitlistOffer, waitlistMatches } from "@/components/waitlist-offer";
 import { canAccessHref } from "@/components/sidebar";
 import { getCurrentUser } from "@/lib/auth";
-import type { WaitlistEntry } from "@/lib/clinic";
+import { useIsClinic, type WaitlistEntry } from "@/lib/clinic";
 import { newClientId } from "@/lib/ids";
 
 function fmtDate(s: string) {
@@ -499,6 +499,7 @@ function DetailModal({ appt, onClose, clients, staffList, allServices, onStatusC
   onReschedule: (apptId: string, date: string, startTime: string) => void;
 }) {
   const [currentStatus, setCurrentStatus] = useState<AppointmentStatus>(appt.status);
+  const clinic = useIsClinic();
   const [editingTime, setEditingTime] = useState(false);
   const [newDate, setNewDate] = useState(appt.date);
   const [newTime, setNewTime] = useState(appt.startTime);
@@ -844,6 +845,13 @@ function DetailModal({ appt, onClose, clients, staffList, allServices, onStatusC
                 ))}
               </div>
             </div>
+          )}
+
+          {clinic && ["arrived", "in-progress", "completed"].includes(currentStatus) && (
+            <a href={`/dashboard/clients/${appt.clientId}?rx=${appt.id}`}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px 0", borderRadius: 12, border: "1.5px solid #ddd6fe", background: "#f5f3ff", color: "#7C3AED", fontSize: 13.5, fontWeight: 800, textDecoration: "none", marginBottom: 12 }}>
+              Write prescription
+            </a>
           )}
 
           {/* ── Status workflow ── */}

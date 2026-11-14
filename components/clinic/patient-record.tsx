@@ -120,8 +120,8 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "consultations", label: "Consultations", icon: ClipboardList },
   { id: "plans", label: "Plans & Packages", icon: ListChecks },
   { id: "charting", label: "Treatment Records", icon: Syringe },
-  { id: "consent", label: "Consent", icon: FileSignature },
   { id: "prescriptions", label: "Prescriptions", icon: Pill },
+  { id: "consent", label: "Consent", icon: FileSignature },
   { id: "photos", label: "Photos", icon: Camera },
   { id: "documents", label: "Documents", icon: FileText },
 ];
@@ -151,8 +151,16 @@ function loadData(): Data {
 
 export default function PatientClinicalRecord({ client, onClientChange }: { client: Client; onClientChange: (c: Client) => void }) {
   const [tab, setTab] = useState<Tab>("timeline");
+  // /dashboard/clients/<id>?rx=<appointmentId> opens a new prescription for that visit (linked from Appointments and Queue).
+  const [rxFor, setRxFor] = useState<string | null>(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("rx");
+    if (id) { setTab("prescriptions"); setRxFor(id); }
+  }, []);
   const [data, setData] = useState<Data | null>(null);
   const [allowed, setAllowed] = useState(true);
+  /** Logins with only the "Prescriptions" permission (e.g. reception) see just that tab. */
+  const [rxOnly, setRxOnly] = useState(false);
   const [canSeeLog, setCanSeeLog] = useState(false);
   const [portalMsg, setPortalMsg] = useState("");
 
@@ -160,14 +168,18 @@ export default function PatientClinicalRecord({ client, onClientChange }: { clie
     const user = getCurrentUser();
     const ok = canAccessHref(user, "/dashboard/medical");
     setAllowed(ok);
+    const rxLimited = !ok && canAccessHref(user, "/dashboard/prescriptions");
+    setRxOnly(rxLimited);
     setCanSeeLog(!!user && user.role !== "staff");
-    if (ok) audit("view", "clinical record", client.id);
+    if (ok || rxLimited) audit("view", "clinical record", client.id);
     const refresh = () => setData(loadData());
     refresh();
     return subscribeToStoredData(refresh);
   }, [client.id]);
 
   if (!data) return null;
+  const shownTab: Tab = rxOnly ? "prescriptions" : tab;
+  const tabList = rxOnly ? TABS.filter((t) => t.id === "prescriptions") : [...TABS, ...(canSeeLog ? [{ id: "access" as Tab, label: "Access Log", icon: ShieldCheck }] : [])];
   const refresh = () => setData(loadData());
   const allergies = client.medical?.allergies?.trim();
   async function sharePortal() {
@@ -208,17 +220,17 @@ export default function PatientClinicalRecord({ client, onClientChange }: { clie
             ) : null;
           })()}
         </div>
-        {allowed && allergies && (
+        {(allowed || rxOnly) && allergies && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", marginBottom: 12, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, fontSize: 12.5, fontWeight: 700, color: "#b91c1c" }}>
             <AlertTriangle size={14} /> Allergies: {allergies}
           </div>
         )}
-        {allowed && (
+        {(allowed || rxOnly) && (
           <div role="tablist" style={{ display: "flex", gap: 2, overflowX: "auto" }}>
-            {[...TABS, ...(canSeeLog ? [{ id: "access" as Tab, label: "Access Log", icon: ShieldCheck }] : [])].map(({ id, label, icon: Icon }) => (
-              <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+            {tabList.map(({ id, label, icon: Icon }) => (
+              <button key={id} type="button" role="tab" aria-selected={shownTab === id} onClick={() => setTab(id)}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 12px", border: "none", background: "none", cursor: "pointer", whiteSpace: "nowrap",
-                  fontSize: 12.5, fontWeight: 800, color: tab === id ? ACCENT : "#8a8aa3", borderBottom: `2px solid ${tab === id ? ACCENT : "transparent"}` }}>
+                  fontSize: 12.5, fontWeight: 800, color: shownTab === id ? ACCENT : "#8a8aa3", borderBottom: `2px solid ${shownTab === id ? ACCENT : "transparent"}` }}>
                 <Icon size={14} /> {label}
               </button>
             ))}
@@ -226,17 +238,17 @@ export default function PatientClinicalRecord({ client, onClientChange }: { clie
         )}
       </div>
       <div style={{ padding: 18 }}>
-        {!allowed ? (
+        {!allowed && !rxOnly ? (
           <Empty>Medical records are restricted. Ask the owner to give you the &ldquo;Medical Records&rdquo; permission.</Empty>
-        ) : tab === "timeline" ? <TimelineTab client={client} data={data} />
-          : tab === "medical" ? <MedicalTab client={client} clients={data.clients} onSaved={onClientChange} />
-          : tab === "consultations" ? <ConsultationsTab client={client} data={data} onChange={refresh} onPlanCreated={() => { refresh(); setTab("plans"); }} />
-          : tab === "plans" ? <PlansTab client={client} data={data} onChange={refresh} />
-          : tab === "charting" ? <ChartsTab client={client} data={data} onChange={refresh} />
-          : tab === "consent" ? <ConsentTab client={client} data={data} onChange={refresh} />
-          : tab === "prescriptions" ? <PrescriptionsTab client={client} data={data} onChange={refresh} />
-          : tab === "documents" ? <DocumentsTab client={client} onChange={refresh} />
-          : tab === "access" ? <AccessLogTab client={client} />
+        ) : shownTab === "timeline" ? <TimelineTab client={client} data={data} />
+          : shownTab === "medical" ? <MedicalTab client={client} clients={data.clients} onSaved={onClientChange} />
+          : shownTab === "consultations" ? <ConsultationsTab client={client} data={data} onChange={refresh} onPlanCreated={() => { refresh(); setTab("plans"); }} />
+          : shownTab === "plans" ? <PlansTab client={client} data={data} onChange={refresh} />
+          : shownTab === "charting" ? <ChartsTab client={client} data={data} onChange={refresh} />
+          : shownTab === "consent" ? <ConsentTab client={client} data={data} onChange={refresh} />
+          : shownTab === "prescriptions" ? <PrescriptionsTab client={client} data={data} onChange={refresh} rxFor={rxFor} onRxStarted={() => { setRxFor(null); window.history.replaceState(null, "", window.location.pathname); }} />
+          : shownTab === "documents" ? <DocumentsTab client={client} onChange={refresh} />
+          : shownTab === "access" ? <AccessLogTab client={client} />
           : <PhotosTab client={client} data={data} onChange={refresh} />}
       </div>
     </div>
@@ -776,13 +788,19 @@ function AccessLogTab({ client }: { client: Client }) {
 
 // ─── Prescriptions ───────────────────────────────────────────────────────────
 
-function PrescriptionsTab({ client, data, onChange }: { client: Client; data: Data; onChange: () => void }) {
-  const [editing, setEditing] = useState<Prescription | null>(null);
+function PrescriptionsTab({ client, data, onChange, rxFor, onRxStarted }: { client: Client; data: Data; onChange: () => void; rxFor?: string | null; onRxStarted?: () => void }) {
+  const [editing, setEditing] = useState<Prescription | null>(() => {
+    const appt = rxFor ? data.appointments.find((x) => x.id === rxFor && x.clientId === client.id) : undefined;
+    return appt ? { id: newId("rx"), clientId: client.id, date: todayKey(), items: [{ time: "Morning", product: "" }], createdAt: new Date().toISOString(),
+      appointmentId: appt.id, treatment: appt.serviceNames.join(", "), practitionerId: appt.staffId || undefined, practitionerName: appt.staffName || undefined } : null;
+  });
   const [error, setError] = useState("");
   const [sendState, runSend] = useSendState();
   const auto = autoWhatsApp();
   const mine = data.prescriptions.filter((p) => p.clientId === client.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const blank = (): Prescription => ({ id: newId("rx"), clientId: client.id, date: todayKey(), items: [{ time: "Morning", product: "" }], createdAt: new Date().toISOString() });
+  // Arriving from a visit (?rx=): the form opens already set to that treatment and that visit's doctor.
+  useEffect(() => { if (rxFor) onRxStarted?.(); }, [rxFor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div>
@@ -794,7 +812,7 @@ function PrescriptionsTab({ client, data, onChange }: { client: Client; data: Da
         <div key={rx.id} style={{ border: "1px solid #ececf4", borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <Pill size={15} color="#0891b2" />
-            <div style={{ flex: 1, fontSize: 13.5, fontWeight: 800, color: "#1a1a2e" }}>{fmtDate(rx.date)}{rx.diagnosis ? ` · ${rx.diagnosis}` : ""}{rx.practitionerName ? ` · ${rx.practitionerName}` : ""}</div>
+            <div style={{ flex: 1, fontSize: 13.5, fontWeight: 800, color: "#1a1a2e" }}>{fmtDate(rx.date)}{rx.treatment ? ` · after ${rx.treatment}` : ""}{rx.diagnosis ? ` · ${rx.diagnosis}` : ""}{rx.practitionerName ? ` · ${rx.practitionerName}` : ""}</div>
             <button type="button" onClick={() => { setError(""); audit("download", "prescription", client.id); downloadClinicPdf({ kind: "prescription", prescription: rx, patientName: client.name }, `Prescription - ${client.name} - ${rx.date}`).catch((e) => setError(e.message)); }}
               style={{ ...BTN_GHOST, padding: "6px 10px", fontSize: 11.5 }}><FileDown size={13} /> PDF</button>
             {client.phone && auto && (
@@ -819,7 +837,7 @@ function PrescriptionsTab({ client, data, onChange }: { client: Client; data: Da
         </div>
       ))}
       {editing && (
-        <PrescriptionForm initial={editing} staff={data.staff} client={client} concerns={data.consultations.filter((c) => c.clientId === client.id).flatMap((c) => c.concerns)} onClose={() => setEditing(null)}
+        <PrescriptionForm initial={editing} staff={data.staff} services={data.services} client={client} concerns={data.consultations.filter((c) => c.clientId === client.id).flatMap((c) => c.concerns)} onClose={() => setEditing(null)}
           onDelete={mine.some((p) => p.id === editing.id) ? () => { removeRecord(getPrescriptions, savePrescriptions, editing.id); setEditing(null); onChange(); } : undefined}
           onSave={(rx) => { upsertRecord(getPrescriptions, savePrescriptions, rx); setEditing(null); onChange(); }} />
       )}
@@ -827,8 +845,8 @@ function PrescriptionsTab({ client, data, onChange }: { client: Client; data: Da
   );
 }
 
-function PrescriptionForm({ initial, staff, client, concerns, onClose, onSave, onDelete }: {
-  initial: Prescription; staff: Staff[]; client: Client; concerns: string[]; onClose: () => void; onSave: (rx: Prescription) => void; onDelete?: () => void;
+function PrescriptionForm({ initial, staff, services, client, concerns, onClose, onSave, onDelete }: {
+  initial: Prescription; staff: Staff[]; services: Service[]; client: Client; concerns: string[]; onClose: () => void; onSave: (rx: Prescription) => void; onDelete?: () => void;
 }) {
   const [rx, setRx] = useState(initial);
   const [templates, setTemplates] = useState<PrescriptionTemplate[]>(() => prescriptionTemplates());
@@ -857,6 +875,10 @@ function PrescriptionForm({ initial, staff, client, concerns, onClose, onSave, o
           <AlertTriangle size={14} /> Allergies: {client.medical?.allergies}
         </div>
       )}
+      <Field label="After treatment">
+        <input list="rx-treatments" value={rx.treatment ?? ""} onChange={(e) => setRx({ ...rx, treatment: e.target.value || undefined })} placeholder="Treatment this follows (optional)" style={{ ...INP, marginBottom: 12 }} />
+        <datalist id="rx-treatments">{services.filter((sv) => sv.isActive !== false).map((sv) => <option key={sv.id} value={sv.name} />)}</datalist>
+      </Field>
       <Field label="Diagnosis / condition">
         <input list="rx-diagnoses" value={rx.diagnosis ?? ""} onChange={(e) => setRx({ ...rx, diagnosis: e.target.value })} placeholder="e.g. Acne, Melasma, Eczema — type or pick" style={{ ...INP, marginBottom: 12 }} />
         <datalist id="rx-diagnoses">{suggestions.map((d) => <option key={d} value={d} />)}</datalist>

@@ -70,6 +70,7 @@ export function renderPrescriptionPdf(clinic: ClinicPdfHeader, patientName: stri
         <Text style={s.title}>Prescription</Text>
         <Text style={s.meta}>Patient: {patientName}</Text>
         <Text style={s.meta}>Date: {rx.date}</Text>
+        {rx.treatment ? <Text style={s.meta}>Treatment: {rx.treatment}</Text> : null}
         {rx.diagnosis ? <Text style={s.meta}>Diagnosis: {rx.diagnosis}</Text> : null}
         {rx.practitionerName ? <Text style={s.meta}>Prescribed by: {rx.practitionerName}</Text> : null}
         {times.map((time) => (

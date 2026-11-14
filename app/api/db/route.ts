@@ -22,7 +22,7 @@ const ENTITY_PERMISSIONS: Record<string, string[]> = {
   consultations: ["medical"],
   treatment_plans: ["medical"],
   clinic_photos: ["medical"],
-  prescriptions: ["medical"],
+  prescriptions: ["medical", "prescriptions"],
   treatment_charts: ["medical"],
   clinic_documents: ["medical"],
   cash_closings: ["cash-closing", "invoices", "revenue"],

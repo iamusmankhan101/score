@@ -7,7 +7,7 @@ import { use, useEffect, useState } from "react";
 interface Portal {
   clinicName: string; phone: string; bookUrl: string; patientName: string;
   appointments: { id: string; date: string; startTime: string; services: string[]; doctor: string; status: string }[];
-  prescriptions: { id: string; date: string; doctor?: string; diagnosis?: string; items: { time: string; product: string; dosage?: string; frequency?: string; duration?: string; instructions?: string }[]; notes?: string }[];
+  prescriptions: { id: string; date: string; doctor?: string; diagnosis?: string; treatment?: string; items: { time: string; product: string; dosage?: string; frequency?: string; duration?: string; instructions?: string }[]; notes?: string }[];
   records: { id: string; date: string; doctor?: string; concerns: string[]; advice?: string }[];
   consents: { id: string; title: string; signedAt: string }[];
   plans: { id: string; title: string; closed: boolean; total: number; done: number; next?: string }[];
@@ -65,6 +65,7 @@ export default function PortalPage({ params }: { params: Promise<{ token: string
         </div>)))}
       {tab === "prescriptions" && (data.prescriptions.length === 0 ? empty("No prescriptions yet.") : data.prescriptions.map((p) => (
         <div key={p.id} style={CARD}><b>{fmt(p.date)}</b>{p.doctor && <span style={{ fontSize: 12, color: "#8a8aa3" }}> · {p.doctor}</span>}
+          {p.treatment && <div style={{ fontSize: 13, marginTop: 4 }}>After: {p.treatment}</div>}
           {p.diagnosis && <div style={{ fontSize: 13, marginTop: 4 }}>For: {p.diagnosis}</div>}
           {p.items.map((i, n) => <div key={n} style={{ fontSize: 13, marginTop: 6 }}><b>{i.product}</b> <span style={{ color: "#6b6b8a" }}>({i.time}{[i.dosage, i.frequency, i.duration].filter(Boolean).map((x) => `, ${x}`).join("")})</span>{i.instructions && <div style={{ fontSize: 12, color: "#8a8aa3" }}>{i.instructions}</div>}</div>)}
           {p.notes && <div style={{ fontSize: 12, marginTop: 8, color: "#6b6b8a" }}>{p.notes}</div>}

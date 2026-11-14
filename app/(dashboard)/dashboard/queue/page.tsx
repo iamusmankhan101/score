@@ -58,6 +58,8 @@ export default function QueuePage() {
   const today = todayKey();
   const [walkIn, setWalkIn] = useState(false);
   const [notice, setNotice] = useState("");
+  /** Shown after a patient is marked done, so the prescription is written while the visit is fresh. */
+  const [rxPrompt, setRxPrompt] = useState<{ clientId: string; apptId: string; name: string } | null>(null);
   const auto = autoWhatsApp();
 
   useEffect(() => {
@@ -75,6 +77,7 @@ export default function QueuePage() {
     saveAppointments(list);
     setAppts(list);
     if (status === "arrived") announce(list, id);
+    if (status === "completed") { const a = list.find((x) => x.id === id); if (a) setRxPrompt({ clientId: a.clientId, apptId: a.id, name: a.clientName }); }
   }
 
   /** Sends the token to the patient's WhatsApp when it is connected; otherwise the row shows a WhatsApp button. */
@@ -188,6 +191,14 @@ export default function QueuePage() {
         </div>
       )}
 
+      {rxPrompt && (
+        <div style={{ margin: "12px 0 0", padding: "9px 12px", background: "#f0fdf4", borderRadius: 10, fontSize: 13, color: "#166534", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ flex: 1 }}>{rxPrompt.name} is done.</span>
+          <a href={`/dashboard/clients/${rxPrompt.clientId}?rx=${rxPrompt.apptId}`} style={{ fontWeight: 800, color: "#7C3AED", textDecoration: "none" }}>Write prescription</a>
+          <button type="button" aria-label="Dismiss" onClick={() => setRxPrompt(null)} style={{ border: "none", background: "none", cursor: "pointer", color: "#166534", display: "flex" }}><X size={15} /></button>
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", margin: "16px 0" }}>
         {tile("Waiting", waiting.length, "#7C3AED", <Users size={19} />)}
         {tile("With the doctor", serving.length, "#16a34a", <Stethoscope size={19} />)}
@@ -222,7 +233,10 @@ export default function QueuePage() {
 
         {column("With the doctor", serving.length, "#16a34a", <Stethoscope size={17} />,
           serving.map((a) => card(a, chip(a, "#16a34a"), null,
-            <button type="button" onClick={() => setStatus(a.id, "completed")} style={{ ...BTN, background: "#16a34a" }}><Check size={14} /> Done</button>)),
+            <>
+              <a href={`/dashboard/clients/${a.clientId}?rx=${a.id}`} style={{ ...GHOST, textDecoration: "none", color: "#7C3AED" }}>Prescription</a>
+              <button type="button" onClick={() => setStatus(a.id, "completed")} style={{ ...BTN, background: "#16a34a" }}><Check size={14} /> Done</button>
+            </>)),
           { text: "No one is in with a doctor" })}
       </div>
 
