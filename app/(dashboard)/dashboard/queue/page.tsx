@@ -14,8 +14,8 @@ import { applyClientCredits, creditsFromAppointments, newGuestClient } from "@/l
 import { autoWhatsApp, clinicHeader, sendClinicWhatsApp, whatsAppLink } from "@/lib/clinic-wa";
 import { settingsStore } from "@/lib/settings-store";
 import { getSalonInvoices } from "@/lib/salon-invoices";
-import { todayKey, withToken } from "@/lib/clinic-core";
-import { newId } from "@/lib/clinic";
+import { nextToCall, todayKey, withToken } from "@/lib/clinic-core";
+import { autoCallNext, newId, setAutoCallNext } from "@/lib/clinic";
 import type { Appointment, AppointmentStatus, Client, Service, Staff } from "@/lib/types";
 
 const BTN: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 9, border: "none", background: "#7C3AED", color: "#fff", fontSize: 12.5, fontWeight: 800, cursor: "pointer" };
@@ -69,6 +69,8 @@ export default function QueuePage() {
   const today = todayKey();
   const [walkIn, setWalkIn] = useState(false);
   const [notice, setNotice] = useState("");
+  const [autoCall, setAutoCall] = useState(true);
+  useEffect(() => { const t = setTimeout(() => setAutoCall(autoCallNext()), 0); return () => clearTimeout(t); }, []);
   /** The token slip being shown in the popup (nothing prints until the user chooses). */
   const [slip, setSlip] = useState<{ a: Appointment; ahead: number } | null>(null);
   /** Shown after a patient is marked done, so the prescription is written while the visit is fresh. */
@@ -88,8 +90,16 @@ export default function QueuePage() {
     // Read the freshest list so a change made on another screen isn't overwritten.
     let list = getStoredAppointments().map((a) => a.id === id ? { ...a, status } : a);
     if (status === "arrived") list = withToken(list, id);
+    // A finished visit calls the next waiting patient, any doctor (unless switched off).
+    let called: Appointment | undefined;
+    if (status === "completed" && autoCallNext()) {
+      const done = list.find((a) => a.id === id);
+      called = done && nextToCall(list, done);
+      if (called) list = list.map((a) => a.id === called!.id ? { ...a, status: "in-progress" as const } : a);
+    }
     saveAppointments(list);
     setAppts(list);
+    if (called) setNotice(`Token ${called.tokenNo} called automatically.`);
     if (status === "arrived") {
       announce(list, id);
       const a = list.find((x) => x.id === id);
@@ -210,6 +220,9 @@ export default function QueuePage() {
       <PageTitle icon={<ListOrdered size={24} />} title="Queue" subtitle={new Date().toLocaleDateString("en-PK", { weekday: "long", day: "numeric", month: "long" })}
         right={<div style={{ display: "flex", gap: 8 }}>
           <a href="/dashboard/queue/display" target="_blank" rel="noopener noreferrer" style={{ ...GHOST, textDecoration: "none" }}><Monitor size={14} /> Waiting-room screen</a>
+          <label title="When a visit is marked Done, call the next waiting patient" style={{ ...GHOST, cursor: "pointer", userSelect: "none" }}>
+            <input type="checkbox" checked={autoCall} onChange={(e) => { setAutoCall(e.target.checked); setAutoCallNext(e.target.checked); }} style={{ accentColor: "#7C3AED" }} /> Auto-call next
+          </label>
           <button type="button" onClick={() => setWalkIn(true)} style={BTN}><UserPlus size={14} /> Walk-in</button>
         </div>} />
 

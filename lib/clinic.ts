@@ -643,3 +643,14 @@ export function patientTimeline(input: {
   }
   return events.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
 }
+
+// ─── Auto-call ───────────────────────────────────────────────────────────────
+
+const AUTOCALL_KEY = "werzio_queue_autocall";
+/** Whether finishing a visit calls the next waiting patient. On unless switched off on this device. */
+export function autoCallNext(): boolean {
+  try { return localStorage.getItem(AUTOCALL_KEY) !== "off"; } catch { return true; }
+}
+export function setAutoCallNext(on: boolean): void {
+  try { localStorage.setItem(AUTOCALL_KEY, on ? "on" : "off"); } catch { /* storage unavailable: stays on */ }
+}

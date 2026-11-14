@@ -192,3 +192,13 @@ export function withToken(list: Appointment[], apptId: string, nowIso = new Date
   const next = Math.max(0, ...list.filter((a) => a.date === target.date).map((a) => a.tokenNo ?? 0)) + 1;
   return list.map((a) => a.id === apptId ? { ...a, tokenNo: next, arrivedAt: a.arrivedAt ?? nowIso } : a);
 }
+
+/**
+ * After a visit finishes, who to call next: the waiting patient with the lowest token that day,
+ * whichever doctor they are booked with.
+ */
+export function nextToCall(list: Appointment[], done: Appointment): Appointment | undefined {
+  return list
+    .filter((a) => a.date === done.date && a.status === "arrived")
+    .sort((a, b) => (a.tokenNo ?? 0) - (b.tokenNo ?? 0))[0];
+}

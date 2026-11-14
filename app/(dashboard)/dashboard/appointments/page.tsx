@@ -34,13 +34,13 @@ import { fmtCurrency as fmt } from "@/lib/format";
 import { TimeSelect } from "@/components/time-select";
 import { returnToStock, settleServiceConsumption, settledConsumption } from "@/lib/inventory-consumption";
 import { isWeeklyOff } from "@/lib/attendance";
-import { withToken } from "@/lib/clinic-core";
+import { nextToCall, withToken } from "@/lib/clinic-core";
 import { assignResources, resourceClash, resourcesAt, type ClinicResource } from "@/lib/clinic-resources";
 import { getActiveLocationFilter } from "@/lib/locations";
 import { WaitlistOffer, waitlistMatches } from "@/components/waitlist-offer";
 import { canAccessHref } from "@/components/sidebar";
 import { getCurrentUser } from "@/lib/auth";
-import { term, useIsClinic, type WaitlistEntry } from "@/lib/clinic";
+import { autoCallNext, term, useIsClinic, type WaitlistEntry } from "@/lib/clinic";
 import { newClientId } from "@/lib/ids";
 
 function fmtDate(s: string) {
@@ -2246,6 +2246,12 @@ export default function AppointmentsPage() {
               const completedAt = newStatus === "completed" ? new Date().toISOString() : undefined;
               let updated = prev.map((a) => a.id === apptId ? { ...a, status: newStatus, completedAt: a.completedAt ?? completedAt } : a);
               if (newStatus === "arrived") updated = withToken(updated, apptId); // waiting-room token
+              if (clinic && newStatus === "completed" && autoCallNext()) {
+                // Finishing a visit calls the next waiting patient (any doctor).
+                const done = updated.find((x) => x.id === apptId);
+                const nxt = done && nextToCall(updated, done);
+                if (nxt) updated = updated.map((x) => x.id === nxt.id ? { ...x, status: "in-progress" as const } : x);
+              }
               saveAppointments(updated);
               return updated;
             });
