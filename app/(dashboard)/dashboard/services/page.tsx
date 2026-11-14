@@ -1229,7 +1229,7 @@ export default function ServicesPage() {
           <span style={{ fontSize: 12, fontWeight: 750, color: "#7C3AED" }}>Showing {getActiveSection()} + unassigned services</span>
         </div>
       ) : (
-        <div className="filter-tabs" style={{ display: "flex", gap: 6, background: "#f4f4f9", border: "1px solid #e3e0eb", borderRadius: 12, padding: 4, alignSelf: "flex-start", marginBottom: 4 }}>
+        <div className="filter-tabs" style={{ display: "flex", flexWrap: "wrap", gap: 6, background: "#f4f4f9", border: "1px solid #e3e0eb", borderRadius: 12, padding: 4, alignSelf: "flex-start", maxWidth: "100%", minWidth: 0, marginBottom: 4 }}>
           {tabSections.map((sec) => {
             const active = sectionFilter === sec;
             return (
@@ -1269,7 +1269,8 @@ export default function ServicesPage() {
                 fontWeight: 750,
                 cursor: "pointer",
                 boxShadow: active ? "0 4px 10px var(--accent-glow)" : "none",
-                transition: "all 0.18s ease"
+                transition: "all 0.18s ease",
+                whiteSpace: "nowrap"
               }}>
               {cat === "all" ? "All Services" : catLabel(cat)}
             </button>
