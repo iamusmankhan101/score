@@ -640,6 +640,8 @@ export default function InvoicesPage() {
           subtitle={activeSection === "all" ? "Receipts from completed POS transactions" : `Restricted to ${activeSection} only`}
         />
 
+        {filtered.length > 0 && <InvoiceDiagnostics month={month} section={activeSection} defaultOpen={false} />}
+
         {/* Stats */}
         <div className="stats-grid-4">
           <StatCard label="Transactions " value={String(stats.total)}        sub={`${stats.paidCount} paid · ${stats.unpaidCount} unpaid`} icon={<ReceiptText size={22} />} bg="rgba(124, 58, 237, 0.08)" color="var(--accent)" />

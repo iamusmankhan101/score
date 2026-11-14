@@ -47,6 +47,21 @@ function recentKey(entity: string): string {
   return `werzio_sync_arrived_${entity}`;
 }
 
+/**
+ * Entity lists live in localStorage, which is only a cache of what Turso holds.
+ * When the browser's quota is full a write throws, and the page would keep
+ * reading the old copy forever, so newer records (invoices made since) never
+ * showed. A failed write is kept in memory for this tab instead, and reads
+ * prefer it; the next load rebuilds it from Turso.
+ */
+const memCache = new Map<string, string>();
+export function cacheSet(key: string, value: string): void {
+  try { localStorage.setItem(key, value); memCache.delete(key); } catch { memCache.set(key, value); }
+}
+export function cacheGet(key: string): string | null {
+  return memCache.get(key) ?? localStorage.getItem(key);
+}
+
 export function entityStorageKey(entity: string, locationId?: string): string {
   return locationUserKey(`werzio_${entity}`, locationId);
 }
@@ -125,7 +140,7 @@ function writeArrivals(entity: string, ids: string[], at: number, locationId?: s
 function storedList(entity: string, locationId?: string): Rec[] {
   if (typeof window === "undefined") return [];
   try {
-    const parsed = JSON.parse(localStorage.getItem(entityStorageKey(entity, locationId)) ?? "[]");
+    const parsed = JSON.parse(cacheGet(entityStorageKey(entity, locationId)) ?? "[]");
     return Array.isArray(parsed) ? parsed as Rec[] : [];
   } catch {
     return [];

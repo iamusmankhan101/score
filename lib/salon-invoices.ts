@@ -6,6 +6,7 @@
 import type { PaymentMethod } from "@/lib/types";
 import { persistEntity, recordDeletions } from "@/lib/turso-sync";
 import { locationUserKey } from "@/lib/locations";
+import { cacheGet } from "@/lib/sync-records";
 
 export type SalonInvoiceStatus = "paid" | "unpaid" | "partial";
 
@@ -288,7 +289,7 @@ export function getSalonInvoices(): SalonInvoice[] {
   if (typeof window === "undefined") return [];
   try {
     const key = locationUserKey(BASE_KEY);
-    const parsed = JSON.parse(localStorage.getItem(key) || "[]") as SalonInvoice[];
+    const parsed = JSON.parse(cacheGet(key) || "[]") as SalonInvoice[];
     let migrated = false;
     const invoices = parsed.map((invoice) => {
       if (invoice.source !== "pos" || !invoice.createdAt) return invoice;

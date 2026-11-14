@@ -2,6 +2,8 @@ import { getCurrentUser, userKey } from "./auth";
 import { getActiveLocationFilter, locationUserKey } from "./locations";
 import { appendDeletions, getDeletedRecords, isActiveDeletion, DELETED_RECORDS_ENTITY } from "./deleted-records";
 import {
+  cacheGet,
+  cacheSet,
   entityStorageKey,
   noteSyncedArrivals,
   pickNewer,
@@ -72,7 +74,7 @@ export async function syncFromDB(): Promise<void> {
         // a DB row that is behind (or was raced by a smaller concurrent save) silently
         // truncates whatever the browser already had — this is how the expenses total
         // dropped from 400k+ to a handful of recent entries.
-        const lsRaw = localStorage.getItem(entityStorageKey(entity, locationId));
+        const lsRaw = cacheGet(entityStorageKey(entity, locationId));
         const localList: Record<string, unknown>[] = [];
         if (lsRaw) {
           try { localList.push(...(JSON.parse(lsRaw) as Record<string, unknown>[])); } catch { /* ignore */ }
@@ -139,7 +141,7 @@ export async function syncFromDB(): Promise<void> {
         }
 
         const union = [...merged, ...localOnly];
-        localStorage.setItem(entityStorageKey(entity, locationId), JSON.stringify(union));
+        cacheSet(entityStorageKey(entity, locationId), JSON.stringify(union));
 
         if (localOnly.length > 0 || localWon) {
           // Push the reconciled (union) list back up so Turso stops being behind.
@@ -412,11 +414,7 @@ export async function persistEntity(entity: Entity, list: unknown[], options: Pe
   // In particular, a large client photo or a long offline history can fill the
   // browser quota and make an otherwise valid import throw before it reaches
   // the database. Keep the previous cache until the remote write succeeds.
-  try {
-    localStorage.setItem(key, serialized);
-  } catch (error) {
-    console.warn(`[persistEntity:${entity}] local cache is full; continuing with remote save`, error);
-  }
+  cacheSet(key, serialized); // keeps it in memory if the browser quota is full; the remote save below still runs
 
   // Tombstones go up first so the record write that follows is already filtered
   // against them server-side. (Out of order it still converges — the next GET

@@ -2,6 +2,7 @@ import { APPOINTMENTS as mockAppointments, CLIENTS as mockClients, STAFF as mock
 import type { Appointment, Client, Staff, Service, InventoryItem } from "./types";
 import { persistEntity, DATA_SYNCED_EVENT } from "./turso-sync";
 import { userKey } from "./auth";
+import { cacheGet } from "./sync-records";
 import { getActiveLocationFilter, locationUserKey } from "./locations";
 import { logStockChanges, type StockChange } from "./inventory-log";
 
@@ -55,7 +56,7 @@ export function getStoredAppointments(): Appointment[] {
   if (typeof window === "undefined") return mockAppointments;
   checkSchema();
   const key = locationUserKey(K.appointments);
-  const saved = localStorage.getItem(key);
+  const saved = cacheGet(key);
   if (!saved) {
     const initial = initialData(mockAppointments);
     localStorage.setItem(key, JSON.stringify(initial));
@@ -75,7 +76,7 @@ export function getStoredClients(): Client[] {
   if (typeof window === "undefined") return mockClients;
   checkSchema();
   const key = locationUserKey(K.clients);
-  const saved = localStorage.getItem(key);
+  const saved = cacheGet(key);
   if (!saved) {
     const initial = normalizeClients(initialData(mockClients));
     localStorage.setItem(key, JSON.stringify(initial));
@@ -105,7 +106,7 @@ export function getStoredStaff(): Staff[] {
   if (typeof window === "undefined") return mockStaff;
   checkSchema();
   const key = locationUserKey(K.staff);
-  const saved = localStorage.getItem(key);
+  const saved = cacheGet(key);
   if (!saved) {
     const initial = initialData(mockStaff);
     localStorage.setItem(key, JSON.stringify(initial));
@@ -126,7 +127,7 @@ export function getStoredServices(): Service[] {
   if (typeof window === "undefined") return mockServices;
   checkSchema();
   const key = locationUserKey(K.services);
-  const saved = localStorage.getItem(key);
+  const saved = cacheGet(key);
   if (!saved) {
     const initial = initialData(mockServices);
     localStorage.setItem(key, JSON.stringify(initial));
@@ -163,7 +164,7 @@ export function getStoredInventory(): InventoryItem[] {
   if (typeof window === "undefined") return mockInventory;
   checkSchema();
   const key = locationUserKey(K.inventory);
-  const saved = localStorage.getItem(key);
+  const saved = cacheGet(key);
   if (!saved) {
     const initial = initialData(mockInventory);
     localStorage.setItem(key, JSON.stringify(initial));
