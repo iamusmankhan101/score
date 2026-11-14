@@ -29,14 +29,23 @@ const tokenMessage = (a: Appointment, ahead: number) =>
 
 /** Opens a small printable token slip and prints it. */
 function printSlip(a: Appointment, ahead: number) {
-  const w = window.open("", "_blank", "width=320,height=420");
+  const w = window.open("", "_blank", "width=340,height=460");
   if (!w) return;
   const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
-  w.document.write(`<!doctype html><title>Token ${a.tokenNo}</title><style>body{font-family:system-ui,sans-serif;text-align:center;margin:0;padding:12px;width:72mm}
-    h1{font-size:15px;margin:0 0 6px}.n{font-size:84px;font-weight:900;line-height:1;margin:8px 0}.s{font-size:13px;margin:3px 0}.m{font-size:11px;color:#555}</style>
-    <h1>${esc(clinicHeader().name)}</h1><div class="m">Your token</div><div class="n">${a.tokenNo}</div>
-    <div class="s"><b>${esc(a.clientName)}</b></div><div class="s">${esc(a.staffName)}</div>
-    <div class="m">${esc(todayKey())} · ${esc(hhmm())}</div><div class="m">${ahead > 0 ? `${ahead} ahead of you` : "You are next"}</div>
+  // 80 mm thermal roll: the page is 80 mm wide with no margins, everything black and centred.
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>Token ${a.tokenNo}</title><style>
+    @page{size:80mm 100mm;margin:0}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;width:80mm}
+    body{font-family:Arial,Helvetica,sans-serif;text-align:center;color:#000;padding:4mm 5mm}
+    h1{font-size:16px;margin:0 0 2mm;line-height:1.2}
+    .l{font-size:12px;margin:0}.n{font-size:92px;font-weight:900;line-height:1;margin:2mm 0}
+    .s{font-size:14px;font-weight:700;margin:1mm 0}.m{font-size:11px;margin:1mm 0}
+    hr{border:0;border-top:1px dashed #000;margin:3mm 0}
+  </style>
+    <h1>${esc(clinicHeader().name)}</h1><hr><div class="l">Your token</div><div class="n">${a.tokenNo}</div><hr>
+    <div class="s">${esc(a.clientName)}</div>${a.staffName ? `<div class="s">${esc(a.staffName)}</div>` : ""}
+    <div class="m">${esc(todayKey())} &middot; ${esc(hhmm())}</div><div class="s">${ahead > 0 ? `${ahead} ahead of you` : "You are next"}</div>
     <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300)}</script>`);
   w.document.close();
 }
