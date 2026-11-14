@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- the logo is a clinic-chosen URL of any size */
 
 /**
  * Waiting-room screen. Open it on a TV signed in to the clinic: it shows the tokens being
@@ -33,6 +34,9 @@ export default function QueueDisplayPage() {
   const [clinic, setClinic] = useState<{ name: string; logo?: string }>({ name: "" });
   const [now, setNow] = useState(() => new Date());
   const [sound, setSound] = useState(false);
+  // "white": the logo is drawn in plain white straight on the screen. That only works when it has a transparent
+  // background; otherwise (or if it can't be inspected) it stays in a white box.
+  const [logoMode, setLogoMode] = useState<"white" | "box">("box");
   const [justCalled, setJustCalled] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const audio = useRef<AudioContext | null>(null);
@@ -65,6 +69,23 @@ export default function QueueDisplayPage() {
     return () => { window.clearInterval(poll); window.clearInterval(tick); off(); };
   }, []);
 
+  const logoUrl = clinic.logo;
+  useEffect(() => {
+    if (!logoUrl) return;
+    const im = new Image();
+    im.crossOrigin = "anonymous";
+    im.onload = () => {
+      try {
+        const c = document.createElement("canvas"); c.width = 8; c.height = 8;
+        const g = c.getContext("2d")!; g.drawImage(im, 0, 0, 8, 8);
+        const corners = [0, 7].flatMap((x) => [0, 7].map((y) => g.getImageData(x, y, 1, 1).data[3]));
+        setLogoMode(corners.every((a) => a < 20) ? "white" : "box");
+      } catch { setLogoMode("box"); }
+    };
+    im.onerror = () => setLogoMode("box");
+    im.src = logoUrl;
+  }, [logoUrl]);
+
   function toggleSound() {
     if (!sound) {
       audio.current ??= new AudioContext();
@@ -82,7 +103,41 @@ export default function QueueDisplayPage() {
   const time = now.toLocaleTimeString("en-PK", { hour: "numeric", minute: "2-digit" });
   const date = now.toLocaleDateString("en-PK", { weekday: "long", day: "numeric", month: "long" });
 
-  const label: React.CSSProperties = { fontSize: "clamp(13px, 1.3vw, 20px)", letterSpacing: "0.22em", textTransform: "uppercase", color: "#c4b5fd", fontWeight: 700 };
+  const firstName = (full: string) => full.trim().split(/\s+/)[0] || "";
+  const minutesWaiting = (a: Appointment) => a.arrivedAt ? Math.max(0, Math.round((now.getTime() - new Date(a.arrivedAt).getTime()) / 60000)) : null;
+  const waitColor = (m: number) => m >= 30 ? ["#fef2f2", "#dc2626"] : m >= 15 ? ["#fffbeb", "#d97706"] : ["#f0fdf4", "#16a34a"];
+
+  /** One patient card (first name only, never the full name). */
+  const card = (a: Appointment, color: string, serving: boolean, isNext = false) => {
+    const m = serving ? null : minutesWaiting(a);
+    const wc = m === null ? null : waitColor(m);
+    return (
+      <div key={a.id} style={{ background: "#fff", color: "#1a1a2e", borderRadius: 22, padding: "clamp(12px, 1.4vw, 22px)", display: "flex", alignItems: "center", gap: "clamp(14px, 1.8vw, 28px)", marginBottom: "clamp(10px, 1.2vw, 18px)",
+        outline: isNext ? "3px solid #c4b5fd" : undefined, animation: justCalled === a.id ? "qd-pulse 1.4s ease-in-out infinite" : undefined }}>
+        <div style={{ minWidth: "clamp(70px, 8vw, 130px)", height: "clamp(70px, 8vw, 130px)", borderRadius: 20, background: color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(34px, 4.6vw, 76px)", fontWeight: 900, flexShrink: 0, padding: "0 10px" }}>{a.tokenNo}</div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontWeight: 800, fontSize: "clamp(20px, 2.6vw, 42px)", lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{firstName(a.clientName)}</div>
+          <div style={{ fontSize: "clamp(14px, 1.6vw, 26px)", color: "#6b6b8a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.serviceNames.join(", ")}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 4, fontSize: "clamp(13px, 1.4vw, 22px)", color: "#8a8aa3", fontWeight: 700 }}>
+            {a.staffName && <span>{a.staffName}</span>}
+            {wc && m !== null && <span style={{ background: wc[0], color: wc[1], padding: "2px 12px", borderRadius: 20 }}>{m} min</span>}
+            {serving && justCalled === a.id && <span style={{ color: "#16a34a" }}>Please proceed</span>}
+            {isNext && <span style={{ color: "#7C3AED" }}>Next</span>}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  const column = (title: string, count: number, color: string, cards: React.ReactNode[], emptyText: string) => (
+    <section style={{ background: "rgba(255,255,255,0.07)", borderRadius: 26, padding: "clamp(12px, 1.6vw, 24px)", borderTop: `5px solid ${color}`, minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "4px 6px clamp(10px, 1.2vw, 18px)" }}>
+        <span style={{ fontSize: "clamp(18px, 2.2vw, 34px)", fontWeight: 800 }}>{title}</span>
+        <span style={{ marginLeft: "auto", minWidth: 36, textAlign: "center", fontSize: "clamp(14px, 1.6vw, 26px)", fontWeight: 800, background: `${color}33`, color: "#fff", padding: "2px 14px", borderRadius: 20 }}>{count}</span>
+      </div>
+      {count === 0 ? <div style={{ textAlign: "center", padding: "clamp(28px, 4vw, 70px) 12px", fontSize: "clamp(16px, 2vw, 32px)", color: "rgba(255,255,255,0.55)", fontWeight: 300 }}>{emptyText}</div> : cards}
+    </section>
+  );
+
 
   return (
     <div ref={box} style={{ minHeight: "100vh", background: "radial-gradient(1200px 700px at 15% -10%, #3b2a86 0%, #1d1442 55%, #140d30 100%)", color: "#fff", padding: "clamp(20px, 3vw, 44px)", display: "flex", flexDirection: "column", gap: "clamp(18px, 2.4vw, 36px)", position: "relative" }}>
@@ -91,8 +146,9 @@ export default function QueueDisplayPage() {
       {/* Header */}
       <header style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
         {clinic.logo
-          // eslint-disable-next-line @next/next/no-img-element -- clinic-chosen logo URL
-          ? <div style={{ background: "#fff", borderRadius: 16, padding: "8px 18px", display: "flex" }}><img src={clinic.logo} alt={clinic.name} style={{ height: "clamp(36px, 4.5vw, 64px)", width: "auto", maxWidth: 320, objectFit: "contain" }} /></div>
+          ? logoMode === "white"
+            ? <img src={clinic.logo} alt={clinic.name} style={{ height: "clamp(44px, 6vw, 88px)", width: "auto", maxWidth: 420, objectFit: "contain", filter: "brightness(0) invert(1)" }} />
+            : <div style={{ background: "#fff", borderRadius: 16, padding: "8px 18px", display: "flex" }}><img src={clinic.logo} alt={clinic.name} style={{ height: "clamp(36px, 4.5vw, 64px)", width: "auto", maxWidth: 320, objectFit: "contain" }} /></div>
           : <div style={{ fontSize: "clamp(22px, 2.6vw, 40px)", fontWeight: 800 }}>{clinic.name}</div>}
         <div style={{ marginLeft: "auto", textAlign: "right" }}>
           <div style={{ fontSize: "clamp(28px, 3.6vw, 56px)", fontWeight: 800, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{time}</div>
@@ -108,48 +164,15 @@ export default function QueueDisplayPage() {
         </div>
       </header>
 
-      {/* Now serving */}
-      <section>
-        <div style={label}>Now serving</div>
-        {serving.length === 0 ? (
-          <div style={{ marginTop: 14, fontSize: "clamp(24px, 3vw, 44px)", color: "rgba(255,255,255,0.55)", fontWeight: 300 }}>
-            {waiting.length > 0 ? "Please be seated. You will be called shortly." : "Welcome. Please take a seat."}
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "clamp(14px, 2vw, 28px)", marginTop: 16 }}>
-            {serving.map((a) => (
-              <div key={a.id} style={{ background: "linear-gradient(160deg,#16a34a,#15803d)", borderRadius: 28, padding: "clamp(14px, 2vw, 28px) clamp(28px, 4vw, 64px)", textAlign: "center", minWidth: "clamp(180px, 20vw, 320px)", animation: justCalled === a.id ? "qd-pulse 1.4s ease-in-out infinite" : undefined }}>
-                <div style={{ fontSize: "clamp(72px, 13vw, 200px)", fontWeight: 900, lineHeight: 1, letterSpacing: "-0.02em" }}>{a.tokenNo}</div>
-                {a.staffName && <div style={{ fontSize: "clamp(16px, 2vw, 32px)", fontWeight: 700, marginTop: 6 }}>{a.staffName}</div>}
-                {justCalled === a.id && <div style={{ fontSize: "clamp(13px, 1.4vw, 22px)", letterSpacing: "0.2em", textTransform: "uppercase", marginTop: 6, color: "#dcfce7" }}>Please proceed</div>}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Next in line */}
-      <section style={{ flex: 1 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-          <div style={label}>Next in line</div>
-          {waiting.length > 0 && <div style={{ fontSize: "clamp(13px, 1.3vw, 20px)", color: "rgba(255,255,255,0.55)" }}>{waiting.length} waiting</div>}
-        </div>
-        {next.length === 0 ? (
-          <div style={{ marginTop: 14, fontSize: "clamp(20px, 2.4vw, 36px)", color: "rgba(255,255,255,0.45)", fontWeight: 300 }}>No one waiting</div>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "clamp(10px, 1.4vw, 20px)", marginTop: 16 }}>
-            {next.map((a, i) => (
-              <div key={a.id} style={{ background: i === 0 ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)", border: i === 0 ? "2px solid rgba(255,255,255,0.45)" : "2px solid transparent", borderRadius: 22, padding: "clamp(8px, 1.2vw, 18px) clamp(20px, 2.6vw, 44px)", textAlign: "center", minWidth: "clamp(90px, 9vw, 150px)" }}>
-                <div style={{ fontSize: "clamp(36px, 6vw, 96px)", fontWeight: 800, lineHeight: 1.1 }}>{a.tokenNo}</div>
-                {i === 0 && <div style={{ fontSize: "clamp(11px, 1.1vw, 17px)", letterSpacing: "0.18em", textTransform: "uppercase", color: "#ddd6fe" }}>Next</div>}
-              </div>
-            ))}
-            {waiting.length > next.length && (
-              <div style={{ alignSelf: "center", fontSize: "clamp(16px, 1.8vw, 28px)", color: "rgba(255,255,255,0.55)" }}>+ {waiting.length - next.length} more</div>
-            )}
-          </div>
-        )}
-      </section>
+      {/* Two columns, like the Queue page: who is with a doctor, and who is waiting */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 440px), 1fr))", gap: "clamp(14px, 2vw, 30px)", flex: 1, alignItems: "start" }}>
+        {column("Now serving", serving.length, "#22c55e", serving.map((a) => card(a, "#16a34a", true)),
+          waiting.length > 0 ? "Please be seated. You will be called shortly." : "Welcome. Please take a seat.")}
+        {column("Waiting", waiting.length, "#8b5cf6", [
+          ...next.map((a, i) => card(a, "#7C3AED", false, i === 0)),
+          ...(waiting.length > next.length ? [<div key="more" style={{ textAlign: "center", fontSize: "clamp(16px, 1.8vw, 28px)", color: "rgba(255,255,255,0.6)", padding: 8 }}>+ {waiting.length - next.length} more</div>] : []),
+        ], "No one is waiting")}
+      </div>
 
       <footer style={{ fontSize: "clamp(12px, 1.2vw, 18px)", color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
         Please keep your token slip with you. Your number will appear above when it is your turn.
