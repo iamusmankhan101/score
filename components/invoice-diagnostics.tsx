@@ -18,7 +18,7 @@ export default function InvoiceDiagnostics({ month, section }: { month: string; 
   const all = getSalonInvoices();
   const pos = all.filter((i) => !i.source || i.source === "pos");
   const inSection = pos.filter((i) => section === "all" || i.section === section);
-  const inMonth = inSection.filter((i) => i.date.startsWith(month));
+  const inMonth = inSection.filter((i) => (i.date ?? "").startsWith(month));
 
   async function check() {
     setServer("checking");

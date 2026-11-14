@@ -84,7 +84,7 @@ export default function InvoicesPage() {
   const canDelete = useCanDelete();
   const [invoices, setInvoices]         = useState<SalonInvoice[]>([]);
   const [search, setSearch]             = useState("");
-  const [month, setMonth]               = useState(() => localDateKey().slice(0, 7)); // "" = all months
+  const [month, setMonth]               = useState(""); // "" = all months (the default, so nothing is hidden until a month is picked)
   const [filterStatus, setFilterStatus] = useState<"all" | "paid" | "advance" | "unpaid">("all");
   const [viewingInvoice, setViewingInvoice] = useState<SalonInvoice | null>(null);
   /** Outcome of re-sending an edited invoice on WhatsApp, shown briefly as a toast. */
@@ -143,7 +143,7 @@ export default function InvoicesPage() {
 
   const stats = useMemo(() => {
     // Stats cover the selected month (all invoices when none is picked).
-    const monthInvoices = invoices.filter((i) => i.date.startsWith(month));
+    const monthInvoices = invoices.filter((i) => (i.date ?? "").startsWith(month));
     const paid   = monthInvoices.filter((i) => i.status === "paid");
     const unpaid = monthInvoices.filter((i) => i.status === "unpaid");
     const partial = monthInvoices.filter((i) => i.status === "partial");
@@ -179,7 +179,7 @@ export default function InvoicesPage() {
           || (filterStatus === "advance" && inv.status === "partial")
           || (filterStatus === "unpaid" && inv.status === "unpaid")
           || (filterStatus === "paid" && inv.status === "paid");
-        return matchSearch && matchStatus && inv.date.startsWith(month);
+        return matchSearch && matchStatus && (inv.date ?? "").startsWith(month);
       })
       // Newest first — explicit rather than relying on storage order, which
       // can get reshuffled by a DB sync merge (see syncFromDB in turso-sync.ts).
