@@ -7,6 +7,11 @@ import type { StaffRef } from "./upsell";
 
 export type PayoutStatus = "pending" | "paid";
 
+/** Days a per-day worker is paid for: present, late (unless counted as absent), half-days at half, and paid leave. */
+export function daysPaidFor(a: { present: number; late: number; latesAsAbsent: number; halfDay: number; paidLeave: number }): number {
+  return a.present + Math.max(0, a.late - a.latesAsAbsent) + a.halfDay * 0.5 + a.paidLeave;
+}
+
 export interface Payout {
   id: string;
   staffId: string;
@@ -18,6 +23,10 @@ export interface Payout {
   revenueGenerated: number;
   /** Commission % snapshot at the time this payout was processed (commission only). */
   commissionRate?: number;
+  /** Per-day rate snapshot (payType "daily" only). */
+  dailyRate?: number;
+  /** Days paid at that rate (payType "daily" only). */
+  daysWorked?: number;
   /** Fixed fuel allowance snapshot, paid in full and not reduced by attendance. */
   fuelAllowance?: number;
   /** Computed pay before adjustments — commission/basic salary/fuel allowance plus any upsell incentive. */

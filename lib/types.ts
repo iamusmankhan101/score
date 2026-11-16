@@ -34,7 +34,7 @@ export type ServiceCategory = "hair" | "skin" | "nails" | "bridal" | "piercing" 
 // Services also accept arbitrary custom category names entered by the user.
 export type ServiceCategoryValue = ServiceCategory | (string & {});
 
-export type StaffPayType = "commission" | "salary" | "both";
+export type StaffPayType = "commission" | "salary" | "both" | "daily";
 
 export interface Staff {
   id: string;
@@ -54,6 +54,8 @@ export interface Staff {
   commissionRate?: number;
   /** Fixed pay-period amount (PKR). Used when payType is "salary" or "both". Attendance deductions apply to this portion only. */
   baseSalary?: number;
+  /** Pay per day worked (PKR). Used when payType is "daily"; days come from Attendance. */
+  dailyRate?: number;
   /** Fixed monthly transport allowance (PKR), paid in full regardless of attendance. Added on top of the prorated basic salary in Payouts. */
   fuelAllowance?: number;
   /**

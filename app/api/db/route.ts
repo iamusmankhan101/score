@@ -39,7 +39,7 @@ const mayWrite = (actor: ResolvedActor, entity: string) =>
   entity === "staff" ? can(actor, ...EXTRA_WRITERS.staff) : mayRead(actor, entity) || can(actor, ...(EXTRA_WRITERS[entity] ?? []));
 // Removing these needs the "Delete records" tick (owners and managers always may).
 const DELETE_GATED = new Set(["salon_invoices", "clients", "staff", "services"]);
-const PAY_FIELDS = ["payType", "commissionRate", "baseSalary", "upsellCommissionRate"];
+const PAY_FIELDS = ["payType", "commissionRate", "baseSalary", "dailyRate", "upsellCommissionRate"];
 const seesPay = (actor: ResolvedActor) => can(actor, "staff", "payouts");
 function withoutPay(list: unknown[]): unknown[] {
   return list.map((item) => {

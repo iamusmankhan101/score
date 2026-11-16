@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { getStoredStaff, getStoredAppointments, getStoredServices } from "@/lib/storage";
-import { getPayouts, savePayouts, lastPayoutEnd, revenueInPeriod, type Payout, type PayoutStatus } from "@/lib/payouts";
+import { getPayouts, savePayouts, lastPayoutEnd, revenueInPeriod, daysPaidFor, type Payout, type PayoutStatus } from "@/lib/payouts";
 import { getAttendanceSummary, standardHoursFor, leaveAllowanceFor, type AttendanceSummary } from "@/lib/attendance";
 import type { Staff, Appointment, Service, StaffPayType } from "@/lib/types";
 import { upsellInPeriod, upsellIncentive } from "@/lib/upsell";
@@ -56,6 +56,8 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
     payType: staff.payType ?? "commission",
     commissionRate: staff.commissionRate ? String(staff.commissionRate) : "",
     salaryAmount: staff.baseSalary ? String(staff.baseSalary) : "",
+    dailyRate: staff.dailyRate ? String(staff.dailyRate) : "",
+    daysOverride: "",
     upsellRate: staff.upsellCommissionRate ? String(staff.upsellCommissionRate) : "",
     adjustment: "",
     adjustmentNote: "",
@@ -114,6 +116,11 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
   const weeklyOffAdjustments = form.weeklyOffWorkedDates.length;
   const salaryBreakdown = salaryAfterAttendance(salaryAmount, attendance, weeklyOffAdjustments);
   const proratedSalary = salaryBreakdown.salary;
+  // Per-day pay: rate × days worked. Days default to what Attendance shows, but can be overridden.
+  const dailyRate = Number(form.dailyRate) || 0;
+  const autoDays = daysPaidFor(attendance);
+  const daysWorked = form.daysOverride !== "" ? Math.max(0, Number(form.daysOverride) || 0) : autoDays;
+  const dailyAmount = Math.round(dailyRate * daysWorked);
 
   const addWeeklyOffWorkedDate = () => {
     const date = form.weeklyOffWorkedDate;
@@ -133,6 +140,7 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
   // sale, which a salaried stylist can do just as well as a commissioned one.
   const payBeforeUpsell = (form.payType === "commission" ? commissionAmount
     : form.payType === "both" ? commissionAmount + proratedSalary
+    : form.payType === "daily" ? dailyAmount
     : proratedSalary) + fuelAllowance;
   const baseAmount = payBeforeUpsell + upsellAmount;
   const adjustment = Number(form.adjustment) || 0;
@@ -150,6 +158,8 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
       payType: form.payType as StaffPayType,
       revenueGenerated: revenue,
       commissionRate: (form.payType === "commission" || form.payType === "both") ? rate : undefined,
+      dailyRate: form.payType === "daily" ? dailyRate : undefined,
+      daysWorked: form.payType === "daily" ? daysWorked : undefined,
       fuelAllowance: fuelAllowance > 0 ? fuelAllowance : undefined,
       upsellValue: upsell.value > 0 ? upsell.value : undefined,
       upsellRate: upsellAmount > 0 ? upsellRate : undefined,
@@ -206,7 +216,7 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={label}>Pay Type for This Payout</label>
             <div style={{ display: "flex", gap: 6, background: "#f4f4f9", border: "1px solid #e3e0eb", borderRadius: 10, padding: 4 }}>
-              {([["commission", "Commission"], ["salary", "Fixed Salary"], ["both", "Both"]] as const).map(([val, lbl]) => {
+              {([["commission", "Commission"], ["salary", "Fixed Salary"], ["both", "Both"], ["daily", "Per Day"]] as const).map(([val, lbl]) => {
                 const active = form.payType === val;
                 return (
                   <button key={val} type="button" onClick={() => set("payType", val)}
@@ -279,6 +289,27 @@ function ProcessPayoutModal({ staff, appointments, services, payouts, onClose, o
                 {upsell.lines.length > 8 && (
                   <div style={{ fontSize: 11, color: "#c49a3a" }}>+{upsell.lines.length - 8} more</div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {form.payType === "daily" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={label}>Daily Rate (PKR)</label>
+                  <input type="number" min="0" style={inp} value={form.dailyRate} onChange={(e) => set("dailyRate", e.target.value)} placeholder="e.g. 2000" />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={label}>Days Worked</label>
+                  <input type="number" min="0" step="0.5" style={inp} value={form.daysOverride} onChange={(e) => set("daysOverride", e.target.value)} placeholder={`Auto: ${autoDays}`} />
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: "#6b6b8a" }}>
+                {attendance.present} present · {attendance.late} late · {attendance.halfDay} half-day · {attendance.paidLeave} paid leave from Attendance = {autoDays} day{autoDays === 1 ? "" : "s"}. Type a number above to override.
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6b6b8a", padding: "0 2px" }}>
+                <span>Per-day pay</span><span style={{ fontWeight: 700, color: "#1a1a2e" }}>{daysWorked} × {fmt(dailyRate)} = {fmt(dailyAmount)}</span>
               </div>
             </div>
           )}
@@ -648,6 +679,7 @@ export default function PayoutsPage() {
             const revenue = revenueInPeriod(s, appointments, services, periodStart, todayStr(), invoices);
             const estAttendance = getAttendanceSummary(s.id, periodStart, todayStr(), undefined, leaveAllowanceFor(s), standardHoursFor(s), s);
             const estSalary = salaryAfterAttendance(s.baseSalary ?? 0, estAttendance).salary;
+            const estDaily = Math.round((s.dailyRate ?? 0) * daysPaidFor(estAttendance));
             const estFuel = s.fuelAllowance ?? 0;
             const estUpsell = upsellIncentive(
               upsellInPeriod(s, invoices, appointments, services, periodStart, todayStr()).value,
@@ -655,6 +687,7 @@ export default function PayoutsPage() {
             );
             const estimated = (payType === "commission" ? Math.round(revenue * (s.commissionRate ?? 0) / 100)
               : payType === "both" ? Math.round(revenue * (s.commissionRate ?? 0) / 100) + estSalary
+              : payType === "daily" ? estDaily
               : estSalary) + estFuel + estUpsell;
             return (
               <div key={s.id} style={{ background: "#fff", padding: "20px", display: "flex", flexDirection: "column", gap: 14, border: "1px solid #ebebf0", borderRadius: 16 }}>
@@ -667,6 +700,7 @@ export default function PayoutsPage() {
                     <span style={{ fontSize: 10, fontWeight: 700, color: payType === "salary" ? "#0284c7" : "#7C3AED", background: payType === "salary" ? "#e0f2fe" : "#f5f3ff", padding: "2px 8px", borderRadius: 20 }}>
                       {payType === "commission" ? `${s.commissionRate ?? 0}% commission`
                         : payType === "both" ? `${s.commissionRate ?? 0}% + salary`
+                        : payType === "daily" ? `${fmt(s.dailyRate ?? 0)} per day`
                         : "Fixed salary"}
                       {s.upsellCommissionRate ? ` · ${s.upsellCommissionRate}% upsell` : ""}
                     </span>

@@ -68,6 +68,8 @@ export default function PayoutSlipPrint({
     if (payout.payType === "both") {
       rows.push({ label: "Basic Salary", amount: fmt(payout.baseAmount - commissionAmount - fuelAllowance - upsellAmount) });
     }
+  } else if (payout.payType === "daily") {
+    rows.push({ label: `Per-day Pay (${payout.daysWorked ?? 0} day${payout.daysWorked === 1 ? "" : "s"} × ${fmt(payout.dailyRate ?? 0)})`, amount: fmt(payout.baseAmount - fuelAllowance - upsellAmount) });
   } else {
     rows.push({ label: "Basic Salary", amount: fmt(payout.baseAmount - fuelAllowance - upsellAmount) });
   }
@@ -148,7 +150,7 @@ export default function PayoutSlipPrint({
                     <tbody>
                       {[
                         ["Pay Period:", `${fmtDate(payout.periodStart)} – ${fmtDate(payout.periodEnd)}`],
-                        ["Pay Type:", payout.payType === "commission" ? "Commission" : payout.payType === "both" ? "Commission + Salary" : "Fixed Salary"],
+                        ["Pay Type:", payout.payType === "commission" ? "Commission" : payout.payType === "both" ? "Commission + Salary" : payout.payType === "daily" ? "Per Day" : "Fixed Salary"],
                         ["Payment:", payout.paymentMethod ? (METHOD_LABELS[payout.paymentMethod] ?? payout.paymentMethod) : "—"],
                         ["Status:", isPaid ? "PAID" : "PENDING"],
                       ].map(([label, value]) => (

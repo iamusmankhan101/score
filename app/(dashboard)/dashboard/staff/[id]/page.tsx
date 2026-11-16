@@ -88,6 +88,7 @@ function EditModal({
     payType: staff.payType ?? "commission",
     commissionRate: staff.commissionRate ? String(staff.commissionRate) : "",
     baseSalary: staff.baseSalary ? String(staff.baseSalary) : "",
+    dailyRate: staff.dailyRate ? String(staff.dailyRate) : "",
     fuelAllowance: staff.fuelAllowance ? String(staff.fuelAllowance) : "",
     paidLeavesPerMonth: staff.paidLeavesPerMonth != null ? String(staff.paidLeavesPerMonth) : "",
     upsellCommissionRate: staff.upsellCommissionRate != null ? String(staff.upsellCommissionRate) : "",
@@ -126,6 +127,7 @@ function EditModal({
       payType: form.payType as StaffPayType,
       commissionRate: (form.payType === "commission" || form.payType === "both") && form.commissionRate ? Number(form.commissionRate) : undefined,
       baseSalary: (form.payType === "salary" || form.payType === "both") && form.baseSalary ? Number(form.baseSalary) : undefined,
+      dailyRate: form.payType === "daily" && form.dailyRate ? Number(form.dailyRate) : undefined,
       fuelAllowance: (form.payType === "salary" || form.payType === "both") && form.fuelAllowance ? Number(form.fuelAllowance) : undefined,
       paidLeavesPerMonth: form.paidLeavesPerMonth !== "" && Number(form.paidLeavesPerMonth) >= 0 ? Number(form.paidLeavesPerMonth) : undefined,
       standardHoursPerDay: Number(form.standardHoursPerDay) > 0 ? Number(form.standardHoursPerDay) : undefined,
@@ -188,7 +190,7 @@ function EditModal({
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Pay Type</label>
             <div style={{ display: "flex", gap: 6, background: "#f4f4f9", border: "1px solid #e3e0eb", borderRadius: 10, padding: 4 }}>
-              {([["commission", "Commission"], ["salary", "Fixed Salary"], ["both", "Both"]] as const).map(([val, label]) => {
+              {([["commission", "Commission"], ["salary", "Fixed Salary"], ["both", "Both"], ["daily", "Per Day"]] as const).map(([val, label]) => {
                 const active = form.payType === val;
                 return (
                   <button key={val} type="button" onClick={() => set("payType", val)}
@@ -208,6 +210,13 @@ function EditModal({
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Commission Rate (%)</label>
               <input type="number" min="0" max="100" style={inp} value={form.commissionRate} onChange={(e) => set("commissionRate", e.target.value)} placeholder="e.g. 30" />
+            </div>
+          )}
+          {form.payType === "daily" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Daily Rate (PKR / day worked)</label>
+              <input type="number" min="0" style={inp} value={form.dailyRate} onChange={(e) => set("dailyRate", e.target.value)} placeholder="e.g. 2000" />
+              <div style={{ fontSize: 11, color: "#b0b0c8" }}>Paid for each day worked (present, late, half-day at half, paid leave) from Attendance. Absent days are not paid.</div>
             </div>
           )}
           {(form.payType === "salary" || form.payType === "both") && (
