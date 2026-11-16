@@ -63,12 +63,13 @@ const STAFF_EXPORT_COLS = [
 
 const STAFF_ROLES = Object.keys(ROLE_COLORS) as StaffRole[];
 /** Role choices for clinic accounts (roles are stored as free text, so no data change). */
-const CLINIC_ROLES: string[] = ["doctor", "consultant", "specialist", "nurse", "therapist", "receptionist", "manager"];
+const CLINIC_ROLES: string[] = ["doctor", "consultant", "specialist", "nurse", "technician", "therapist", "receptionist", "manager"];
 const CLINIC_ROLE_COLORS: Record<string, { color: string; bg: string }> = {
   doctor:     { color: "#0f766e", bg: "#ccfbf1" },
   consultant: { color: "#0369a1", bg: "#e0f2fe" },
   specialist: { color: "#7C3AED", bg: "#EDE9FE" },
   nurse:      { color: "#db2777", bg: "#fdf2f8" },
+  technician: { color: "#d97706", bg: "#fffbeb" },
   therapist:  { color: "#059669", bg: "#ecfdf5" },
 };
 /** Sentinel select value that reveals the free-text role field — never stored. */
@@ -253,7 +254,7 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
     <div onClick={onClose} className="modal-overlay" style={{ zIndex: 100 }}>
       <div onClick={(e) => e.stopPropagation()} className="modal-sheet" style={{ background: "#fff", borderRadius: 20, width: 440, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ padding: "22px 24px 18px", borderBottom: "1px solid #f0f0f8", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontWeight: 700, fontSize: 16, color: "#1a1a2e" }}>{clinicForm ? (staff ? "Edit Doctor" : "Add Doctor") : (staff ? "Edit Staff Member" : "Add Staff Member")}</div>
+          <div style={{ fontWeight: 700, fontSize: 16, color: "#1a1a2e" }}>{clinicForm ? (staff ? "Edit Doctor / Technician" : "Add Doctor / Technician") : (staff ? "Edit Staff Member" : "Add Staff Member")}</div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", display: "flex" }}><X size={18} color="#6b6b8a" /></button>
         </div>
         <div style={{ padding: "22px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -392,7 +393,7 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
           <div style={{ display: "flex", gap: 10, paddingTop: 4 }}>
             <button onClick={onClose} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid #e8e8f0", background: "#fff", fontSize: 13, fontWeight: 600, color: "#6b6b8a", cursor: "pointer" }}>Cancel</button>
             <button onClick={handleSave} disabled={!canSubmit} style={{ flex: 2, padding: "11px 0", borderRadius: 10, border: "none", background: canSubmit ? "#7C3AED" : "#e8e8f0", fontSize: 13, fontWeight: 600, color: canSubmit ? "#fff" : "#b0b0c8", cursor: canSubmit ? "pointer" : "not-allowed" }}>
-              {staff ? "Save Changes" : clinicForm ? "Add Doctor" : "Add Staff"}
+              {staff ? "Save Changes" : clinicForm ? (form.role === "technician" ? "Add Technician" : "Add Doctor") : "Add Staff"}
             </button>
           </div>
         </div>
