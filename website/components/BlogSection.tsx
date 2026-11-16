@@ -34,7 +34,7 @@ export default function BlogSection({ posts }: { posts: BlogPost[] }) {
 
   return (
     <section className={styles.section} id="blog">
-      <div className={styles.header}>
+      <div className={`${styles.header} text-center`}>
         <div className="section-label" data-animate data-delay="0">✦ From the Blog</div>
         <h2 className="section-title" data-animate data-delay="0.1">Tips & Guides for Salon Owners</h2>
         <p className="section-sub" data-animate data-delay="0.2" style={{ marginBottom: 0 }}>
