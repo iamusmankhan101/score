@@ -1906,6 +1906,21 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
   const shownIn  = shown.reduce((s, r) => s + r.moneyIn, 0);
   const shownOut = shown.reduce((s, r) => s + r.moneyOut, 0);
 
+  // Each day with entries gets its own opening and closing balance (the day's
+  // opening is the previous day's closing). Days with nothing in the book are skipped.
+  const daysOf = (month: LedgerMonth) => {
+    const days: { date: string; opening: number; closing: number; totalIn: number; totalOut: number; rows: (LedgerRow & { balance: number })[] }[] = [];
+    for (const r of month.rows) {
+      let d = days[days.length - 1];
+      if (!d || d.date !== r.date) {
+        d = { date: r.date, opening: r.balance - (r.moneyIn - r.moneyOut), closing: r.balance, totalIn: 0, totalOut: 0, rows: [] };
+        days.push(d);
+      }
+      d.rows.push(r); d.totalIn += r.moneyIn; d.totalOut += r.moneyOut; d.closing = r.balance;
+    }
+    return days;
+  };
+
   // Money still to come in (unpaid / part-paid bills) and to go out (pending expenses), as of today.
   const owedToMe = useMemo((): OwedRow[] => outstandingInvoices
     .map(inv => ({ id: inv.id, name: inv.clientName || "Walk-in client", date: inv.date,
@@ -1945,8 +1960,16 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
     const XLSX = await import("xlsx");
     const sheetRows: Record<string, string | number>[] = months.flatMap(month => [
       { Date: `${month.key}-01`, Description: `${month.label} — Opening balance`, Details: "", Account: "", "Money In": "", "Money Out": "", Balance: month.opening },
-      ...month.rows.filter(row => shown.includes(row)).map(row => ({ Date: row.date, Description: row.description, Details: row.detail, Account: accountLabel(row.account),
-        "Money In": row.moneyIn || "", "Money Out": row.moneyOut || "", Balance: row.balance })),
+      ...daysOf(month).flatMap(day => {
+        const dayShown = day.rows.filter(row => shown.includes(row));
+        if (dayShown.length === 0) return [];
+        return [
+          { Date: day.date, Description: "Opening balance", Details: "", Account: "", "Money In": "", "Money Out": "", Balance: day.opening },
+          ...dayShown.map(row => ({ Date: row.date, Description: row.description, Details: row.detail, Account: accountLabel(row.account),
+            "Money In": row.moneyIn || "", "Money Out": row.moneyOut || "", Balance: row.balance })),
+          { Date: day.date, Description: "Closing balance", Details: "", Account: "", "Money In": day.totalIn, "Money Out": day.totalOut, Balance: day.closing },
+        ];
+      }),
       { Date: `${month.key}-${new Date(Number(month.key.slice(0, 4)), Number(month.key.slice(5, 7)), 0).getDate()}`, Description: `${month.label} — Closing balance`, Details: "", Account: "", "Money In": month.totalIn, "Money Out": month.totalOut, Balance: month.closing },
     ]);
     if (isFiltered) sheetRows.push({ Date: "", Description: "Total of shown entries", Details: "", Account: "", "Money In": shownIn, "Money Out": shownOut, Balance: "" });
@@ -1961,8 +1984,14 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
     const money = (n: number) => (n ? fmt(n) : "");
     const now = new Date();
     const body = months.map(month => {
-      const monthBody = shown.filter(row => month.rows.includes(row)).map(r => `<tr><td>${r.date}</td><td><b>${e(r.description)}</b><div class="muted">${e(r.detail)}</div></td>
-        <td class="num in">${money(r.moneyIn)}</td><td class="num out">${money(r.moneyOut)}</td><td class="num">${signed(r.balance)}</td></tr>`).join("");
+      const monthBody = daysOf(month).map(day => {
+        const dayShown = day.rows.filter(row => shown.includes(row));
+        if (dayShown.length === 0) return "";
+        return `<tr class="day-head"><td>${day.date}</td><td>Opening balance</td><td></td><td></td><td class="num">${signed(day.opening)}</td></tr>`
+          + dayShown.map(r => `<tr><td>${r.date}</td><td><b>${e(r.description)}</b><div class="muted">${e(r.detail)}</div></td>
+        <td class="num in">${money(r.moneyIn)}</td><td class="num out">${money(r.moneyOut)}</td><td class="num">${signed(r.balance)}</td></tr>`).join("")
+          + `<tr class="day-head"><td></td><td>Closing balance · ${day.date}</td><td class="num in">${fmt(day.totalIn)}</td><td class="num out">${fmt(day.totalOut)}</td><td class="num">${signed(day.closing)}</td></tr>`;
+      }).join("");
       return `<tr class="month-head"><td colspan="5">${e(month.label)} · Opening ${signed(month.opening)}</td></tr>${monthBody}<tr class="edge"><td></td><td>${e(month.label)} closing balance</td><td class="num in">${fmt(month.totalIn)}</td><td class="num out">${fmt(month.totalOut)}</td><td class="num">${signed(month.closing)}</td></tr>`;
     }).join("");
     printHtml(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${e(bookName)} ${ledgerRangeStart} to ${ledgerFilterEnd}</title>
@@ -1988,6 +2017,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
   .in { color: #059669; } .out { color: #dc2626; }
   .muted { color: #a0a0b8; font-size: 10px; margin-top: 2px; }
   .edge td { background: #faf9fd; font-weight: 800; }
+  .day-head td { background: #faf9fd; color: #6b6b8a; font-weight: 700; font-size: 11px; }
   .month-head td { background: #F5F3FF; color: #5B21B6; font-weight: 800; padding-top: 12px; }
   .foot { margin-top: 28px; padding-top: 14px; border-top: 1px solid #f0f0f8; font-size: 10px; color: #c0c0d0; display: flex; justify-content: space-between; }
   @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .page { padding: 24px 32px; } }
@@ -2133,16 +2163,36 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
                   <div style={{ padding: "18px 20px", color: "#9898b0", fontSize: 12, borderBottom: "1px solid #f8f8fc" }}>
                     {month.rows.length === 0 ? "No entries in this month" : "No entries match these filters"}
                   </div>
-                ) : monthShown.map(row => (
+                ) : daysOf(month).map(day => {
+                  const dayShown = day.rows.filter(row => shown.includes(row));
+                  if (dayShown.length === 0) return null;
+                  return <div key={day.date}>
+                    <div style={{ display: "grid", gridTemplateColumns: cols, padding: "8px 20px", background: "#faf9fd", borderBottom: "1px solid #f4f2f9" }}>
+                      <div style={{ ...cell, fontWeight: 800, color: "#5B21B6" }}>{day.date}</div>
+                      <div style={{ ...cell, fontWeight: 750, color: "#6b6b8a" }}>Opening balance</div>
+                      <div /><div /><div />
+                      <div style={{ ...cell, fontWeight: 800, color: day.opening >= 0 ? "#1a1a2e" : "#dc2626", textAlign: "right" }}>{signed(day.opening)}</div>
+                    </div>
+                    {dayShown.map(row => (
                   <div key={row.id} style={{ display: "grid", gridTemplateColumns: cols, padding: "10px 20px", borderBottom: "1px solid #f8f8fc", alignItems: "center" }}>
-                    <div style={cell}>{row.date}</div>
-                    <div style={{ ...cell, fontWeight: 700, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.description}>{row.description}</div>
-                    <div style={{ ...cell, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.detail}>{row.detail}</div>
-                    <div style={{ ...cell, fontWeight: 750, color: "#059669", textAlign: "right" }}>{row.moneyIn ? fmt(row.moneyIn) : ""}</div>
-                    <div style={{ ...cell, fontWeight: 750, color: "#dc2626", textAlign: "right" }}>{row.moneyOut ? fmt(row.moneyOut) : ""}</div>
-                    <div style={{ ...cell, fontWeight: 800, color: row.balance >= 0 ? "#1a1a2e" : "#dc2626", textAlign: "right" }}>{signed(row.balance)}</div>
-                  </div>
-                ))}
+                        <div style={cell}>{row.date}</div>
+                        <div style={{ ...cell, fontWeight: 700, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.description}>{row.description}</div>
+                        <div style={{ ...cell, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.detail}>{row.detail}</div>
+                        <div style={{ ...cell, fontWeight: 750, color: "#059669", textAlign: "right" }}>{row.moneyIn ? fmt(row.moneyIn) : ""}</div>
+                        <div style={{ ...cell, fontWeight: 750, color: "#dc2626", textAlign: "right" }}>{row.moneyOut ? fmt(row.moneyOut) : ""}</div>
+                        <div style={{ ...cell, fontWeight: 800, color: row.balance >= 0 ? "#1a1a2e" : "#dc2626", textAlign: "right" }}>{signed(row.balance)}</div>
+                      </div>
+                        ))}
+                    <div style={{ display: "grid", gridTemplateColumns: cols, padding: "8px 20px", background: "#faf9fd", borderBottom: "1px solid #f0f0f5" }}>
+                      <div style={cell} />
+                      <div style={{ ...cell, fontWeight: 750, color: "#6b6b8a" }}>Closing balance · {day.date}</div>
+                      <div />
+                      <div style={{ ...cell, fontWeight: 800, color: "#059669", textAlign: "right" }}>{fmt(day.totalIn)}</div>
+                      <div style={{ ...cell, fontWeight: 800, color: "#dc2626", textAlign: "right" }}>{fmt(day.totalOut)}</div>
+                      <div style={{ ...cell, fontWeight: 850, color: day.closing >= 0 ? "var(--accent)" : "#dc2626", textAlign: "right" }}>{signed(day.closing)}</div>
+                    </div>
+                  </div>;
+                })}
                 <div style={{ display: "grid", gridTemplateColumns: cols, padding: "10px 20px", background: "#fcfcfe", borderBottom: "1px solid #f0f0f5" }}>
                   <div style={cell} />
                   <div style={{ ...cell, fontWeight: 800, color: "#1a1a2e" }}>{month.label} closing balance</div>
