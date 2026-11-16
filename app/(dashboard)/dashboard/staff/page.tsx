@@ -62,13 +62,22 @@ const STAFF_EXPORT_COLS = [
 ];
 
 const STAFF_ROLES = Object.keys(ROLE_COLORS) as StaffRole[];
+/** Role choices for clinic accounts (roles are stored as free text, so no data change). */
+const CLINIC_ROLES: string[] = ["doctor", "consultant", "specialist", "nurse", "therapist", "receptionist", "manager"];
+const CLINIC_ROLE_COLORS: Record<string, { color: string; bg: string }> = {
+  doctor:     { color: "#0f766e", bg: "#ccfbf1" },
+  consultant: { color: "#0369a1", bg: "#e0f2fe" },
+  specialist: { color: "#7C3AED", bg: "#EDE9FE" },
+  nurse:      { color: "#db2777", bg: "#fdf2f8" },
+  therapist:  { color: "#059669", bg: "#ecfdf5" },
+};
 /** Sentinel select value that reveals the free-text role field — never stored. */
 const CUSTOM_ROLE = "__custom__";
 
 /** Custom roles already in use, so the second person with one can just pick it. */
-function customRolesInUse(list: Staff[]): string[] {
+function customRolesInUse(list: Staff[], known: string[]): string[] {
   return Array.from(new Set(list.map((s) => s.role)))
-    .filter((r): r is string => !!r && !STAFF_ROLES.includes(r as StaffRole))
+    .filter((r): r is string => !!r && !known.includes(r))
     .sort();
 }
 const STAFF_PAY_TYPES: StaffPayType[] = ["commission", "salary", "both"];
@@ -148,11 +157,12 @@ async function exportStaff(list: Staff[], servicesList: Service[], format: "xlsx
 // ── Staff Form Modal (Add & Edit) ─────────────────────────────────────────────
 function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { onClose: () => void; onSave: (s: Staff, assignedServiceIds: string[]) => void; staff?: Staff; servicesList: Service[]; staffList: Staff[] }) {
   const [done, setDone] = useState(false);
+  const roleList: string[] = businessType() === "clinic" ? CLINIC_ROLES : STAFF_ROLES;
   const [form, setForm] = useState({
     name: staff?.name ?? "",
     phone: staff?.phone ?? "",
-    role: staff && !STAFF_ROLES.includes(staff.role as StaffRole) ? CUSTOM_ROLE : (staff?.role ?? ""),
-    customRole: staff && !STAFF_ROLES.includes(staff.role as StaffRole) ? staff.role : "",
+    role: staff && !roleList.includes(staff.role) ? CUSTOM_ROLE : (staff?.role ?? ""),
+    customRole: staff && !roleList.includes(staff.role) ? staff.role : "",
     section: staff?.section ?? defaultSectionForNewRecord(),
     payType: staff?.payType ?? "commission",
     commissionRate: staff?.commissionRate ? String(staff.commissionRate) : "",
@@ -168,7 +178,7 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
   const [offDays, setOffDays] = useState<number[] | null>(staff?.weeklyOffDays ?? null);
   const sectionOptions = getSectionOptions(staffList);
   // The role being edited is already the selected option, so don't list it twice.
-  const existingCustomRoles = customRolesInUse(staffList).filter((r) => r !== staff?.role);
+  const existingCustomRoles = customRolesInUse(staffList, roleList).filter((r) => r !== staff?.role);
 
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(() => {
     if (staff) {
@@ -264,7 +274,7 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
             <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>{clinicForm ? "Role" : "Salon Role"}</label>
             <select value={form.role} onChange={(e) => set("role", e.target.value)} style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #e8e8f0", fontSize: 13, color: "#1a1a2e", outline: "none", background: "#fff" }}>
               <option value="">Select a role…</option>
-              {STAFF_ROLES.map((r) => <option key={r} value={r}>{r.replace(/-/g, " ")}</option>)}
+              {roleList.map((r) => <option key={r} value={r}>{r.replace(/-/g, " ")}</option>)}
               {existingCustomRoles.map((r) => <option key={r} value={r}>{r}</option>)}
               <option value={CUSTOM_ROLE}>Custom…</option>
             </select>
@@ -889,7 +899,7 @@ export default function StaffPage() {
       <div className="cards-grid-auto">
         {visibleStaff.map((s) => {
           const stats = getStaffStats(s, appointmentsList, servicesList, invoicesList);
-          const role  = ROLE_COLORS[s.role] ?? { color: "#6b7280", bg: "#f9fafb" };
+          const role  = ROLE_COLORS[s.role] ?? CLINIC_ROLE_COLORS[s.role] ?? { color: "#6b7280", bg: "#f9fafb" };
           return (
             <div
               key={s.id}
