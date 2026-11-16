@@ -490,14 +490,18 @@ export async function restoreSalonBackupBundle(bundleId: string): Promise<Restor
   };
 }
 
-// "manual-snapshot" is never auto-pruned (someone deliberately took it).
+// Nightly full-database snapshots were once kept 30 days, which put ~30 copies
+// of the whole database inside the database itself and filled Turso's 5 GB
+// free storage. Keep 7 days here; longer history belongs on the owner's laptop.
+// "manual-snapshot" is deliberate, so it lasts longer, but not forever.
 // "before-account-delete" is the safety net for a destructive action, kept 30
 // days so a mistaken delete can still be undone — but a closed salon's data
 // isn't held forever. Everything else grows unbounded otherwise —
 // "before-write" alone was ~470 rows/week.
 const RETENTION_DAYS: Partial<Record<BackupReason, number>> = {
   "before-write": 7,
-  "scheduled-snapshot": 30,
+  "scheduled-snapshot": 7,
+  "manual-snapshot": 14,
   "before-account-delete": 30,
 };
 
