@@ -178,7 +178,7 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
   const [offDays, setOffDays] = useState<number[] | null>(staff?.weeklyOffDays ?? null);
   const sectionOptions = getSectionOptions(staffList);
   // The role being edited is already the selected option, so don't list it twice.
-  const existingCustomRoles = customRolesInUse(staffList, roleList).filter((r) => r !== staff?.role);
+  const existingCustomRoles = customRolesInUse(staffList, [...roleList, ...(businessType() === "clinic" ? STAFF_ROLES : [])]).filter((r) => r !== staff?.role);
 
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(() => {
     if (staff) {
