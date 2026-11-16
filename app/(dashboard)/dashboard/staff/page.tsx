@@ -243,14 +243,14 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
     <div onClick={onClose} className="modal-overlay" style={{ zIndex: 100 }}>
       <div onClick={(e) => e.stopPropagation()} className="modal-sheet" style={{ background: "#fff", borderRadius: 20, width: 440, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ padding: "22px 24px 18px", borderBottom: "1px solid #f0f0f8", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontWeight: 700, fontSize: 16, color: "#1a1a2e" }}>{staff ? "Edit Staff Member" : "Add Staff Member"}</div>
+          <div style={{ fontWeight: 700, fontSize: 16, color: "#1a1a2e" }}>{clinicForm ? (staff ? "Edit Doctor" : "Add Doctor") : (staff ? "Edit Staff Member" : "Add Staff Member")}</div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", display: "flex" }}><X size={18} color="#6b6b8a" /></button>
         </div>
         <div style={{ padding: "22px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
           
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Full Name</label>
-            <input type="text" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Sara Ahmed"
+            <input type="text" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder={clinicForm ? "e.g. Dr. Sara Ahmed" : "e.g. Sara Ahmed"}
               style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #e8e8f0", fontSize: 13, color: "#1a1a2e", outline: "none" }} />
           </div>
 
@@ -261,7 +261,7 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Salon Role</label>
+            <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>{clinicForm ? "Role" : "Salon Role"}</label>
             <select value={form.role} onChange={(e) => set("role", e.target.value)} style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #e8e8f0", fontSize: 13, color: "#1a1a2e", outline: "none", background: "#fff" }}>
               <option value="">Select a role…</option>
               {STAFF_ROLES.map((r) => <option key={r} value={r}>{r.replace(/-/g, " ")}</option>)}
@@ -278,7 +278,7 @@ function StaffFormModal({ onClose, onSave, staff, servicesList, staffList }: { o
           )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Salon Section</label>
+            <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>{clinicForm ? "Department" : "Salon Section"}</label>
             <select value={form.section} onChange={(e) => set("section", e.target.value)} style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #e8e8f0", fontSize: 13, color: "#1a1a2e", outline: "none", background: "#fff" }}>
               <option value="">Unassigned</option>
               {sectionOptions.map((s) => <option key={s} value={s}>{s}</option>)}
