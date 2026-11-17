@@ -127,3 +127,5 @@
   .card { padding: 24px 20px; }
   .amount { font-size: 2.2rem; }
 }
+.billed { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; }
+.featured .billed { color: rgba(255,255,255,.6); }

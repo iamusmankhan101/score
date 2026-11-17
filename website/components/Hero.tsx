@@ -68,7 +68,7 @@ export default function Hero() {
           Manage bookings, clients, staff and revenue from start to finish.
         </p>
         <div className={styles.btns}>
-          <Link href="/#pricing" className={styles.btnPrimary}>View Pricing</Link>
+          <Link href="/pricing" className={styles.btnPrimary}>View Pricing</Link>
         </div>
       </div>
 

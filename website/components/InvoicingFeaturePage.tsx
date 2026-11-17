@@ -514,7 +514,7 @@ export default function InvoicingFeaturePage() {
                 <button type="button" onClick={() => setDemoOpen(true)} className={styles.primaryCta}>
                   Get started <ArrowRight size={17} />
                 </button>
-                <Link href="/#pricing" className={styles.secondaryCta}>
+                <Link href="/pricing" className={styles.secondaryCta}>
                   View pricing
                 </Link>
               </div>
@@ -554,7 +554,7 @@ export default function InvoicingFeaturePage() {
             <button type="button" onClick={() => setDemoOpen(true)} className={styles.primaryCta}>
               Get started <ArrowRight size={17} />
             </button>
-            <Link href="/#pricing" className={styles.secondaryDark}>View pricing</Link>
+            <Link href="/pricing" className={styles.secondaryDark}>View pricing</Link>
           </div>
         </section>
 

@@ -580,7 +580,7 @@ export default function ClientFeaturePage() {
                 <button type="button" onClick={() => setDemoOpen(true)} className={styles.primaryCta}>
                   Get started <ArrowRight size={17} />
                 </button>
-                <Link href="/#pricing" className={styles.secondaryCta}>View pricing</Link>
+                <Link href="/pricing" className={styles.secondaryCta}>View pricing</Link>
               </div>
             </div>
             <div className={styles.heroVisual}>
@@ -616,7 +616,7 @@ export default function ClientFeaturePage() {
             <button type="button" onClick={() => setDemoOpen(true)} className={styles.primaryCta}>
               Get started <ArrowRight size={17} />
             </button>
-            <Link href="/#pricing" className={styles.secondaryDark}>View pricing</Link>
+            <Link href="/pricing" className={styles.secondaryDark}>View pricing</Link>
           </div>
         </section>
 

@@ -6,7 +6,6 @@ import HowItWorks    from "../components/HowItWorks";
 import WhySalonCentral from "../components/WhySalonCentral";
 import Testimonials, { testimonials } from "../components/Testimonials";
 import BlogSection   from "../components/BlogSection";
-import Pricing       from "../components/Pricing";
 import FAQ           from "../components/FAQ";
 import Footer        from "../components/Footer";
 import ScrollReveal  from "../components/ScrollReveal";
@@ -105,7 +104,6 @@ export default async function Home() {
       <WhySalonCentral />
       <Testimonials />
       <BlogSection posts={posts} />
-      <Pricing />
       <FAQ />
       <Footer />
     </>

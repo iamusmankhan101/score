@@ -173,7 +173,7 @@ export default function VerticalPage({
             <button type="button" onClick={() => setDemoOpen(true)} className={styles.primaryCta}>
               Get started <ArrowRight size={17} />
             </button>
-            <Link href="/#pricing" className={styles.secondaryDark}>
+            <Link href="/pricing" className={styles.secondaryDark}>
               View pricing
             </Link>
           </div>

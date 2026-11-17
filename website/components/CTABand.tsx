@@ -10,7 +10,7 @@ export default function CTABand() {
         counting with Salon Central.
       </p>
       <div className={styles.btns}>
-        <a href="#pricing" className={`btn btn-primary btn-lg ${styles.lightBtn}`}>
+        <a href="/pricing" className={`btn btn-primary btn-lg ${styles.lightBtn}`}>
           <ArrowRight size={18} />
           Get Started Now
         </a>

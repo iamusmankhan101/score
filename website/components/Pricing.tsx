@@ -88,31 +88,41 @@ const plans: Array<{
   },
 ];
 
-export default function Pricing() {
+type Props = {
+  prices?: Record<string, number | null>; // monthly price per lowercase plan name; missing/null = Contact Sales
+  symbol?: string;
+  annual?: boolean;                        // show the discounted per-month price, billed yearly
+  discount?: number;                       // e.g. 0.2 = 20% off when annual
+  showHeader?: boolean;
+};
+
+export default function Pricing({ prices, symbol = "", annual = false, discount = 0.2, showHeader = true }: Props) {
+  const fmt = (n: number) => `${symbol}${n.toLocaleString("en-US")}`;
   return (
     <section className={styles.section} id="pricing">
-      <div className="text-center">
+      {showHeader && <div className="text-center">
         <div className="section-label" data-animate data-delay="0">✦ Pricing</div>
         <h2 className="section-title" data-animate data-delay="0.1">Plans Built Around<br />Your Salon.</h2>
         <p className="section-sub" data-animate data-delay="0.2">Talk to our sales team and choose the setup that fits your salon.</p>
-      </div>
+      </div>}
       <div className={styles.grid}>
-        {plans.map((p, i) => (
+        {plans.map((p, i) => {
+          const base = prices?.[p.name.toLowerCase()];
+          const amount = base == null ? null : annual ? Math.round(base * (1 - discount)) : base;
+          return (
           <div key={p.name} data-animate data-delay={`${0.25 + i * 0.12}`} className={`${styles.card} ${p.featured ? styles.featured : ""}`}>
             <div className={styles.badge} style={p.badgeStyle}>{p.badge}</div>
             <div className={styles.planName}>{p.name}</div>
             <p className={styles.planDesc}>{p.desc}</p>
             <div className={styles.price}>
-              {p.price === "Contact Sales" ? (
+              {amount == null ? (
                 <span className={`${styles.amount} ${styles.contactPrice}`}>Contact Sales</span>
-              ) : p.price === "0" ? (
-                <span className={styles.amount} style={{ fontSize: "2.4rem" }}>Free</span>
               ) : (
-                <>
-                  <span className={styles.currency}>₨</span>
-                  <span className={styles.amount}>{p.price}</span>
-                  <span className={styles.period}>{p.period}</span>
-                </>
+                <div>
+                  <span className={styles.amount}>{fmt(amount)}</span>
+                  <span className={styles.period}> /month</span>
+                  {annual && <div className={styles.billed}>Billed {fmt(amount * 12)} yearly</div>}
+                </div>
               )}
             </div>
             <ul className={styles.features}>
@@ -128,9 +138,10 @@ export default function Pricing() {
                 );
               })}
             </ul>
-            <a href={p.ctaHref} target="_blank" rel="noopener noreferrer" className={`${p.ctaClass} ${styles.planBtn}`}>{p.cta}</a>
+            <a href={p.ctaHref} target="_blank" rel="noopener noreferrer" className={`${p.ctaClass} ${styles.planBtn}`}>{amount == null ? p.cta : "Get Started"}</a>
           </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
