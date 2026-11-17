@@ -9,7 +9,7 @@ import type { AppointmentStatus, Appointment, Client, Staff } from "@/lib/types"
 import type { SalonInvoice } from "@/lib/salon-invoices";
 import DashboardHeader from "@/components/dashboard-header";
 import MobilePageHeader from "@/components/mobile-page-header";
-import { MoreHorizontal, TrendingUp, Calendar, Users, Award, Clock, ArrowUpRight, Tag, Star, Wallet } from "lucide-react";
+import { MoreHorizontal, TrendingUp, Calendar, Users, Award, Clock, ArrowUpRight, Star, Wallet } from "lucide-react";
 import { fmtCurrency as fmt } from "@/lib/format";
 import { useIsClinic } from "@/lib/clinic";
 import { syncFromDB } from "@/lib/turso-sync";
@@ -181,7 +181,6 @@ export default function DashboardPage() {
     const todayPosInvoices = posInvoicesForRevenue.filter((invoice) => (invoice.paidDate || invoice.date) === today);
   const todayTotal = todayPosInvoices.reduce((s, invoice) => s + revenueAmount(invoice), 0);
   const todayTransactionCount = todayPosInvoices.length;
-  const avgTicket = todayTransactionCount > 0 ? todayTotal / todayTransactionCount : 0;
   const activeStaffCount = staffListScoped.length;
   const scopedTodayTotal = todayApptsScoped.reduce((s, a) => s + a.totalAmount, 0);
 
@@ -193,7 +192,7 @@ export default function DashboardPage() {
       <MobilePageHeader title="Dashboard" subtitle="Salon Overview" />
 
       {/* Stats Row */}
-      <div className="stats-grid-4 dash-stats" style={{ marginBottom: 4, gridTemplateColumns: "repeat(5, 1fr)" }}>
+      <div className="stats-grid-4 dash-stats" style={{ marginBottom: 4, gridTemplateColumns: "repeat(4, 1fr)" }}>
         {/* Stat 0: Today's revenue — billed only (paid invoices and advances taken today) */}
         <div style={{ background: "#fff", borderRadius: 18, border: "1px solid rgba(226,223,235,.95)", boxShadow: "0 8px 28px rgba(38,25,75,.04)", padding: 20, display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", overflow: "hidden" }}>
           <div>
@@ -335,49 +334,6 @@ export default function DashboardPage() {
             color: "#059669"
           }}>
             <Users size={20} />
-          </div>
-        </div>
-
-        {/* Stat 4: Average Ticket */}
-        <div style={{
-          background: "#fff",
-          borderRadius: 18,
-          border: "1px solid rgba(226,223,235,.95)",
-          boxShadow: "0 8px 28px rgba(38,25,75,.04)",
-          padding: 20,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          position: "relative",
-          overflow: "hidden"
-        }}>
-          <div style={{
-            position: "absolute",
-            bottom: -10,
-            right: -10,
-            opacity: 0.04,
-            color: "#f59e0b"
-          }}>
-            <Tag size={80} />
-          </div>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#a0a0b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Average Ticket</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: "#1a1a2e", marginTop: 6 }}>{fmt(avgTicket)}</div>
-            <div style={{ fontSize: 11, color: "#6b6b8a", fontWeight: 600, marginTop: 4 }}>
-              Per appointment today
-            </div>
-          </div>
-          <div style={{
-            width: 44,
-            height: 44,
-            borderRadius: 12,
-            background: "rgba(245, 158, 11, 0.08)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#f59e0b"
-          }}>
-            <Tag size={20} />
           </div>
         </div>
       </div>
