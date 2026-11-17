@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { validatePasswordStrength } from "@/lib/password-policy";
 import { ensureBillingTables, upsertBillingUser } from "@/lib/billing-db";
+import { applyPendingPaddleOrders } from "@/lib/paddle";
 import { PLAN_CONFIGS } from "@/lib/plan-limits";
 import { sendWelcomeEmail } from "@/lib/welcome-email";
 
@@ -134,6 +135,13 @@ export async function POST(req: NextRequest) {
       } catch (err) {
         console.error("[auth/signup] billing registration failed:", err);
       }
+    }
+
+    // Paid on the website before creating an account? Apply that purchase now.
+    try {
+      await applyPendingPaddleOrders(user.id, user.email);
+    } catch (err) {
+      console.error("[auth/signup] pending Paddle order failed:", err);
     }
 
     if (user.role === "owner") {

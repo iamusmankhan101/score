@@ -13,18 +13,12 @@ export const metadata = pageMetadata({
   path: "/pricing",
 });
 
-// ── EDIT PRICES HERE ─────────────────────────────────────────────────────────
-// Monthly price per plan, per region. Leave a price as null to show "Contact Sales".
-// Add a region = add a row here + its country codes in COUNTRY_REGION below.
+// ── EDIT PAKISTAN PRICES HERE ───────────────────────────────────────────────
+// Pakistan keeps fixed ₨ prices and the WhatsApp sales route. Every other country pays through
+// Paddle: the USD base price (set in the Paddle dashboard) is converted to local currency.
 type PlanKey = "starter" | "pro" | "premium";
-const REGIONS: Record<string, { label: string; symbol: string; prices: Record<PlanKey, number | null> }> = {
-  PK:    { label: "Pakistan", symbol: "₨",   prices: { starter: 3999, pro: 9499, premium: 12499 } },
-  AE:    { label: "UAE",      symbol: "AED ", prices: { starter: 80, pro: 175, premium: 250 } },
-  GB:    { label: "UK",       symbol: "£",   prices: { starter: 15, pro: 30, premium: 50 } },
-  OTHER: { label: "Global",   symbol: "$",   prices: { starter: null, pro: null, premium: null } },
-};
-const ANNUAL_DISCOUNT = 0.2; // annual billing = 20% off the monthly price
-const COUNTRY_REGION: Record<string, string> = { PK: "PK", AE: "AE", GB: "GB" }; // anything else → OTHER
+const PK_PRICES: Record<PlanKey, number> = { starter: 3999, pro: 9499, premium: 12499 };
+const ANNUAL_DISCOUNT = 0.2; // annual billing = 20% off the monthly price (matches the yearly prices in Paddle)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PLANS: { key: PlanKey; name: string }[] = [
@@ -51,16 +45,10 @@ const rows: [string, boolean, boolean, boolean][] = [
 export default async function PricingPage({ searchParams }: { searchParams: Promise<{ c?: string; b?: string }> }) {
   const { c, b } = await searchParams;
   const annual = b !== "monthly"; // annual is the default tab
-  // Visitor's country comes from Vercel's geo header. ?c=PK|AE|GB is only a manual override for testing.
+  // Visitor's country comes from Vercel's geo header. ?c=GB etc. is only a manual override for testing.
   const country = (c || (await headers()).get("x-vercel-ip-country") || "").toUpperCase();
-  const regionKey = c && REGIONS[c.toUpperCase()] ? c.toUpperCase() : COUNTRY_REGION[country] ?? "OTHER";
-  const region = REGIONS[regionKey];
-
-  const fmt = (n: number) => `${region.symbol}${n.toLocaleString("en-US")}`;
-  const priceText = (k: PlanKey) => {
-    const p = region.prices[k];
-    return p == null ? "Contact Sales" : `${fmt(annual ? Math.round(p * (1 - ANNUAL_DISCOUNT)) : p)}/month`;
-  };
+  const isPK = country === "PK";
+  const pkPrice = (k: PlanKey) => `₨${(annual ? Math.round(PK_PRICES[k] * (1 - ANNUAL_DISCOUNT)) : PK_PRICES[k]).toLocaleString("en-US")}/month`;
 
   return (
     <>
@@ -70,12 +58,14 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
           <h1>Plans for every salon</h1>
           <p>Simple pricing, shown in your local currency. Pick the plan that fits your salon or clinic.</p>
           <div className={styles.switch} role="group" aria-label="Billing period">
-            <Link href={`/pricing?c=${regionKey}&b=monthly`} scroll={false} className={!annual ? styles.active : ""}>Monthly</Link>
-            <Link href={`/pricing?c=${regionKey}&b=annual`} scroll={false} className={annual ? styles.active : ""}>Annual · save 20%</Link>
+            <Link href={`/pricing?${c ? `c=${c}&` : ""}b=monthly`} scroll={false} className={!annual ? styles.active : ""}>Monthly</Link>
+            <Link href={`/pricing?${c ? `c=${c}&` : ""}b=annual`} scroll={false} className={annual ? styles.active : ""}>Annual · save 20%</Link>
           </div>
         </section>
 
-        <Pricing symbol={region.symbol} prices={region.prices} annual={annual} discount={ANNUAL_DISCOUNT} showHeader={false} />
+        {isPK
+          ? <Pricing symbol="₨" prices={PK_PRICES} annual={annual} discount={ANNUAL_DISCOUNT} showHeader={false} />
+          : <Pricing paddleCountry={country} annual={annual} showHeader={false} />}
 
         <section className={styles.tableWrap}>
           <table className={styles.table}>
@@ -83,10 +73,12 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
               <tr><th></th>{PLANS.map((p) => <th key={p.key}>{p.name}</th>)}</tr>
             </thead>
             <tbody>
-              <tr>
-                <td>Price</td>
-                {PLANS.map((p) => <td key={p.key}>{priceText(p.key)}</td>)}
-              </tr>
+              {isPK && (
+                <tr>
+                  <td>Price</td>
+                  {PLANS.map((p) => <td key={p.key}>{pkPrice(p.key)}</td>)}
+                </tr>
+              )}
               {rows.map(([name, ...vals]) => (
                 <tr key={name}>
                   <td>{name}</td>
