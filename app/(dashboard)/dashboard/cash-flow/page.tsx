@@ -465,7 +465,14 @@ export default function CashFlowPage() {
     }
   }
 
+  const savingExpense = useRef(false);
   async function handleSave() {
+    if (savingExpense.current) return; // ignore double-clicks that would add the expense twice
+    savingExpense.current = true;
+    try { await saveExpenseOnce(); } finally { savingExpense.current = false; }
+  }
+
+  async function saveExpenseOnce() {
     if (!form.date) {
       setFormError("Please select an expense date.");
       return;
