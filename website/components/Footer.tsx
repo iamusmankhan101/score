@@ -18,7 +18,7 @@ const linkCols: { heading: string; items: { label: string; href: string; externa
     heading: "Company",
     items: [
       { label: "Why Salon Central", href: "/#why" },
-      { label: "Contact Sales",     href: CONTACT_SALES_URL, external: true },
+      { label: "Contact Us",        href: "/contact" },
       { label: "Get Started",       href: CONTACT_SALES_URL, external: true },
     ],
   },

@@ -4,6 +4,7 @@ import { getPublishedPosts } from "@/lib/blog";
 
 const STATIC_ROUTES: { path: string; changeFrequency: "weekly" | "monthly" | "yearly"; priority: number }[] = [
   { path: "",                                          changeFrequency: "weekly",  priority: 1.0 },
+  { path: "/contact",                                  changeFrequency: "yearly",  priority: 0.6 },
   { path: "/features/appointment-scheduling",          changeFrequency: "monthly", priority: 0.8 },
   { path: "/features/client-management",               changeFrequency: "monthly", priority: 0.8 },
   { path: "/features/inventory-management",            changeFrequency: "monthly", priority: 0.8 },
