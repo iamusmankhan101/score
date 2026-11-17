@@ -55,7 +55,7 @@ const cell = (v: boolean | string) =>
 export default async function PricingPage({ searchParams }: { searchParams: Promise<{ c?: string; b?: string }> }) {
   const { c, b } = await searchParams;
   const annual = b !== "monthly"; // annual is the default tab
-  // Visitor's country: ?c= override (from the switcher) wins, else Vercel's geo header.
+  // Visitor's country comes from Vercel's geo header. ?c=PK|AE|GB is only a manual override for testing.
   const country = (c || (await headers()).get("x-vercel-ip-country") || "").toUpperCase();
   const regionKey = c && REGIONS[c.toUpperCase()] ? c.toUpperCase() : COUNTRY_REGION[country] ?? "OTHER";
   const region = REGIONS[regionKey];
@@ -83,12 +83,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
       <main className={styles.page}>
         <section className={styles.hero}>
           <h1>Plans for every salon</h1>
-          <p>Simple monthly pricing. Pick the plan that fits your salon or clinic.</p>
-          <div className={styles.switch} role="group" aria-label="Choose your country">
-            {Object.entries(REGIONS).map(([k, r]) => (
-              <Link key={k} href={`/pricing?c=${k}&b=${annual ? "annual" : "monthly"}`} scroll={false} className={k === regionKey ? styles.active : ""}>{r.label}</Link>
-            ))}
-          </div>
+          <p>Simple pricing, shown in your local currency. Pick the plan that fits your salon or clinic.</p>
           <div className={styles.switch} role="group" aria-label="Billing period">
             <Link href={`/pricing?c=${regionKey}&b=monthly`} scroll={false} className={!annual ? styles.active : ""}>Monthly</Link>
             <Link href={`/pricing?c=${regionKey}&b=annual`} scroll={false} className={annual ? styles.active : ""}>Annual · save 20%</Link>
