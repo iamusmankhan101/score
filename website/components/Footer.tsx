@@ -9,7 +9,7 @@ const linkCols: { heading: string; items: { label: string; href: string; externa
     heading: "Product",
     items: [
       { label: "Features",     href: "/#features" },
-      { label: "Pricing",      href: "/#pricing" },
+      { label: "Pricing",      href: "/pricing" },
       { label: "How It Works", href: "/#how" },
       { label: "Testimonials", href: "/#testimonials" },
     ],

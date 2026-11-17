@@ -39,7 +39,7 @@ const links = [
   { label: "How It Works", href: "/#how" },
   { label: "Why Salon Central",   href: "/#why" },
   { label: "Testimonials", href: "/#testimonials" },
-  { label: "Pricing",      href: "/#pricing" },
+  { label: "Pricing",      href: "/pricing" },
   { label: "FAQ",          href: "/#faq" },
   { label: "Blog",         href: "/blog" },
 ];

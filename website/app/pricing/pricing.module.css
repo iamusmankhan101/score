@@ -1,0 +1,35 @@
+.page { background: var(--white); padding: 120px 5% 80px; }
+
+.hero { text-align: center; max-width: 640px; margin: 0 auto 48px; }
+.hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); letter-spacing: -0.03em; font-weight: 500; margin-bottom: 12px; }
+.hero p { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 24px; }
+
+.switch { display: inline-flex; gap: 4px; padding: 4px; background: #f3f3f1; border-radius: 999px; }
+.switch a { padding: 6px 16px; border-radius: 999px; font-size: 0.85rem; color: var(--text-muted); }
+.switch a.active { background: #111; color: #fff; }
+
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; max-width: 1000px; margin: 0 auto 72px; }
+.card { background: #f8f8f6; border-radius: 20px; padding: 28px; }
+.card h2 { font-size: 1rem; font-weight: 500; margin-bottom: 14px; }
+.featured { background: #111; color: #fff; }
+.price { min-height: 48px; margin-bottom: 12px; }
+.amount { font-size: 2.6rem; letter-spacing: -0.04em; }
+.contact { font-size: 1.7rem; letter-spacing: -0.03em; }
+.period { font-size: 0.85rem; opacity: .6; }
+.desc { font-size: 0.85rem; opacity: .7; line-height: 1.5; margin-bottom: 24px; }
+.btn { display: block; text-align: center; padding: 12px; border-radius: 10px; background: #111; color: #fff; font-size: 0.85rem; font-weight: 500; }
+.featured .btn { background: #fff; color: #111; }
+
+.tableWrap { max-width: 1000px; margin: 0 auto; overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 560px; }
+.table th { background: #111; color: #fff; font-weight: 500; padding: 16px; text-align: center; }
+.table th:first-child { border-top-left-radius: 14px; }
+.table th:last-child { border-top-right-radius: 14px; }
+.table td { padding: 14px 16px; text-align: center; border: 1px solid var(--border); border-top: 0; }
+.table td:first-child { text-align: left; border-left: 0; }
+.table td:last-child { border-right: 0; }
+.tick { color: #111; display: inline-block; }
+
+@media (max-width: 800px) {
+  .cards { grid-template-columns: 1fr; }
+}
