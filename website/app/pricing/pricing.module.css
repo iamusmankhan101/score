@@ -4,7 +4,7 @@
 .hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); letter-spacing: -0.03em; font-weight: 500; margin-bottom: 12px; }
 .hero p { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 24px; }
 
-.switch { display: inline-flex; gap: 4px; padding: 4px; background: #f3f3f1; border-radius: 999px; }
+.switch { display: inline-flex; margin: 0 6px 8px; gap: 4px; padding: 4px; background: #f3f3f1; border-radius: 999px; }
 .switch a { padding: 6px 16px; border-radius: 999px; font-size: 0.85rem; color: var(--text-muted); }
 .switch a.active { background: #111; color: #fff; }
 
@@ -33,3 +33,4 @@
 @media (max-width: 800px) {
   .cards { grid-template-columns: 1fr; }
 }
+.billed { font-size: 0.78rem; opacity: .6; margin-top: 6px; }

@@ -19,11 +19,13 @@ const WHATSAPP = "https://wa.me/923029646928?text=Hi%2C%20I%27m%20interested%20i
 // Add a region = add a row here + its country codes in COUNTRY_REGION below.
 type PlanKey = "starter" | "pro" | "premium";
 const REGIONS: Record<string, { label: string; symbol: string; prices: Record<PlanKey, number | null> }> = {
-  PK:    { label: "Pakistan", symbol: "₨",   prices: { starter: null, pro: null, premium: null } },
-  AE:    { label: "UAE",      symbol: "AED ", prices: { starter: null, pro: null, premium: null } },
+  PK:    { label: "Pakistan", symbol: "₨",   prices: { starter: 3999, pro: 9499, premium: 12499 } },
+  AE:    { label: "UAE",      symbol: "AED ", prices: { starter: 80, pro: 175, premium: 250 } },
+  GB:    { label: "UK",       symbol: "£",   prices: { starter: 15, pro: 30, premium: 50 } },
   OTHER: { label: "Global",   symbol: "$",   prices: { starter: null, pro: null, premium: null } },
 };
-const COUNTRY_REGION: Record<string, string> = { PK: "PK", AE: "AE" }; // anything else → OTHER
+const ANNUAL_DISCOUNT = 0.2; // annual billing = 20% off the monthly price
+const COUNTRY_REGION: Record<string, string> = { PK: "PK", AE: "AE", GB: "GB" }; // anything else → OTHER
 // ─────────────────────────────────────────────────────────────────────────────
 
 const plans: { key: PlanKey; name: string; desc: string; featured: boolean }[] = [
@@ -50,19 +52,27 @@ const rows: [string, boolean | string, boolean | string, boolean | string][] = [
 const cell = (v: boolean | string) =>
   v === true ? <Check size={16} strokeWidth={3} className={styles.tick} aria-label="Included" /> : v === false ? <span aria-label="Not included">–</span> : v;
 
-export default async function PricingPage({ searchParams }: { searchParams: Promise<{ c?: string }> }) {
-  const { c } = await searchParams;
+export default async function PricingPage({ searchParams }: { searchParams: Promise<{ c?: string; b?: string }> }) {
+  const { c, b } = await searchParams;
+  const annual = b !== "monthly"; // annual is the default tab
   // Visitor's country: ?c= override (from the switcher) wins, else Vercel's geo header.
   const country = (c || (await headers()).get("x-vercel-ip-country") || "").toUpperCase();
   const regionKey = c && REGIONS[c.toUpperCase()] ? c.toUpperCase() : COUNTRY_REGION[country] ?? "OTHER";
   const region = REGIONS[regionKey];
 
-  const price = (k: PlanKey) => {
+  const fmt = (n: number) => `${region.symbol}${n.toLocaleString("en-US")}`;
+  // Per-month price for the selected billing tab; null = Contact Sales.
+  const monthly = (k: PlanKey) => {
     const p = region.prices[k];
+    return p == null ? null : annual ? Math.round(p * (1 - ANNUAL_DISCOUNT)) : p;
+  };
+  const price = (k: PlanKey) => {
+    const p = monthly(k);
     return p == null ? <span className={styles.contact}>Contact Sales</span> : (
       <>
-        <span className={styles.amount}>{region.symbol}{p.toLocaleString("en-US")}</span>
+        <span className={styles.amount}>{fmt(p)}</span>
         <span className={styles.period}> /month</span>
+        {annual && <div className={styles.billed}>Billed {fmt(p * 12)} yearly</div>}
       </>
     );
   };
@@ -76,8 +86,12 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
           <p>Simple monthly pricing. Pick the plan that fits your salon or clinic.</p>
           <div className={styles.switch} role="group" aria-label="Choose your country">
             {Object.entries(REGIONS).map(([k, r]) => (
-              <Link key={k} href={`/pricing?c=${k}`} scroll={false} className={k === regionKey ? styles.active : ""}>{r.label}</Link>
+              <Link key={k} href={`/pricing?c=${k}&b=${annual ? "annual" : "monthly"}`} scroll={false} className={k === regionKey ? styles.active : ""}>{r.label}</Link>
             ))}
+          </div>
+          <div className={styles.switch} role="group" aria-label="Billing period">
+            <Link href={`/pricing?c=${regionKey}&b=monthly`} scroll={false} className={!annual ? styles.active : ""}>Monthly</Link>
+            <Link href={`/pricing?c=${regionKey}&b=annual`} scroll={false} className={annual ? styles.active : ""}>Annual · save 20%</Link>
           </div>
         </section>
 
@@ -101,8 +115,8 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
               <tr>
                 <td>Price</td>
                 {plans.map((p) => {
-                  const v = region.prices[p.key];
-                  return <td key={p.key}>{v == null ? "Contact Sales" : `${region.symbol}${v.toLocaleString("en-US")}/month`}</td>;
+                  const v = monthly(p.key);
+                  return <td key={p.key}>{v == null ? "Contact Sales" : `${fmt(v)}/month`}</td>;
                 })}
               </tr>
               {rows.map(([name, ...vals]) => (
