@@ -83,7 +83,10 @@ function ensureTable(): Promise<void> {
         created_at      TEXT NOT NULL,
         updated_at      TEXT NOT NULL
       )
-    `).then(async () => {
+    `).catch(() => {
+      // Table almost certainly exists already. If the DB is blocking writes (plan limit),
+      // don't let this DDL take down read-only pages/builds; a real failure surfaces on the query itself.
+    }).then(async () => {
       // Added after the table's initial release — backfill for any deployment
       // whose blog_posts table was created before this column existed.
       await db.execute(`ALTER TABLE blog_posts ADD COLUMN seo_keywords TEXT NOT NULL DEFAULT '[]'`).catch(() => {});
