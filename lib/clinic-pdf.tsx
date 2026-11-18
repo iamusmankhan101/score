@@ -195,6 +195,53 @@ function drawBlankConsentPdf(clinic: ClinicPdfHeader, title: string, body: strin
   );
 }
 
+/** A plain letterhead document: title, a few "label: value" lines, optional table, free text and a signature line. */
+export interface GenericDoc {
+  title: string;
+  meta?: [string, string][];
+  table?: { head: string[]; rows: string[][]; foot?: [string, string][] };
+  body?: string;
+  /** Printed under the signature line, e.g. the doctor's name. */
+  signer?: string;
+  footer?: string;
+}
+
+function drawDocumentPdf(clinic: ClinicPdfHeader, d: GenericDoc): Promise<Buffer> {
+  const cols = d.table?.head.length ?? 1;
+  return renderToBuffer(
+    <Document title={d.title}>
+      <Page size="A4" style={s.page}>
+        <Header clinic={clinic} />
+        <Text style={s.title}>{d.title}</Text>
+        {(d.meta ?? []).filter(([, v]) => v).map(([k, v]) => <Text key={k} style={s.meta}>{k}: {v}</Text>)}
+        {d.table ? (
+          <View style={{ marginTop: 14 }}>
+            <View style={[s.item, { backgroundColor: "#f3f3f3" }]}>
+              {d.table.head.map((h, i) => <Text key={i} style={{ width: `${100 / cols}%`, fontFamily: "Helvetica-Bold", textAlign: i === 0 ? "left" : "right" }}>{h}</Text>)}
+            </View>
+            {d.table.rows.map((r, ri) => (
+              <View key={ri} style={s.item} wrap={false}>
+                {r.map((c, i) => <Text key={i} style={{ width: `${100 / cols}%`, textAlign: i === 0 ? "left" : "right" }}>{c}</Text>)}
+              </View>
+            ))}
+            {(d.table.foot ?? []).map(([k, v]) => (
+              <View key={k} style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 4 }}>
+                <Text style={{ fontFamily: "Helvetica-Bold", marginRight: 12 }}>{k}</Text><Text>{v}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {d.body ? <Text style={s.body}>{d.body}</Text> : null}
+        <View style={{ marginTop: 40 }} wrap={false}>
+          <View style={{ borderBottomWidth: 1, borderBottomColor: "#111111", width: 200, height: 22 }} />
+          <Text style={s.meta}>{d.signer ? `${d.signer} · ` : ""}Signature &amp; stamp</Text>
+        </View>
+        {d.footer ? <Text style={s.footer} fixed>{d.footer}</Text> : null}
+      </Page>
+    </Document>,
+  );
+}
+
 /**
  * The server fetches the logo itself, so only addresses we trust are accepted
  * (an inline image, our own site, or the image host); anything else is ignored
@@ -221,3 +268,5 @@ export const renderConsentPdf = (clinic: ClinicPdfHeader, c: ConsentRecord) => w
 export const renderPrescriptionPdf = (clinic: ClinicPdfHeader, patientName: string, rx: Prescription) => withLogoFallback(clinic, (h) => drawPrescriptionPdf(h, patientName, rx));
 
 export const renderBlankConsentPdf = (clinic: ClinicPdfHeader, title: string, body: string) => withLogoFallback(clinic, (h) => drawBlankConsentPdf(h, title, body));
+
+export const renderDocumentPdf = (clinic: ClinicPdfHeader, d: GenericDoc) => withLogoFallback(clinic, (h) => drawDocumentPdf(h, d));

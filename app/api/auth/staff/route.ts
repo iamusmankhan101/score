@@ -12,6 +12,7 @@ const ALL_PERMISSION_KEYS = new Set([
   "revenue", "cash-flow", "inventory", "vendor-bills", "services", "staff", "attendance", "payouts", "messages", "try-on",
   "account", "billing",
   "medical", "consent-forms", "leads", "rooms", "aftercare", "waitlist", "clinic-reports",
+  "lab-orders", "medical-documents", "quotations", "purchase-orders",
   "delete",
 ]);
 

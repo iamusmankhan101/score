@@ -8,7 +8,7 @@ import {
   UserCog, BarChart3, Package, Globe, Sparkles, CreditCard, Scissors,
   CircleUserRound, Languages, LogOut, Shield, Wand2, ReceiptText, ShoppingCart,
   X, Gift, Banknote, ListOrdered, ChevronRight, ChevronDown, MapPin, Check, Wallet, Star,
-  ClipboardCheck, Store, Landmark, Archive, Smartphone, FileText, FileSignature, Megaphone, DoorOpen, HeartPulse,
+  ClipboardCheck, Store, Landmark, Archive, Smartphone, FileText, FileSignature, Megaphone, DoorOpen, HeartPulse, FlaskConical, Truck,
 } from "lucide-react";
 import { businessTypeOf, term, useIsClinic } from "@/lib/clinic";
 import { AuthUser, getCurrentUser, signOut } from "@/lib/auth";
@@ -113,8 +113,9 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
     items: [
       // Salon-only screens (hair/makeup Virtual Try-On) don't belong in a clinic.
       ...group.items.filter((item) => !(clinic && item.href === "/dashboard/try-on")).map((item) => ({ ...item, label: term(item.label, clinic) })),
-      ...(clinic && group.label === "Clients & Sales" ? [{ href: "/dashboard/consent-forms", icon: FileSignature, label: "Consent Forms" }] : []),
+      ...(clinic && group.label === "Clients & Sales" ? [{ href: "/dashboard/consent-forms", icon: FileSignature, label: "Consent Forms" }, { href: "/dashboard/lab-orders", icon: FlaskConical, label: "Lab & Scan Orders" }, { href: "/dashboard/quotations", icon: ReceiptText, label: "Quotations" }, { href: "/dashboard/medical-documents", icon: FileText, label: "Medical Documents" }] : []),
       ...(clinic && group.label === "Business" ? [{ href: "/dashboard/clinic-reports", icon: BarChart3, label: "Clinic Reports" }, { href: "/dashboard/cash-closing", icon: Banknote, label: "Cash Closing" }, { href: "/dashboard/rooms", icon: DoorOpen, label: "Rooms & Machines" }] : []),
+      ...(group.label === "Business" ? [{ href: "/dashboard/purchase-orders", icon: Truck, label: "Purchase Orders" }] : []),
       ...(clinic && group.label === "Marketing" ? [{ href: "/dashboard/leads", icon: Megaphone, label: "Leads" }, { href: "/dashboard/aftercare", icon: HeartPulse, label: "Aftercare" }] : []),
       ...(clinic && group.label === "Overview" ? [{ href: "/dashboard/queue", icon: ListOrdered, label: "Queue" }] : []),
     ],

@@ -6,7 +6,7 @@
 
 import { NextRequest } from "next/server";
 import { resolveActor } from "@/lib/api-auth";
-import { renderBlankConsentPdf, renderConsentPdf, renderPrescriptionPdf, trustedLogo, type ClinicPdfHeader } from "@/lib/clinic-pdf";
+import { renderBlankConsentPdf, renderConsentPdf, renderDocumentPdf, renderPrescriptionPdf, trustedLogo, type ClinicPdfHeader, type GenericDoc } from "@/lib/clinic-pdf";
 import type { ConsentRecord, Prescription } from "@/lib/clinic";
 
 export async function POST(req: NextRequest) {
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   if (!actor) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => null) as {
-    kind?: "consent" | "consent-blank" | "prescription"; template?: { title?: string; body?: string }; clinic?: ClinicPdfHeader; patientName?: string; consent?: ConsentRecord; prescription?: Prescription;
+    kind?: "consent" | "consent-blank" | "prescription" | "document"; doc?: GenericDoc; template?: { title?: string; body?: string }; clinic?: ClinicPdfHeader; patientName?: string; consent?: ConsentRecord; prescription?: Prescription;
   } | null;
   if (!body?.clinic?.name) return Response.json({ ok: false, error: "Missing clinic details." }, { status: 400 });
 
@@ -31,6 +31,9 @@ export async function POST(req: NextRequest) {
     } else if (body.kind === "prescription" && Array.isArray(body.prescription?.items)) {
       pdf = await renderPrescriptionPdf(body.clinic, body.patientName || "Patient", body.prescription!);
       filename = `Prescription - ${body.patientName || "patient"} - ${body.prescription!.date}`;
+    } else if (body.kind === "document" && body.doc?.title && (body.doc.body ?? "").length < 30_000 && (body.doc.table?.rows.length ?? 0) < 200) {
+      pdf = await renderDocumentPdf(body.clinic, body.doc);
+      filename = `${body.doc.title.slice(0, 80)}${body.patientName ? ` - ${body.patientName.slice(0, 60)}` : ""}`;
     } else {
       return Response.json({ ok: false, error: "Nothing to print." }, { status: 400 });
     }

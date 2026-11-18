@@ -2223,6 +2223,10 @@ const PERMISSION_OPTIONS = [
   { key: "waitlist", label: "Waiting List" },
   { key: "queue", label: "Queue / Tokens (clinic)" },
   { key: "clinic-reports", label: "Clinic Reports (clinic)" },
+  { key: "lab-orders", label: "Lab & Scan Orders (clinic)" },
+  { key: "medical-documents", label: "Medical Documents (clinic)" },
+  { key: "quotations", label: "Quotations (clinic)" },
+  { key: "purchase-orders", label: "Purchase Orders" },
   { key: "cash-closing", label: "Daily Cash Closing" },
   // Not a page: lets this login delete invoices/sales, clients, staff and services.
   { key: "delete", label: "Can delete records" },

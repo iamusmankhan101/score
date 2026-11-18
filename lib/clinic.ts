@@ -362,7 +362,7 @@ export interface WaitlistEntry {
   createdAt: string;
 }
 
-type ClinicEntity = "consultations" | "treatment_plans" | "consents" | "clinic_photos" | "prescriptions" | "leads" | "treatment_charts" | "waitlist" | "clinic_documents" | "cash_closings";
+type ClinicEntity = "consultations" | "treatment_plans" | "consents" | "clinic_photos" | "prescriptions" | "leads" | "treatment_charts" | "waitlist" | "clinic_documents" | "cash_closings" | "lab_orders" | "quotations" | "purchase_orders";
 
 function readList<T>(entity: ClinicEntity): T[] {
   if (typeof window === "undefined") return [];
@@ -424,6 +424,92 @@ export interface CashClosing {
 }
 export const getCashClosings = () => readList<CashClosing>("cash_closings");
 export const saveCashClosings = (list: CashClosing[], deletedIds?: string[]) => writeList("cash_closings", list, deletedIds);
+
+// ─── Lab & scan orders ───────────────────────────────────────────────────────
+
+export const LAB_STATUSES = [{ id: "ordered", label: "Ordered" }, { id: "sample", label: "Sample / scan done" }, { id: "reported", label: "Reported" }] as const;
+export type LabStatus = typeof LAB_STATUSES[number]["id"];
+
+/** A lab test or scan ordered for a patient, tracked until the result is back. */
+export interface LabOrder {
+  id: string;
+  clientId: string;
+  clientName: string;
+  kind: "Lab" | "Radiology";
+  /** e.g. "CBC, HbA1c" or "Ultrasound abdomen". */
+  tests: string;
+  provider?: string;
+  /** Why it was ordered; passed on to the provider. */
+  indication?: string;
+  /** Preparation the patient must do (fasting etc.). */
+  prep?: string;
+  status: LabStatus;
+  /** YYYY-MM-DD the result is expected. */
+  dueDate?: string;
+  /** Result summary, typed in when it comes back. */
+  result?: string;
+  abnormal?: boolean;
+  createdAt: string;
+  reportedAt?: string;
+}
+
+/** Ordered or done, but still without a result past its due date. */
+export const labIsOverdue = (o: LabOrder, today = todayKey()) => o.status !== "reported" && !!o.dueDate && o.dueDate < today;
+
+export const getLabOrders = () => readList<LabOrder>("lab_orders");
+export const saveLabOrders = (list: LabOrder[], deletedIds?: string[]) => writeList("lab_orders", list, deletedIds);
+
+// ─── Quotations ──────────────────────────────────────────────────────────────
+
+export interface QuoteLine { name: string; qty: number; price: number }
+export const QUOTE_STATUSES = ["draft", "sent", "accepted", "declined"] as const;
+export type QuoteStatus = typeof QUOTE_STATUSES[number];
+
+/** A priced offer for a treatment, with an optional deposit to confirm it. */
+export interface Quotation {
+  id: string;
+  number: string;
+  clientId?: string;
+  clientName: string;
+  phone?: string;
+  lines: QuoteLine[];
+  discount: number;
+  /** YYYY-MM-DD. */
+  validUntil?: string;
+  notes?: string;
+  status: QuoteStatus;
+  /** Deposit asked for, and how much has actually been received. */
+  depositAsked: number;
+  depositPaid: number;
+  createdAt: string;
+}
+
+export const quoteTotal = (q: Pick<Quotation, "lines" | "discount">) =>
+  Math.max(0, q.lines.reduce((sum, l) => sum + l.qty * l.price, 0) - (q.discount || 0));
+
+export const getQuotations = () => readList<Quotation>("quotations");
+export const saveQuotations = (list: Quotation[], deletedIds?: string[]) => writeList("quotations", list, deletedIds);
+
+// ─── Purchase orders ─────────────────────────────────────────────────────────
+
+export interface POLine { itemId: string; name: string; qty: number; cost: number }
+export const PO_STATUSES = ["draft", "ordered", "received", "cancelled"] as const;
+export type POStatus = typeof PO_STATUSES[number];
+
+/** Stock ordered from a supplier; receiving it adds the quantities to inventory. */
+export interface PurchaseOrder {
+  id: string;
+  number: string;
+  supplier: string;
+  lines: POLine[];
+  status: POStatus;
+  notes?: string;
+  createdAt: string;
+  receivedAt?: string;
+}
+
+export const getPurchaseOrders = () => readList<PurchaseOrder>("purchase_orders");
+export const savePurchaseOrders = (list: PurchaseOrder[], deletedIds?: string[]) => writeList("purchase_orders", list, deletedIds);
 
 export const getWaitlist = () => readList<WaitlistEntry>("waitlist");
 export const saveWaitlist = (list: WaitlistEntry[], deletedIds?: string[]) => writeList("waitlist", list, deletedIds);
