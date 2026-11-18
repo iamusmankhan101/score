@@ -105,12 +105,19 @@ export function slugify(title: string): string {
 }
 
 export async function getPublishedPosts(): Promise<BlogPost[]> {
-  await ensureTable();
-  const result = await db.execute({
-    sql: "SELECT * FROM blog_posts WHERE status = 'published' ORDER BY published_at DESC",
-    args: [],
-  });
-  return result.rows.map((r) => fromRow(r as unknown as Row));
+  // If the database can't be reached (e.g. env vars not set yet on a new deploy), show no posts
+  // instead of failing the build; pages revalidate and fill in once the DB is reachable.
+  try {
+    await ensureTable();
+    const result = await db.execute({
+      sql: "SELECT * FROM blog_posts WHERE status = 'published' ORDER BY published_at DESC",
+      args: [],
+    });
+    return result.rows.map((r) => fromRow(r as unknown as Row));
+  } catch (e) {
+    console.error("[blog] getPublishedPosts failed:", e);
+    return [];
+  }
 }
 
 export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
