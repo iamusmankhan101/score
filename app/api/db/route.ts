@@ -6,7 +6,7 @@ import { invalidatePublicSalon } from "@/lib/public-salon-cache";
 
 const DELETED_RECORDS_ENTITY = "deleted_records";
 
-const ALLOWED = new Set(["clients", "appointments", "staff", "services", "inventory", "salon_invoices", "expenses", "attendance", "payouts", "cash_flow_income", "held_sales", "inventory_log", "vendor_bills", "consultations", "treatment_plans", "consents", "clinic_photos", "prescriptions", "leads", "treatment_charts", "waitlist", "clinic_documents", "cash_closings", "lab_orders", "quotations", "purchase_orders", DELETED_RECORDS_ENTITY]);
+const ALLOWED = new Set(["clients", "appointments", "staff", "services", "inventory", "salon_invoices", "expenses", "attendance", "payouts", "cash_flow_income", "held_sales", "inventory_log", "vendor_bills", "consultations", "treatment_plans", "consents", "clinic_photos", "prescriptions", "leads", "treatment_charts", "waitlist", "clinic_documents", "cash_closings", "lab_orders", "quotations", "purchase_orders", "stock_transfers", DELETED_RECORDS_ENTITY]);
 
 /**
  * Staff logins see only what their ticked pages need (see PERMISSION_OPTIONS on the Account
@@ -31,6 +31,7 @@ const ENTITY_PERMISSIONS: Record<string, string[]> = {
   lab_orders: ["medical", "lab-orders"],
   quotations: ["quotations"],
   purchase_orders: ["purchase-orders"],
+  stock_transfers: ["stock-transfers"],
 };
 const mayRead = (actor: ResolvedActor, entity: string) => !ENTITY_PERMISSIONS[entity] || can(actor, ...ENTITY_PERMISSIONS[entity]);
 // The staff list feeds every staff picker, so everyone reads it — but only the Staff page

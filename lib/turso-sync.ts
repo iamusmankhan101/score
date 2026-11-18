@@ -19,7 +19,7 @@ import {
   type PendingWrite,
 } from "./offline-queue";
 
-const ENTITIES = ["clients", "appointments", "staff", "services", "inventory", "salon_invoices", "expenses", "attendance", "payouts", "cash_flow_income", "held_sales", "inventory_log", "vendor_bills", "consultations", "treatment_plans", "consents", "clinic_photos", "prescriptions", "leads", "treatment_charts", "waitlist", "clinic_documents", "cash_closings", "lab_orders", "quotations", "purchase_orders", DELETED_RECORDS_ENTITY] as const;
+const ENTITIES = ["clients", "appointments", "staff", "services", "inventory", "salon_invoices", "expenses", "attendance", "payouts", "cash_flow_income", "held_sales", "inventory_log", "vendor_bills", "consultations", "treatment_plans", "consents", "clinic_photos", "prescriptions", "leads", "treatment_charts", "waitlist", "clinic_documents", "cash_closings", "lab_orders", "quotations", "purchase_orders", "stock_transfers", DELETED_RECORDS_ENTITY] as const;
 type Entity = typeof ENTITIES[number];
 
 /**

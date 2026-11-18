@@ -362,7 +362,7 @@ export interface WaitlistEntry {
   createdAt: string;
 }
 
-type ClinicEntity = "consultations" | "treatment_plans" | "consents" | "clinic_photos" | "prescriptions" | "leads" | "treatment_charts" | "waitlist" | "clinic_documents" | "cash_closings" | "lab_orders" | "quotations" | "purchase_orders";
+type ClinicEntity = "consultations" | "treatment_plans" | "consents" | "clinic_photos" | "prescriptions" | "leads" | "treatment_charts" | "waitlist" | "clinic_documents" | "cash_closings" | "lab_orders" | "quotations" | "purchase_orders" | "stock_transfers";
 
 function readList<T>(entity: ClinicEntity): T[] {
   if (typeof window === "undefined") return [];
@@ -507,6 +507,22 @@ export interface PurchaseOrder {
   createdAt: string;
   receivedAt?: string;
 }
+
+// ─── Branch stock transfers ──────────────────────────────────────────────────
+
+/** Stock moved from one branch to another. Kept in the sending branch's data as a history. */
+export interface StockTransfer {
+  id: string;
+  number: string;
+  fromLocationId: string;
+  toLocationId: string;
+  lines: { itemId: string; name: string; qty: number }[];
+  note?: string;
+  createdAt: string;
+}
+
+export const getStockTransfers = () => readList<StockTransfer>("stock_transfers");
+export const saveStockTransfers = (list: StockTransfer[], deletedIds?: string[]) => writeList("stock_transfers", list, deletedIds);
 
 export const getPurchaseOrders = () => readList<PurchaseOrder>("purchase_orders");
 export const savePurchaseOrders = (list: PurchaseOrder[], deletedIds?: string[]) => writeList("purchase_orders", list, deletedIds);

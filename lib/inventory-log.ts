@@ -14,7 +14,7 @@ import { persistEntity } from "./turso-sync";
 import type { InventoryItem } from "./types";
 
 export type StockChangeReason =
-  | "opening" | "restock" | "wastage" | "correction" | "sold" | "purchase" | "returned" | "import";
+  | "opening" | "restock" | "wastage" | "correction" | "sold" | "purchase" | "returned" | "import" | "transfer";
 
 export const STOCK_REASON_LABEL: Record<StockChangeReason, string> = {
   opening: "Opening stock",
@@ -25,6 +25,7 @@ export const STOCK_REASON_LABEL: Record<StockChangeReason, string> = {
   purchase: "Purchase",
   returned: "Returned to stock",
   import: "Excel import",
+  transfer: "Branch transfer",
 };
 
 export interface StockLogEntry {
