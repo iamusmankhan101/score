@@ -696,14 +696,18 @@ async function runBookingQueueCron(): Promise<{ sent: number; failed: number; sk
       skipped++;
       continue;
     }
-    if (sendAttemptsThisRun >= SEND_LIMIT_PER_RUN) {
+    // Booking confirmations and the salon's own group alert are expected, not outbound
+    // marketing: skip the one-per-run cap and use the short POS-style gaps so a new
+    // booking isn't held behind unrelated sends.
+    const fastKind = item.kind === "confirmation" || item.kind === "groupalert";
+    if (!fastKind && sendAttemptsThisRun >= SEND_LIMIT_PER_RUN) {
       deferredDelayMs += spacingDelayMs(item.kind);
       await deferItem(item, deferredDelayMs, "Deferred to pace automated WhatsApp sends.");
       skipped++;
       continue;
     }
     const lastSentForKind = await getLastSentAtMs(item.userId, logTypeForKind(item.kind), lastSentCache);
-    const minGap = minGapMsForKind(item.kind);
+    const minGap = fastKind ? POS_MIN_GAP_MS : minGapMsForKind(item.kind);
     if (lastSentForKind != null && Date.now() - lastSentForKind < minGap) {
       await deferItem(item, spacingDelayMs(item.kind), "Deferred to keep automated WhatsApp sends spaced apart.");
       skipped++;
@@ -711,7 +715,7 @@ async function runBookingQueueCron(): Promise<{ sent: number; failed: number; sk
     }
     const lastAnySent = await getLastAnySentAtMs(item.userId, lastSentCache);
     if (lastAnySent != null) {
-      const targetGap = globalTargetGapMs();
+      const targetGap = fastKind ? posGlobalTargetGapMs() : globalTargetGapMs();
       const elapsed = Date.now() - lastAnySent;
       if (elapsed < targetGap) {
         await deferItem(item, targetGap - elapsed, "Deferred to keep automated WhatsApp sends spaced apart from other message types.");
