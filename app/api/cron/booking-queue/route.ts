@@ -72,7 +72,7 @@ function spacingDelayMs(kind: QueueKind): number {
 // the same second, and short enough that the fifth client still has theirs
 // before they reach the door (2nd lands 1-2 min out, 3rd 2-4 min, ...).
 function posSpacingDelayMs(): number {
-  return randBetween(1 * MINUTE_MS, 2 * MINUTE_MS);
+  return randBetween(5 * MINUTE_MS, 7 * MINUTE_MS);
 }
 
 // A failed send is almost never worth retrying immediately — the usual causes
@@ -512,7 +512,7 @@ function minGapMsForKind(kind: QueueKind): number {
 // at that width a second checkout inside the same 10 minutes had its receipt
 // pushed past the client's visit, which is the delay this is meant to remove.
 // A 1 min floor still keeps two receipts off the same second.
-const POS_MIN_GAP_MS = 1 * MINUTE_MS;
+const POS_MIN_GAP_MS = 5 * MINUTE_MS; // never closer than 5 min between any two messages
 
 // SEND_LIMIT_PER_RUN only caps how many messages go out within one cron
 // invocation — it does nothing to stop a *later* invocation from sending
@@ -564,7 +564,7 @@ function globalTargetGapMs(): number {
 // so it is the least likely of the automated types to be reported, which is
 // what the cross-type gap is ultimately protecting against.
 function posGlobalTargetGapMs(): number {
-  return randBetween(1 * MINUTE_MS, 2 * MINUTE_MS);
+  return randBetween(5 * MINUTE_MS, 7 * MINUTE_MS);
 }
 async function getLastAnySentAtMs(
   userId: string,
