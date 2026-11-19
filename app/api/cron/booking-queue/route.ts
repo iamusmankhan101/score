@@ -759,6 +759,11 @@ async function runBookingQueueCron(): Promise<{ sent: number; failed: number; sk
       continue;
     }
     await logMessage(item.userId, item.kind, item.clientName, item.phone, result.ok ? "sent" : "failed", result.errorReason, apptId, item.apptDate ?? "", item.service ?? "");
+    // Count this attempt toward the gap checks for the rest of THIS run too (the cache
+    // otherwise holds the last send from before the run, so several due messages
+    // would go out back-to-back and trip the provider's rate limit).
+    lastSentCache.set(`${item.userId}:${logTypeForKind(item.kind)}`, Date.now());
+    lastSentCache.set(`${item.userId}:any`, Date.now());
 
     if (result.ok) {
       recordWhatsAppSafetySend({ phone: item.phone, config: providerConfig });
@@ -856,6 +861,8 @@ async function runBookingQueueCron(): Promise<{ sent: number; failed: number; sk
       continue;
     }
     await logMessage(item.userId, "invoice", item.clientName, item.phone, result.ok ? "sent" : "failed", result.error, item.invoiceId);
+    lastSentCache.set(`${item.userId}:invoice`, Date.now());
+    lastSentCache.set(`${item.userId}:any`, Date.now());
 
     if (result.ok) {
       recordWhatsAppSafetySend({ phone: item.phone, config: providerConfig });
