@@ -38,7 +38,31 @@ export async function POST(req: NextRequest) {
   const actor = await resolveActor(req);
   if (!actor) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json().catch(() => ({})) as { source?: unknown; id?: unknown };
+  const body = await req.json().catch(() => ({})) as { source?: unknown; id?: unknown; phone?: unknown };
+
+  // Remove every still-pending message for one patient from both queues. Only
+  // pending rows go, so history of what was already sent is left alone.
+  if (typeof body.phone === "string" && body.phone.trim()) {
+    const phone = body.phone.trim();
+    try {
+      const scope = await branchScope(actor);
+      if (scope && !scope.hasPhone(phone)) {
+        return Response.json({ ok: false, error: "That client belongs to another branch." }, { status: 403 });
+      }
+      let deleted = 0;
+      for (const { table } of Object.values(TARGETS)) {
+        const r = await db.execute({
+          sql: `DELETE FROM ${table} WHERE user_id = ? AND phone = ? AND status = 'pending'`,
+          args: [actor.userId, phone],
+        });
+        deleted += r.rowsAffected;
+      }
+      return Response.json({ ok: true, deleted });
+    } catch (error) {
+      console.error("[whatsapp/queue-delete]", error);
+      return Response.json({ ok: false, error: "Could not remove the client's queued messages." }, { status: 500 });
+    }
+  }
 
   if (!isQueueSource(body.source)) {
     return Response.json({ ok: false, error: "source must be \"booking\" or \"pos\"." }, { status: 400 });

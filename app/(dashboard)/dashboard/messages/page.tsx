@@ -1562,6 +1562,27 @@ function QueueDetailsModal({ items, loading, onClose, onRefresh }: {
     }
   }
 
+  async function deleteClientPending(item: QueueDetailItem) {
+    setDeletingKey(itemKey(item));
+    setDeleteError("");
+    try {
+      const res = await fetch("/api/whatsapp/queue-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: item.phone }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (!data.ok) throw new Error(data.error || "Could not remove that client's messages.");
+      const gone = items.filter((i) => i.phone === item.phone && i.status === "pending").map(itemKey);
+      setRemovedKeys((keys) => [...keys, ...gone]);
+      setConfirmKey(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Could not remove that client's messages.");
+    } finally {
+      setDeletingKey(null);
+    }
+  }
+
   const renderItem = (item: QueueDetailItem) => {
     const key = itemKey(item);
     const armed = confirmKey === key;
@@ -1595,6 +1616,13 @@ function QueueDetailsModal({ items, loading, onClose, onRefresh }: {
                 style={{ border: "1px solid #dc2626", background: "#dc2626", color: "#fff", borderRadius: 7, padding: "3px 8px", fontSize: 10, fontWeight: 800, cursor: deleting ? "wait" : "pointer" }}>
                 {deleting ? "…" : item.status === "pending" ? "Cancel send" : "Delete"}
               </button>
+              {item.status === "pending" && !item.phone.includes("@") && (
+                <button type="button" onClick={() => void deleteClientPending(item)} disabled={deleting}
+                  title="Cancel every pending message for this client"
+                  style={{ border: "1px solid #dc2626", background: "#fff", color: "#dc2626", borderRadius: 7, padding: "3px 8px", fontSize: 10, fontWeight: 800, cursor: deleting ? "wait" : "pointer" }}>
+                  All for client
+                </button>
+              )}
               <button type="button" onClick={() => setConfirmKey(null)} disabled={deleting}
                 style={{ border: "1px solid #e8e8f0", background: "#fff", color: "#6b6b8a", borderRadius: 7, padding: "3px 7px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
                 Keep
