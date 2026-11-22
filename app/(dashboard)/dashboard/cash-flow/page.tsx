@@ -464,6 +464,13 @@ export default function CashFlowPage() {
     }
   }
 
+  // The expense is already in local storage when addExpense/updateExpense start;
+  // only the database sync can hang. Don't leave the form frozen on a slow
+  // network — give up waiting (the sync warning shows and the write retries).
+  function withinSeconds<T>(seconds: number, work: Promise<T>, fallback?: T): Promise<T> {
+    return Promise.race([work, new Promise<T>(res => setTimeout(() => res(fallback as T), seconds * 1000))]);
+  }
+
   const savingExpense = useRef(false);
   async function handleSave() {
     if (savingExpense.current) return; // ignore double-clicks that would add the expense twice
@@ -512,10 +519,10 @@ export default function CashFlowPage() {
       const itemsPatch = { items: linkedItems.length ? linkedItems : undefined };
       if (editId) {
         const previousItems = getExpenses().find(e => e.id === editId)?.items;
-        dbSaved = await updateExpense(editId, { date: form.date, category: form.category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch });
+        dbSaved = await withinSeconds(8, updateExpense(editId, { date: form.date, category: form.category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch }), false);
         applyExpenseStock(previousItems, linkedItems);
       } else {
-        ({ dbSaved } = await addExpense({ date: form.date, category: form.category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch }));
+        ({ dbSaved } = (await withinSeconds(8, addExpense({ date: form.date, category: form.category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch }), undefined)) ?? { dbSaved: false });
         applyExpenseStock([], linkedItems);
       }
       setExpenseSyncFailed(!dbSaved);
