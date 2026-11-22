@@ -497,7 +497,7 @@ export default function RevenuePage() {
   const expensesByChannel = useMemo(() => {
     let cash = 0, online = 0;
     periodExpenses.forEach(e => {
-      if ((e.paymentMethod || "cash") === "cash") cash += e.amount;
+      if (["cash", "petty_cash"].includes(e.paymentMethod || "cash")) cash += e.amount;
       else online += e.amount;
     });
     return { cash, online };

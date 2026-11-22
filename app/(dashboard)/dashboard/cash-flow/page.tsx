@@ -43,13 +43,13 @@ export const EXPENSE_CATEGORIES: { key: ExpenseCategory; label: string; color: s
   { key: "miscellaneous", label: "Miscellaneous",       color: "#6b7280" },
 ];
 
-const PAYMENT_METHODS = ["cash", "jazzcash", "easypaisa", "bank", "card"];
+const PAYMENT_METHODS = ["cash", "petty_cash", "jazzcash", "easypaisa", "bank", "card"];
 const PAYMENT_LABELS: Record<string, string> = {
-  cash: "Cash", jazzcash: "JazzCash", easypaisa: "EasyPaisa",
+  cash: "Cash", petty_cash: "Petty Cash", jazzcash: "JazzCash", easypaisa: "EasyPaisa",
   bank: "Bank Transfer", card: "Card",
 };
 const PAYMENT_COLORS: Record<string, string> = {
-  cash: "#22c55e", jazzcash: "#f97316", easypaisa: "#10b981",
+  cash: "#22c55e", petty_cash: "#059669", jazzcash: "#f97316", easypaisa: "#10b981",
   bank: "#3b82f6", card: "#6366f1",
 };
 const PAYMENT_STATUSES = [
@@ -286,7 +286,7 @@ export default function CashFlowPage() {
   const periodExpenseSplit = useMemo(() => {
     let cash = 0, online = 0;
     paidPeriodExpenses.forEach(e => {
-      if ((e.paymentMethod || "cash") === "cash") cash += e.amount;
+      if (["cash", "petty_cash"].includes(e.paymentMethod || "cash")) cash += e.amount;
       else online += e.amount;
     });
     return { cash, online };
@@ -294,14 +294,13 @@ export default function CashFlowPage() {
 
   const netCashIncome   = periodIncomeSplit.cash   - periodExpenseSplit.cash;
 
-  // Petty cash is its own pot: what was put in, minus every paid cash expense
-  // since the first top-up (cash expenses from before petty cash was used aren't
-  // charged against it). The balance runs up to the end of the selected period.
+  // Petty cash is its own pot: what was put in, minus every paid expense
+  // whose Payment is "Petty Cash", since the first top-up. The balance runs up to the end of the selected period.
   const pettySummary = useMemo(() => {
     if (pettyCash.length === 0 || !filterEnd) return null;
     const firstDate = pettyCash.reduce((min, e) => (e.date < min ? e.date : min), pettyCash[0].date);
     const cashSpend = expenses.filter(e =>
-      expensePaymentStatus(e) === "paid" && (e.paymentMethod || "cash") === "cash" && e.date >= firstDate && e.date <= filterEnd);
+      expensePaymentStatus(e) === "paid" && e.paymentMethod === "petty_cash" && e.date >= firstDate && e.date <= filterEnd);
     const addedToDate = pettyCash.filter(e => e.date <= filterEnd).reduce((s, e) => s + e.amount, 0);
     const spentToDate = cashSpend.reduce((s, e) => s + e.amount, 0);
     const inPeriod = pettyCash.filter(e => e.date >= rangeStart && e.date <= filterEnd)
@@ -1158,7 +1157,7 @@ export default function CashFlowPage() {
           <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #a7f3d0", padding: 16, display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 10 }}>
             <div style={{ width: "100%", fontSize: 14, fontWeight: 800, color: "#1a1a2e" }}>
               Add Petty Cash
-              <span style={{ display: "block", fontSize: 11, fontWeight: 500, color: "#9898b0", marginTop: 2 }}>Cash put into the drawer. Kept separate from income — paid cash expenses are deducted from it.</span>
+              <span style={{ display: "block", fontSize: 11, fontWeight: 500, color: "#9898b0", marginTop: 2 }}>Cash put into the drawer. Kept separate from income — expenses with Payment set to "Petty Cash" are deducted from it.</span>
             </div>
             <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, fontWeight: 700, color: "#7c7c9a" }}>
               Date
@@ -1267,7 +1266,7 @@ export default function CashFlowPage() {
                 </div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", marginTop: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Petty Cash Balance</div>
                 <div style={{ fontSize: 11, color: "#9898b0", marginTop: 2, fontWeight: 500 }}>
-                  This period: {fmt(pettySummary.addedInPeriod)} added − {fmt(pettySummary.spentInPeriod)} cash expenses
+                  This period: {fmt(pettySummary.addedInPeriod)} added − {fmt(pettySummary.spentInPeriod)} petty cash expenses
                 </div>
               </div>
             </div>
