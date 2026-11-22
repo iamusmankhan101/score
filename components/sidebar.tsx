@@ -116,7 +116,8 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
       ...(clinic && group.label === "Clients & Sales" ? [{ href: "/dashboard/consent-forms", icon: FileSignature, label: "Consent Forms" }, { href: "/dashboard/lab-orders", icon: FlaskConical, label: "Lab & Scan Orders" }, { href: "/dashboard/quotations", icon: ReceiptText, label: "Quotations" }, { href: "/dashboard/medical-documents", icon: FileText, label: "Medical Documents" }] : []),
       ...(clinic && group.label === "Business" ? [{ href: "/dashboard/clinic-reports", icon: BarChart3, label: "Clinic Reports" }, { href: "/dashboard/cash-closing", icon: Banknote, label: "Cash Closing" }, { href: "/dashboard/rooms", icon: DoorOpen, label: "Rooms & Machines" }] : []),
       ...(group.label === "Business" ? [{ href: "/dashboard/purchase-orders", icon: Truck, label: "Purchase Orders" }, { href: "/dashboard/stock-transfers", icon: ArrowLeftRight, label: "Stock Transfers" }] : []),
-      ...(clinic && group.label === "Marketing" ? [{ href: "/dashboard/leads", icon: Megaphone, label: "Leads" }, { href: "/dashboard/aftercare", icon: HeartPulse, label: "Aftercare" }] : []),
+      ...(clinic && group.label === "Marketing" ? [{ href: "/dashboard/leads", icon: Megaphone, label: "Leads" }] : []),
+      ...(group.label === "Marketing" ? [{ href: "/dashboard/aftercare", icon: HeartPulse, label: "Aftercare" }] : []),
       ...(clinic && group.label === "Overview" ? [{ href: "/dashboard/queue", icon: ListOrdered, label: "Queue" }] : []),
     ],
   }));

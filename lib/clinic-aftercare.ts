@@ -28,6 +28,8 @@ export interface AftercareFlow {
 
 export interface ClinicAutomationSettings {
   autoAftercare?: boolean;
+  /** Salons (not clinics): aftercare is opt-in — nothing is sent unless this is true. */
+  salonAftercare?: boolean;
   aftercareFlows?: AftercareFlow[] | null;
   /** "You have N sessions left" the day after a package session is used. */
   packageReminders?: boolean;

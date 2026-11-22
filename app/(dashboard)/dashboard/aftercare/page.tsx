@@ -12,7 +12,7 @@ import PageTitle from "@/components/page-title";
 import { saveSettings, settingsStore } from "@/lib/settings-store";
 import { getStoredServices } from "@/lib/storage";
 import { getCurrentPlan } from "@/lib/plan-limits";
-import { newId } from "@/lib/clinic";
+import { newId, useIsClinic } from "@/lib/clinic";
 import { DEFAULT_AFTERCARE_FLOWS, aftercareFlows, type AftercareFlow, type ClinicAutomationSettings } from "@/lib/clinic-aftercare";
 import type { Service } from "@/lib/types";
 
@@ -27,20 +27,21 @@ export default function AftercarePage() {
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [hasWhatsApp, setHasWhatsApp] = useState(true);
+  const clinic = useIsClinic();
 
   useEffect(() => {
     const c = clinicSettings();
     setFlows(aftercareFlows(c).map((f) => ({ ...f, steps: f.steps.map((s) => ({ ...s })) })));
-    setToggles({ autoAftercare: c.autoAftercare !== false, packageReminders: c.packageReminders !== false, planReminders: c.planReminders !== false });
+    setToggles({ autoAftercare: clinic ? c.autoAftercare !== false : c.salonAftercare === true, packageReminders: c.packageReminders !== false, planReminders: c.planReminders !== false });
     setServices(getStoredServices().filter((s) => s.isActive !== false));
     setHasWhatsApp(getCurrentPlan().whatsapp);
-  }, []);
+  }, [clinic]);
 
   const change = (next: AftercareFlow[]) => { setFlows(next); setDirty(true); };
   const update = (id: string, patch: Partial<AftercareFlow>) => change(flows.map((f) => f.id === id ? { ...f, ...patch } : f));
 
   async function save() {
-    Object.assign(settingsStore.clinic, { ...toggles, aftercareFlows: flows });
+    Object.assign(settingsStore.clinic, { ...toggles, ...(clinic ? {} : { autoAftercare: true, salonAftercare: toggles.autoAftercare }), aftercareFlows: flows });
     await saveSettings();
     setDirty(false);
     setSaved(true);
@@ -60,8 +61,8 @@ export default function AftercarePage() {
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <Toggle on={toggles.autoAftercare} onChange={(v) => { setToggles((t) => ({ ...t, autoAftercare: v })); setDirty(true); }} label="Aftercare messages" sub="Day 1, 7, 14… after each treatment, per the schedules below" />
-        <Toggle on={toggles.packageReminders} onChange={(v) => { setToggles((t) => ({ ...t, packageReminders: v })); setDirty(true); }} label="Package reminders" sub="“You have 3 sessions left” the day after a package session is used" />
-        <Toggle on={toggles.planReminders} onChange={(v) => { setToggles((t) => ({ ...t, planReminders: v })); setDirty(true); }} label="Plan reminders" sub="“Your next session is due” when a plan session falls due and nothing is booked" />
+        {clinic && <Toggle on={toggles.packageReminders} onChange={(v) => { setToggles((t) => ({ ...t, packageReminders: v })); setDirty(true); }} label="Package reminders" sub="“You have 3 sessions left” the day after a package session is used" />}
+        {clinic && <Toggle on={toggles.planReminders} onChange={(v) => { setToggles((t) => ({ ...t, planReminders: v })); setDirty(true); }} label="Plan reminders" sub="“Your next session is due” when a plan session falls due and nothing is booked" />}
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

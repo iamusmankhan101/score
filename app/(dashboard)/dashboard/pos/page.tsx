@@ -1830,7 +1830,7 @@ export default function POSPage() {
                               For {entry.guestName}
                             </div>
                           )}
-                          {clinic && entry.type === "service" && (
+                          {entry.type === "service" && (
                             <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, fontSize: 11, fontWeight: 700, color: "#5b5b7a", cursor: "pointer" }}>
                               <input type="checkbox" checked={!entry.noAftercare}
                                 onChange={() => setCart(prev => prev.map(en => en.cartId === entry.cartId ? { ...en, noAftercare: !en.noAftercare } : en))} />

@@ -52,6 +52,7 @@ function normalizePhone(raw: string): string {
 
 /** One clinic branch: its own patients, sales, appointments and plans. */
 async function runForBranch(userId: string, locationId: string, settings: Record<string, unknown>): Promise<number> {
+  const isClinic = businessTypeOf(settings, locationId) === "clinic";
   const clinicSettings = (settings.clinic ?? {}) as ClinicAutomationSettings;
   const tz = timezoneFromSettings(settings);
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -82,7 +83,7 @@ async function runForBranch(userId: string, locationId: string, settings: Record
   const inWindow = (date: string) => date <= today && date >= addDays(today, -CATCH_UP_DAYS);
 
   // Aftercare steps — one per client, flow, visit day and step.
-  if (clinicSettings.autoAftercare !== false) {
+  if (isClinic ? clinicSettings.autoAftercare !== false : clinicSettings.salonAftercare === true) {
     const flows = aftercareFlows(clinicSettings);
     // Treatment lines the clinic switched aftercare off for at billing (ref = inv:<invoice>:<line>:<service>).
     const skipped = new Set(invoices.flatMap((inv) => inv.items.filter((l) => l.noAftercare).map((l) => `inv:${inv.id}:${l.id}:`)));
@@ -101,7 +102,7 @@ async function runForBranch(userId: string, locationId: string, settings: Record
   }
 
   // Package sessions left, the day after one is used.
-  if (clinicSettings.packageReminders !== false) {
+  if (isClinic && clinicSettings.packageReminders !== false) {
     const buyers = new Set(invoices.filter((inv) => inv.clientId && inv.items.some((l) => l.packagePurchase)).map((inv) => inv.clientId!));
     for (const clientId of buyers) {
       const client = clientById.get(clientId);
@@ -116,7 +117,7 @@ async function runForBranch(userId: string, locationId: string, settings: Record
   }
 
   // Next plan session due within 3 days (or up to a week overdue) with nothing booked.
-  if (clinicSettings.planReminders !== false) {
+  if (isClinic && clinicSettings.planReminders !== false) {
     for (const plan of plans) {
       if (plan.closed) continue;
       const client = clientById.get(plan.clientId);
@@ -145,7 +146,9 @@ export async function GET(req: NextRequest) {
         const settings = JSON.parse(row.data as string) as Record<string, unknown>;
         // A salon can run several branches, each a salon or a clinic.
         const branches = ((settings.locations as { items?: { id: string }[] } | undefined)?.items ?? []).map((l) => l.id);
-        const clinicBranches = (branches.length ? branches : ["main"]).filter((id) => businessTypeOf(settings, id) === "clinic");
+        // Clinics run automatically; salon branches only if the owner switched aftercare on.
+        const salonOptIn = (settings.clinic as ClinicAutomationSettings | undefined)?.salonAftercare === true;
+        const clinicBranches = (branches.length ? branches : ["main"]).filter((id) => businessTypeOf(settings, id) === "clinic" || salonOptIn);
         if (clinicBranches.length === 0) continue;
         const ws = (settings.wasender ?? {}) as Record<string, unknown>;
         if (ws.enabled === false) continue;
