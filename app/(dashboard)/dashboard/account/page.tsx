@@ -1397,6 +1397,96 @@ function WhatsAppSection() {
   const isConnected = activeCredential && connectionState !== "disconnected";
   const isEnabled = form.enabled !== false; // Default to true if not set
 
+  const contactsModal = showContacts && (
+      <div onClick={() => setShowContacts(false)} className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div onClick={(e) => e.stopPropagation()} className="modal-sheet" style={{ background: "#fff", borderRadius: 20, width: 440, maxWidth: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+          <div style={{ padding: "20px 22px 14px", borderBottom: "1px solid #f0f0f8", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: "#1a1a2e" }}>WhatsApp Contacts</div>
+              <div style={{ fontSize: 12, color: "#9898b0", marginTop: 2 }}>{contacts.length} synced to the connected salon number</div>
+            </div>
+            <button type="button" onClick={() => setShowContacts(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#6b6b8a" }}>
+              ✕
+            </button>
+          </div>
+          <div style={{ padding: "14px 22px" }}>
+            <input
+              value={contactSearch}
+              onChange={(e) => setContactSearch(e.target.value)}
+              placeholder="Search by name or phone…"
+              style={{ width: "100%", boxSizing: "border-box", padding: "9px 12px", borderRadius: 9, border: "1px solid #e8e8f0", fontSize: 13, outline: "none" }}
+            />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 10 }}>
+              <button
+                type="button"
+                onClick={toggleVisibleContacts}
+                disabled={visibleSelectableContacts.length === 0}
+                style={{
+                  border: "1px solid #e8e8f0", background: visibleSelectableContacts.length === 0 ? "#f8f8fc" : "#fff",
+                  color: visibleSelectableContacts.length === 0 ? "#b0b0c8" : "#5a5a78", borderRadius: 8, padding: "7px 10px",
+                  fontSize: 11, fontWeight: 800, cursor: visibleSelectableContacts.length === 0 ? "not-allowed" : "pointer",
+                }}
+              >
+                {allVisibleSelected ? "Clear visible" : "Select visible"} ({visibleSelectableContacts.length})
+              </button>
+              <button
+                type="button"
+                onClick={addSelectedContactsAsClients}
+                disabled={totalSelectedCount === 0}
+                style={{
+                  border: "1px solid var(--accent)", background: totalSelectedCount === 0 ? "#f8f8fc" : "var(--accent)",
+                  color: totalSelectedCount === 0 ? "#b0b0c8" : "#fff", borderRadius: 8, padding: "7px 12px",
+                  fontSize: 11, fontWeight: 900, cursor: totalSelectedCount === 0 ? "not-allowed" : "pointer",
+                }}
+              >
+                Add Selected {totalSelectedCount > 0 ? `(${totalSelectedCount})` : ""}
+              </button>
+            </div>
+          </div>
+          <div style={{ overflowY: "auto", flex: 1, padding: "0 10px 14px" }}>
+            {filteredContacts.length === 0 ? (
+              <div style={{ padding: "30px 12px", textAlign: "center", color: "#9898b0", fontSize: 13 }}>
+                {contacts.length === 0 ? "No contacts loaded." : "No contacts match your search."}
+              </div>
+            ) : filteredContacts.map((c) => {
+              const already = isExistingClient(c.phone);
+              const normalized = normalizePhone(c.phone);
+              const selectable = Boolean(normalized) && !already;
+              const selected = selectedContactKeys.has(contactKey(c));
+              return (
+                <div key={c.jid || c.phone} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "9px 12px", borderRadius: 9 }} className="hover-bg-light">
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    disabled={!selectable}
+                    onChange={() => toggleContactSelection(c)}
+                    aria-label={`Select ${c.name || c.phone}`}
+                    style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: selectable ? "pointer" : "not-allowed", flexShrink: 0 }}
+                  />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a2e" }}>{c.name}</div>
+                    <div style={{ fontSize: 12, color: "#6b6b8a", fontVariantNumeric: "tabular-nums" }}>{c.phone}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => addContactAsClient(c)}
+                    disabled={!selectable}
+                    style={{
+                      flexShrink: 0, whiteSpace: "nowrap", border: already ? "1px solid #bbf7d0" : "1px solid var(--accent)",
+                      background: already ? "#ecfdf5" : "#fff", color: already ? "#059669" : "var(--accent)",
+                      borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 800, cursor: selectable ? "pointer" : "default",
+                    }}
+                  >
+                    {already ? "✓ Added" : normalized ? "+ Add as Client" : "No number"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+  );
+
   if (!waPlan.whatsapp) {
     return (
       <section style={{ textAlign: "center", padding: "48px 24px" }}>
@@ -1411,9 +1501,19 @@ function WhatsAppSection() {
           <span style={{ fontSize: 13, color: "#9898b0" }}>Current plan:</span>
           <span style={{ fontSize: 13, fontWeight: 800, color: waPlan.color, background: waPlan.bg, borderRadius: 20, padding: "2px 12px", border: `1px solid ${waPlan.color}30` }}>{waPlan.label}</span>
         </div>
+        <div style={{ maxWidth: 420, margin: "0 auto 24px", padding: 16, border: "1px solid #e8e8f0", borderRadius: 14, textAlign: "left" }}>
+          <div style={{ fontWeight: 800, fontSize: 14, color: "#1a1a2e", marginBottom: 4 }}>Import clients from WhatsApp</div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>Included on every plan. Pick contacts from your connected WhatsApp number and add them to your clients list.</div>
+          <button type="button" onClick={loadContacts} disabled={loadingContacts}
+            style={{ border: "1px solid #16a34a", background: "#dcfce7", color: "#15803d", borderRadius: 9, padding: "8px 18px", fontSize: 12, fontWeight: 800, cursor: loadingContacts ? "wait" : "pointer" }}>
+            {loadingContacts ? "Loading..." : "View WhatsApp Contacts"}
+          </button>
+          {testResult && <div style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: testResult.ok ? "#059669" : "#dc2626" }}>{testResult.msg}</div>}
+        </div>
         <a href="/dashboard/billing" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "13px 28px", borderRadius: 12, background: "linear-gradient(135deg,#7C3AED,#9333EA)", color: "#fff", fontSize: 14, fontWeight: 800, textDecoration: "none", boxShadow: "0 4px 16px rgba(124,58,237,0.38)" }}>
           Upgrade to unlock WhatsApp →
         </a>
+      {contactsModal}
       </section>
     );
   }
@@ -1777,95 +1877,7 @@ function WhatsAppSection() {
       {saved && <SavedBanner />}
       <SaveButton onClick={save} />
 
-      {showContacts && (
-        <div onClick={() => setShowContacts(false)} className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div onClick={(e) => e.stopPropagation()} className="modal-sheet" style={{ background: "#fff", borderRadius: 20, width: 440, maxWidth: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <div style={{ padding: "20px 22px 14px", borderBottom: "1px solid #f0f0f8", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 16, color: "#1a1a2e" }}>WhatsApp Contacts</div>
-                <div style={{ fontSize: 12, color: "#9898b0", marginTop: 2 }}>{contacts.length} synced to the connected salon number</div>
-              </div>
-              <button type="button" onClick={() => setShowContacts(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#6b6b8a" }}>
-                ✕
-              </button>
-            </div>
-            <div style={{ padding: "14px 22px" }}>
-              <input
-                value={contactSearch}
-                onChange={(e) => setContactSearch(e.target.value)}
-                placeholder="Search by name or phone…"
-                style={{ width: "100%", boxSizing: "border-box", padding: "9px 12px", borderRadius: 9, border: "1px solid #e8e8f0", fontSize: 13, outline: "none" }}
-              />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 10 }}>
-                <button
-                  type="button"
-                  onClick={toggleVisibleContacts}
-                  disabled={visibleSelectableContacts.length === 0}
-                  style={{
-                    border: "1px solid #e8e8f0", background: visibleSelectableContacts.length === 0 ? "#f8f8fc" : "#fff",
-                    color: visibleSelectableContacts.length === 0 ? "#b0b0c8" : "#5a5a78", borderRadius: 8, padding: "7px 10px",
-                    fontSize: 11, fontWeight: 800, cursor: visibleSelectableContacts.length === 0 ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {allVisibleSelected ? "Clear visible" : "Select visible"} ({visibleSelectableContacts.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={addSelectedContactsAsClients}
-                  disabled={totalSelectedCount === 0}
-                  style={{
-                    border: "1px solid var(--accent)", background: totalSelectedCount === 0 ? "#f8f8fc" : "var(--accent)",
-                    color: totalSelectedCount === 0 ? "#b0b0c8" : "#fff", borderRadius: 8, padding: "7px 12px",
-                    fontSize: 11, fontWeight: 900, cursor: totalSelectedCount === 0 ? "not-allowed" : "pointer",
-                  }}
-                >
-                  Add Selected {totalSelectedCount > 0 ? `(${totalSelectedCount})` : ""}
-                </button>
-              </div>
-            </div>
-            <div style={{ overflowY: "auto", flex: 1, padding: "0 10px 14px" }}>
-              {filteredContacts.length === 0 ? (
-                <div style={{ padding: "30px 12px", textAlign: "center", color: "#9898b0", fontSize: 13 }}>
-                  {contacts.length === 0 ? "No contacts loaded." : "No contacts match your search."}
-                </div>
-              ) : filteredContacts.map((c) => {
-                const already = isExistingClient(c.phone);
-                const normalized = normalizePhone(c.phone);
-                const selectable = Boolean(normalized) && !already;
-                const selected = selectedContactKeys.has(contactKey(c));
-                return (
-                  <div key={c.jid || c.phone} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "9px 12px", borderRadius: 9 }} className="hover-bg-light">
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      disabled={!selectable}
-                      onChange={() => toggleContactSelection(c)}
-                      aria-label={`Select ${c.name || c.phone}`}
-                      style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: selectable ? "pointer" : "not-allowed", flexShrink: 0 }}
-                    />
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a2e" }}>{c.name}</div>
-                      <div style={{ fontSize: 12, color: "#6b6b8a", fontVariantNumeric: "tabular-nums" }}>{c.phone}</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => addContactAsClient(c)}
-                      disabled={!selectable}
-                      style={{
-                        flexShrink: 0, whiteSpace: "nowrap", border: already ? "1px solid #bbf7d0" : "1px solid var(--accent)",
-                        background: already ? "#ecfdf5" : "#fff", color: already ? "#059669" : "var(--accent)",
-                        borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 800, cursor: selectable ? "pointer" : "default",
-                      }}
-                    >
-                      {already ? "✓ Added" : normalized ? "+ Add as Client" : "No number"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      {contactsModal}
     </section>
   );
 }
