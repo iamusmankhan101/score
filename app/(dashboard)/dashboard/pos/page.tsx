@@ -76,6 +76,8 @@ interface CartEntry {
   dayBreakdown?: { label: string; amount: number }[];
   priceRangeMin?: number;
   priceRangeMax?: number;
+  /** Clinics: skip the automatic aftercare messages for this treatment. */
+  noAftercare?: boolean;
   /** Paid for by a session package the client already bought (lib/clinic.ts) — priced at 0. */
   packageId?: string;
   /** Covered by the client's membership's included treatments — priced at 0. */
@@ -398,6 +400,7 @@ export default function POSPage() {
       qty: e.qty, unitPrice: wholePkr(e.unitPrice), total: wholePkr(e.total),
       ...(e.guestName ? { guestName: e.guestName } : {}),
       ...(e.packageId ? { packageId: e.packageId } : {}),
+      ...(e.noAftercare && e.type === "service" ? { noAftercare: true } : {}),
       ...(e.membershipUse ? { membershipUse: e.membershipUse } : {}),
       // Selling a membership: it runs from today, or on from the end of the
       // one the client already has, so renewing early loses nothing.
@@ -1826,6 +1829,13 @@ export default function POSPage() {
                             <div style={{ display: "inline-block", marginTop: 4, padding: "2px 7px", borderRadius: 20, background: "#f5f3ff", color: "#7C3AED", fontSize: 10, fontWeight: 800 }}>
                               For {entry.guestName}
                             </div>
+                          )}
+                          {clinic && entry.type === "service" && (
+                            <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, fontSize: 11, fontWeight: 700, color: "#5b5b7a", cursor: "pointer" }}>
+                              <input type="checkbox" checked={!entry.noAftercare}
+                                onChange={() => setCart(prev => prev.map(en => en.cartId === entry.cartId ? { ...en, noAftercare: !en.noAftercare } : en))} />
+                              Send aftercare messages
+                            </label>
                           )}
                           {!entry.packageId && (entry.membershipUse || includedLeft(entry) > 0) && (
                             <button type="button" onClick={() => toggleMembershipUse(entry)}

@@ -84,7 +84,10 @@ async function runForBranch(userId: string, locationId: string, settings: Record
   // Aftercare steps — one per client, flow, visit day and step.
   if (clinicSettings.autoAftercare !== false) {
     const flows = aftercareFlows(clinicSettings);
+    // Treatment lines the clinic switched aftercare off for at billing (ref = inv:<invoice>:<line>:<service>).
+    const skipped = new Set(invoices.flatMap((inv) => inv.items.filter((l) => l.noAftercare).map((l) => `inv:${inv.id}:${l.id}:`)));
     for (const p of listPerformances(invoices, appointments, services, { from: addDays(today, -400) })) {
+      if (p.ref && [...skipped].some((s) => p.ref!.startsWith(s))) continue;
       const client = p.clientId ? clientById.get(p.clientId) : undefined;
       if (!client) continue;
       for (const f of flowsForService(p.service, flows)) {

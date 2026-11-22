@@ -45,6 +45,8 @@ export interface SalonInvoiceItem {
   /** On a line covered by a membership's included treatments: the membership (`${invoiceId}:${lineId}`). */
   membershipUse?: string;
   packageId?: string;
+  /** Clinics: don't send the automatic aftercare messages for this treatment line. */
+  noAftercare?: boolean;
   description: string;
   qty: number;
   unitPrice: number;
