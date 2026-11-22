@@ -1,0 +1,131 @@
+Service ID,Name,Description,Category,Sub-category,Section,Duration (Min),Variable Price,Price,Min Price,Max Price,Included Services,Assigned Staff,Active
+,Basic Clean Up,,skin,Clean Ups,,30,No,500,,,,,Yes
+,Deep Cleansing Clean Up,,skin,Clean Ups,,45,No,1500,,,,,Yes
+,Acne Clean Up,,skin,Clean Ups,,45,No,2500,,,,,Yes
+,Face Bleach,,skin,Bleach & Brightening,,30,No,500,,,,,Yes
+,Gold Bleach,,skin,Bleach & Brightening,,30,No,800,,,,,Yes
+,Oxy Bleach,,skin,Bleach & Brightening,,30,No,1000,,,,,Yes
+,D-Tan Treatment,,skin,Bleach & Brightening,,45,No,2500,,,,,Yes
+,Fruit Facial (Simple),,skin,Facials,,60,No,2500,,,,,Yes
+,Gold Facial (Simple),,skin,Facials,,60,No,4500,,,,,Yes
+,Diamond Facial (Simple),,skin,Facials,,60,No,4500,,,,,Yes
+,Whitening Facial (Simple),,skin,Facials,,60,No,3000,,,,,Yes
+,Anti-Aging Facial,,skin,Facials,,60,No,8000,,,,,Yes
+,Cerav Facial (Simple),,skin,Facials,,60,No,5500,,,,,Yes
+,Glass Glow Facial (Simple),,skin,Facials,,60,No,6500,,,,,Yes
+,Korean Exfoliating Facial (Simple),,skin,Facials,,60,No,8000,,,,,Yes
+,Arfa's Signature Facial,,skin,Facials,,60,No,12000,,,,,Yes
+,Fruit Facial (Hydra),,skin,Facials,,75,No,4500,,,,,Yes
+,Gold Facial (Hydra),,skin,Facials,,75,No,6000,,,,,Yes
+,Diamond Facial (Hydra),,skin,Facials,,75,No,6000,,,,,Yes
+,Whitening Facial (Hydra),,skin,Facials,,75,No,4000,,,,,Yes
+,Cerav Facial (Hydra),,skin,Facials,,75,No,8000,,,,,Yes
+,Glass Glow Facial (Hydra),,skin,Facials,,75,No,8500,,,,,Yes
+,Korean Exfoliating Facial (Hydra),,skin,Facials,,75,No,12000,,,,,Yes
+,Skin Polishing (White),,skin,Advanced Skin Care,,60,No,8000,,,,,Yes
+,Skin Polishing (Pink),,skin,Advanced Skin Care,,75,No,14000,,,,,Yes
+,Face Polishing (White),,skin,Advanced Skin Care,,60,No,1500,,,,,Yes
+,Face Polishing (Pink),,skin,Advanced Skin Care,,75,No,3000,,,,,Yes
+,Brightening Treatment (White),,skin,Advanced Skin Care,,60,No,2000,,,,,Yes
+,Brightening Treatment (Pink),,skin,Advanced Skin Care,,75,No,3500,,,,,Yes
+,Glow Treatment (White),,skin,Advanced Skin Care,,60,No,8000,,,,,Yes
+,Glow Treatment (Pink),,skin,Advanced Skin Care,,75,No,12000,,,,,Yes
+,Instant Glow Facial,,skin,Advanced Skin Care,,45,No,4000,,,,,Yes
+,Charcoal Mask,,skin,Masks & Care,,20,No,1000,,,,,Yes
+,Hydrating Mask,,skin,Masks & Care,,20,No,2000,,,,,Yes
+,Detan Mask,,skin,Masks & Care,,20,No,2000,,,,,Yes
+,Acne Care Mask,,skin,Masks & Care,,20,No,3500,,,,,Yes
+,Eyebrows Threading,,threading,Face Elegance,,10,No,300,,,,,Yes
+,Upper Lip Threading,,threading,Face Elegance,,5,No,100,,,,,Yes
+,Chin Threading,,threading,Face Elegance,,10,No,350,,,,,Yes
+,Forehead Threading,,threading,Face Elegance,,10,No,350,,,,,Yes
+,Side Look Threading,,threading,Face Elegance,,15,No,1000,,,,,Yes
+,Neck Threading,,threading,Face Elegance,,10,No,500,,,,,Yes
+,Full Face Threading,,threading,Face Elegance,,30,No,2500,,,,,Yes
+,Eyebrows Shaping,,threading,Face Elegance,,15,No,500,,,,,Yes
+,Hair Trim,,hair,Hair Cutting,,20,Yes,1000,1000,1500,,,Yes
+,Straight Cut,,hair,Hair Cutting,,45,No,3500,,,,,Yes
+,U Cut,,hair,Hair Cutting,,45,No,3500,,,,,Yes
+,V Cut,,hair,Hair Cutting,,45,No,3500,,,,,Yes
+,Layer Cut,,hair,Hair Cutting,,60,No,6000,,,,,Yes
+,Step Cut,,hair,Hair Cutting,,60,No,6000,,,,,Yes
+,Fringe / Bangs Cut,,hair,Hair Cutting,,30,No,3500,,,,,Yes
+,Kids Hair Cut,,hair,Hair Cutting,,30,Yes,500,500,3000,,,Yes
+,Blow Dry,,hair,Hair Styling,,45,No,3500,,,,,Yes
+,Hair Ironing,,hair,Hair Styling,,45,No,3000,,,,,Yes
+,Hair Curling,,hair,Hair Styling,,45,No,3000,,,,,Yes
+,Crimping,,hair,Hair Styling,,45,No,3000,,,,,Yes
+,Wash & Blow Dry,,hair,Hair Styling,,60,No,4500,,,,,Yes
+,Party Hairstyle,,hair,Occasion Hairstyles,,60,No,5000,,,,,Yes
+,Engagement Hairstyle,,hair,Occasion Hairstyles,,75,No,5000,,,,,Yes
+,Bridal Hairstyle,,bridal,Occasion Hairstyles,,120,Yes,10000,10000,25000,,,Yes
+,Reception Hairstyle,,hair,Occasion Hairstyles,,90,No,20000,,,,,Yes
+,Braided Hairstyle,,hair,Occasion Hairstyles,,45,No,2500,,,,,Yes
+,Bun Hairstyle,,hair,Occasion Hairstyles,,45,No,2500,,,,,Yes
+,Hair Wash,,hair,Hair Finishing,,20,No,1000,,,,,Yes
+,Root Touch-Up (per inch),,hair,Hair Color Lounge,,60,No,4000,,,,,Yes
+,Short Hair Global Color,,hair,Hair Color Lounge,,120,No,12000,,,,,Yes
+,Medium Hair Global Color,,hair,Hair Color Lounge,,150,No,18000,,,,,Yes
+,Long Hair Global Color,,hair,Hair Color Lounge,,180,No,24000,,,,,Yes
+,Front Highlights,,hair,Hair Color Lounge,,120,No,8000,,,,,Yes
+,Partial Highlights,,hair,Hair Color Lounge,,150,No,12000,,,,,Yes
+,Full Head Highlights,,hair,Hair Color Lounge,,180,Yes,18000,18000,24000,,,Yes
+,Babylights,,hair,Hair Color Lounge,,180,Yes,18000,18000,24000,,,Yes
+,Balayage,,hair,Creative Color,,180,No,22000,,,,,Yes
+,Ombre,,hair,Creative Color,,180,No,22000,,,,,Yes
+,Color Melt,,hair,Creative Color,,180,No,22000,,,,,Yes
+,Fashion Color (per foil),,hair,Creative Color,,30,No,1500,,,,,Yes
+,Hair Toning,,hair,Toner & Gloss,,45,No,8000,,,,,Yes
+,Color Gloss,,hair,Toner & Gloss,,60,No,12000,,,,,Yes
+,Color Refresh,,hair,Toner & Gloss,,60,No,12000,,,,,Yes
+,Deep Conditioning Treatment,,hair,Hair Wellness Treatments,,60,No,3500,,,,,Yes
+,Protein Treatment,,hair,Hair Wellness Treatments,,60,No,3500,,,,,Yes
+,Hair Repair Treatment,,hair,Hair Wellness Treatments,,60,No,6500,,,,,Yes
+,Anti Hair Fall Treatment,,hair,Hair Wellness Treatments,,60,No,6500,,,,,Yes
+,Anti-Dandruff Treatment,,hair,Hair Wellness Treatments,,60,No,6500,,,,,Yes
+,Scalp Detox Treatment,,hair,Hair Wellness Treatments,,60,No,8000,,,,,Yes
+,Hydration Therapy,,hair,Hair Wellness Treatments,,60,No,8000,,,,,Yes
+,Hair Mask Therapy,,hair,Hair Wellness Treatments,,60,No,4500,,,,,Yes
+,Split End Care,,hair,Hair Wellness Treatments,,60,No,4500,,,,,Yes
+,Keratin Treatment (Frizz),,hair,Hair Transformation Studio,,180,Yes,12500,12500,16500,,,Yes
+,Smoothening,,hair,Hair Transformation Studio,,180,Yes,14500,14500,20500,,,Yes
+,Rebonding,,hair,Hair Transformation Studio,,240,Yes,16500,16500,22500,,,Yes
+,Hair Botox (Damaged),,hair,Hair Transformation Studio,,150,No,16500,,,,,Yes
+,Permanent Straightening,,hair,Hair Transformation Studio,,240,No,18500,,,,,Yes
+,Nanoplastia Treatment,,hair,Hair Transformation Studio,,180,No,22500,,,,,Yes
+,Keratin Re-Touch,,hair,Hair Transformation Studio,,120,No,12000,,,,,Yes
+,Perming,,hair,Hair Transformation Studio,,180,No,16000,,,,,Yes
+,Basic Manicure,,nails,Hand & Foot Spa Rituals,,30,No,1500,,,,,Yes
+,Spa Manicure,,nails,Hand & Foot Spa Rituals,,45,No,1500,,,,,Yes
+,Deluxe Manicure,,nails,Hand & Foot Spa Rituals,,60,No,2500,,,,,Yes
+,Basic Pedicure,,nails,Hand & Foot Spa Rituals,,45,No,3000,,,,,Yes
+,Spa Pedicure,,nails,Hand & Foot Spa Rituals,,60,No,4500,,,,,Yes
+,Deluxe Pedicure,,nails,Hand & Foot Spa Rituals,,75,No,6000,,,,,Yes
+,Hand Polishing,,nails,Hand & Foot Spa Rituals,,30,No,1000,,,,,Yes
+,Foot Polishing,,nails,Hand & Foot Spa Rituals,,30,No,1000,,,,,Yes
+,Paraffin Wax Treatment,,nails,Hand & Foot Spa Rituals,,30,No,1500,,,,,Yes
+,Callus Removal Treatment,,nails,Hand & Foot Spa Rituals,,30,No,2000,,,,,Yes
+,Hand & Foot D-Tan,,nails,Hand & Foot Spa Rituals,,45,No,2500,,,,,Yes
+,Moisture Therapy,,nails,Hand & Foot Spa Rituals,,30,No,2000,,,,,Yes
+,Half Arm Wax (Lemon),,waxing,Wax Rates,,20,No,1000,,,,,Yes
+,Half Arm Wax (Rica),,waxing,Wax Rates,,20,No,1200,,,,,Yes
+,Full Arm Wax (Lemon),,waxing,Wax Rates,,30,No,1800,,,,,Yes
+,Full Arm Wax (Rica),,waxing,Wax Rates,,30,No,2500,,,,,Yes
+,Half Legs Wax (Lemon),,waxing,Wax Rates,,30,No,1400,,,,,Yes
+,Half Legs Wax (Rica),,waxing,Wax Rates,,30,No,1600,,,,,Yes
+,Full Legs Wax (Lemon),,waxing,Wax Rates,,45,No,3000,,,,,Yes
+,Full Legs Wax (Rica),,waxing,Wax Rates,,45,No,4000,,,,,Yes
+,Under Arm Wax (Lemon),,waxing,Wax Rates,,15,No,800,,,,,Yes
+,Under Arm Wax (Rica),,waxing,Wax Rates,,15,No,1000,,,,,Yes
+,Under Legs Wax (Lemon),,waxing,Wax Rates,,30,No,1500,,,,,Yes
+,Under Legs Wax (Rica),,waxing,Wax Rates,,30,No,2000,,,,,Yes
+,Full Body Wax (Lemon),,waxing,Wax Rates,,90,No,10000,,,,,Yes
+,Full Body Wax (Rica),,waxing,Wax Rates,,90,No,15000,,,,,Yes
+,Face Wax (Lemon),,waxing,Wax Rates,,20,No,1000,,,,,Yes
+,Face Wax (Rica),,waxing,Wax Rates,,20,No,1500,,,,,Yes
+,Chin Wax (Lemon),,waxing,Wax Rates,,10,No,300,,,,,Yes
+,Chin Wax (Rica),,waxing,Wax Rates,,10,No,500,,,,,Yes
+,Upper Lip Wax (Lemon),,waxing,Wax Rates,,10,No,300,,,,,Yes
+,Upper Lip Wax (Rica),,waxing,Wax Rates,,10,No,500,,,,,Yes
+,Forehead Wax (Lemon),,waxing,Wax Rates,,10,No,350,,,,,Yes
+,Forehead Wax (Rica),,waxing,Wax Rates,,10,No,600,,,,,Yes
