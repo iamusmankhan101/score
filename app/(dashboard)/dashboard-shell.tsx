@@ -17,7 +17,7 @@ import { getStoredInventory, getStoredStaff, getStoredServices } from "@/lib/sto
 import { getActiveSection, setActiveSection, getSectionOptions } from "@/lib/sections";
 import type { Invoice } from "@/lib/invoices";
 import { PLAN_CONFIGS, getCurrentPlanId, type PlanId } from "@/lib/plan-limits";
-import { setActivePlan } from "@/lib/payment-requests";
+import { getActivePlan, setActivePlan } from "@/lib/payment-requests";
 import { addSalonLocation, clearLocationLocalData, getActiveLocationFilter, getSalonLocations, removeSalonLocation, setActiveLocationFilter, type SalonLocation } from "@/lib/locations";
 import { whatsAppConnected } from "@/lib/whatsapp-scheduler";
 import { settleServiceConsumption } from "@/lib/inventory-consumption";
@@ -741,6 +741,30 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     const interval = window.setInterval(verify, 30 * 60 * 1000);
     return () => { cancelled = true; window.clearInterval(interval); };
   }, [isReady, router]);
+
+  // Plan refresh — the plan is cached in this browser and otherwise only re-read
+  // when the dashboard loads, so an upgrade/downgrade made by the admin never
+  // reached an already-open tab. Re-check when the tab comes back into focus
+  // (at most once a minute); reload only if the plan actually changed.
+  useEffect(() => {
+    if (!isReady || isAdmin) return;
+    let last = 0;
+    async function refreshPlan() {
+      if (document.visibilityState !== "visible" || Date.now() - last < 60_000) return;
+      last = Date.now();
+      try {
+        const res = await fetch("/api/billing/user", { signal: AbortSignal.timeout(15000) });
+        const data = await res.json() as { ok?: boolean; planId?: string };
+        if (data.ok && data.planId && data.planId !== getActivePlan()) {
+          setActivePlan(data.planId);
+          window.location.reload();
+        }
+      } catch { /* offline or slow — keep the cached plan */ }
+    }
+    document.addEventListener("visibilitychange", refreshPlan);
+    window.addEventListener("focus", refreshPlan);
+    return () => { document.removeEventListener("visibilitychange", refreshPlan); window.removeEventListener("focus", refreshPlan); };
+  }, [isReady, isAdmin]);
 
   // Appearance
   useEffect(() => {
