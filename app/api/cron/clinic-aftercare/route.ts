@@ -82,6 +82,25 @@ async function runForBranch(userId: string, locationId: string, settings: Record
   const first = (c: Client) => c.name.split(" ")[0] || c.name;
   const inWindow = (date: string) => date <= today && date >= addDays(today, -CATCH_UP_DAYS);
 
+  // "Time to revisit": for each client and service, counted from their latest visit
+  // for it (invoice or completed appointment) — skipped if they've already been back
+  // or the line was unticked at billing. Works on past visits too.
+  const rv = revisitSettings(clinicSettings);
+  if (rv.enabled && rv.days >= 1) {
+    const declined = new Set(invoices.flatMap((inv) => inv.items.filter((l) => l.noAftercare || l.aftercare === false).map((l) => `inv:${inv.id}:${l.id}:`)));
+    const perfs = listPerformances(invoices, appointments, services, { from: addDays(today, -400) }).filter((p) => p.clientId);
+    const latest = new Map<string, string>();
+    for (const p of perfs) { const k = `${p.clientId}|${p.service.id}`; if (!latest.get(k) || p.date > latest.get(k)!) latest.set(k, p.date); }
+    for (const p of perfs) {
+      if (p.date !== latest.get(`${p.clientId}|${p.service.id}`) || !inWindow(addDays(p.date, rv.days))) continue;
+      if ([...declined].some((s) => p.ref.startsWith(s))) continue;
+      const client = clientById.get(p.clientId!);
+      if (!client) continue;
+      await queue(`aftercare_${client.id}_revisit_${p.service.id}_${p.date}`, client,
+        fillAftercare(rv.message, { name: first(client), treatment: p.service.name, clinic: clinicName }), p.date);
+    }
+  }
+
   // Aftercare steps — one per client, flow, visit day and step.
   if (isClinic ? clinicSettings.autoAftercare !== false : clinicSettings.salonAftercare !== false) {
     const flows = aftercareFlows(clinicSettings, isClinic);
@@ -94,12 +113,6 @@ async function runForBranch(userId: string, locationId: string, settings: Record
       if (!isClinic && ![...chosen].some((s) => p.ref.startsWith(s))) continue;
       const client = p.clientId ? clientById.get(p.clientId) : undefined;
       if (!client) continue;
-      // "Time to revisit" nudge for the same service, N days after the visit.
-      const rv = revisitSettings(clinicSettings);
-      if (rv.enabled && rv.days >= 1 && inWindow(addDays(p.date, rv.days))) {
-        await queue(`aftercare_${client.id}_revisit_${p.service.id}_${p.date}`, client,
-          fillAftercare(rv.message, { name: first(client), treatment: p.service.name, clinic: clinicName }), p.date);
-      }
       for (const f of flowsForService(p.service, flows)) {
         for (const step of f.steps) {
           if (step.day < 1 || !inWindow(addDays(p.date, step.day))) continue;

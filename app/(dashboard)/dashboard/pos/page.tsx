@@ -404,7 +404,7 @@ export default function POSPage() {
       ...(e.guestName ? { guestName: e.guestName } : {}),
       ...(e.packageId ? { packageId: e.packageId } : {}),
       ...(e.noAftercare && e.type === "service" ? { noAftercare: true } : {}),
-      ...(!clinic && e.aftercare !== false && e.type === "service" ? { aftercare: true } : {}),
+      ...(!clinic && e.type === "service" ? { aftercare: e.aftercare !== false } : {}),
       ...(e.membershipUse ? { membershipUse: e.membershipUse } : {}),
       // Selling a membership: it runs from today, or on from the end of the
       // one the client already has, so renewing early loses nothing.
