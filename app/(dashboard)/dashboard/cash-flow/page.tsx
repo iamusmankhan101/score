@@ -515,23 +515,27 @@ export default function CashFlowPage() {
       let dbSaved: boolean;
       // Products Inventory doesn't have yet are created there (zero stock),
       // then get this purchase's quantity like any other linked product.
-      const linkedItems = linkExpenseItemsToInventory(items, expenseSection);
+      // Stock bookkeeping must never block saving the expense itself (a full
+      // browser storage can make it throw); the expense is what matters.
+      const safe = <T,>(fn: () => T, fallback: T): T => { try { return fn(); } catch (e) { console.warn("expense stock update failed", e); return fallback; } };
+      const linkedItems = safe(() => linkExpenseItemsToInventory(items, expenseSection), items);
       const itemsPatch = { items: linkedItems.length ? linkedItems : undefined };
       if (editId) {
         const previousItems = getExpenses().find(e => e.id === editId)?.items;
         dbSaved = await withinSeconds(8, updateExpense(editId, { date: form.date, category: form.category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch }), false);
-        applyExpenseStock(previousItems, linkedItems);
+        safe(() => applyExpenseStock(previousItems, linkedItems), undefined);
       } else {
         ({ dbSaved } = (await withinSeconds(8, addExpense({ date: form.date, category: form.category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch }), undefined)) ?? { dbSaved: false });
-        applyExpenseStock([], linkedItems);
+        safe(() => applyExpenseStock([], linkedItems), undefined);
       }
       setExpenseSyncFailed(!dbSaved);
       setExpenses(getExpenses().filter(e => !cashFlowScoped || e.section === activeSection));
       setFormError("");
       setShowForm(false);
       setEditId(null);
-    } catch {
-      setFormError("The expense could not be saved. Please try again.");
+    } catch (e) {
+      console.error("expense save failed", e);
+      setFormError(`The expense could not be saved${e instanceof Error && e.message ? ` (${e.message})` : ""}. Please try again.`);
     }
   }
 
