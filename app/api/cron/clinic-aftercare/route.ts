@@ -83,12 +83,15 @@ async function runForBranch(userId: string, locationId: string, settings: Record
   const inWindow = (date: string) => date <= today && date >= addDays(today, -CATCH_UP_DAYS);
 
   // Aftercare steps — one per client, flow, visit day and step.
-  if (isClinic ? clinicSettings.autoAftercare !== false : clinicSettings.salonAftercare === true) {
-    const flows = aftercareFlows(clinicSettings);
+  if (isClinic ? clinicSettings.autoAftercare !== false : clinicSettings.salonAftercare !== false) {
+    const flows = aftercareFlows(clinicSettings, isClinic);
     // Treatment lines the clinic switched aftercare off for at billing (ref = inv:<invoice>:<line>:<service>).
     const skipped = new Set(invoices.flatMap((inv) => inv.items.filter((l) => l.noAftercare).map((l) => `inv:${inv.id}:${l.id}:`)));
+    const chosen = new Set(invoices.flatMap((inv) => inv.items.filter((l) => l.aftercare).map((l) => `inv:${inv.id}:${l.id}:`)));
     for (const p of listPerformances(invoices, appointments, services, { from: addDays(today, -400) })) {
       if (p.ref && [...skipped].some((s) => p.ref!.startsWith(s))) continue;
+      // Salons: only services ticked at billing (lines with aftercare: true).
+      if (!isClinic && ![...chosen].some((s) => p.ref.startsWith(s))) continue;
       const client = p.clientId ? clientById.get(p.clientId) : undefined;
       if (!client) continue;
       for (const f of flowsForService(p.service, flows)) {
@@ -146,8 +149,8 @@ export async function GET(req: NextRequest) {
         const settings = JSON.parse(row.data as string) as Record<string, unknown>;
         // A salon can run several branches, each a salon or a clinic.
         const branches = ((settings.locations as { items?: { id: string }[] } | undefined)?.items ?? []).map((l) => l.id);
-        // Clinics run automatically; salon branches only if the owner switched aftercare on.
-        const salonOptIn = (settings.clinic as ClinicAutomationSettings | undefined)?.salonAftercare === true;
+        // Clinics run automatically; salon branches unless the owner switched aftercare off (and only for services ticked at billing).
+        const salonOptIn = (settings.clinic as ClinicAutomationSettings | undefined)?.salonAftercare !== false;
         const clinicBranches = (branches.length ? branches : ["main"]).filter((id) => businessTypeOf(settings, id) === "clinic" || salonOptIn);
         if (clinicBranches.length === 0) continue;
         const ws = (settings.wasender ?? {}) as Record<string, unknown>;

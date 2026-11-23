@@ -73,8 +73,43 @@ export const DEFAULT_AFTERCARE_FLOWS: AftercareFlow[] = [
   ]),
 ];
 
-export function aftercareFlows(clinic: ClinicAutomationSettings | undefined): AftercareFlow[] {
-  return Array.isArray(clinic?.aftercareFlows) ? clinic!.aftercareFlows! : DEFAULT_AFTERCARE_FLOWS;
+/** Starter schedules for salons (hair, skin, nails, bridal). */
+export const SALON_AFTERCARE_FLOWS: AftercareFlow[] = [
+  flow("sf-colour", "Hair colour / highlights", ["colour", "color", "highlight", "balayage", "ombre", "toner"], [
+    [2, "Hi {name}, thank you for visiting {clinic}! To keep your {treatment} looking fresh: wait 48 hours before washing, use sulphate-free shampoo and cool water, and avoid heat styling where you can."],
+    [30, "Hi {name}, it's been a month since your {treatment} at {clinic}. Time for a gloss or root touch-up? Reply to book."],
+  ]),
+  flow("sf-keratin", "Keratin / smoothing / rebonding", ["keratin", "smoothing", "rebonding", "botox hair", "straightening"], [
+    [1, "Hi {name}, after your {treatment}: keep your hair dry and loose for 72 hours (no tying, clips or tucking behind ears) and avoid water, gym and heat."],
+    [4, "Hi {name}, you can wash your hair now. Please use only a sulphate-free shampoo and conditioner to make your {treatment} last."],
+    [90, "Hi {name}, your {treatment} is due for a refresh around now. Reply to book at {clinic}."],
+  ]),
+  flow("sf-cut", "Haircut / styling", ["haircut", "hair cut", "trim", "blow dry", "layer"], [
+    [30, "Hi {name}, it's been about a month since your {treatment} at {clinic}. Ready for a trim to keep the shape? Reply to book."],
+  ]),
+  flow("sf-treatment", "Hair spa / treatment", ["hair spa", "hair treatment", "protein", "scalp", "hair mask"], [
+    [2, "Hi {name}, thank you for your {treatment} at {clinic}. Avoid washing for 24 hours and use a gentle shampoo to keep the benefits."],
+    [21, "Hi {name}, how is your hair after your {treatment}? Reply to book your next session."],
+  ]),
+  flow("sf-facial", "Facial / skin", ["facial", "cleanup", "clean up", "hydrafacial", "whitening", "polish"], [
+    [1, "Hi {name}, after your {treatment}: skip makeup, scrubs and the sun for 24 hours, drink plenty of water and use SPF."],
+    [30, "Hi {name}, it's been a month since your {treatment} at {clinic} — the ideal time for your next one. Reply to book."],
+  ]),
+  flow("sf-wax", "Waxing / threading", ["wax", "threading", "bleach", "sugaring"], [
+    [1, "Hi {name}, after your {treatment}: avoid hot showers, sun, gym and tight clothes for 24 hours, and don't scrub the area."],
+    [21, "Hi {name}, your next {treatment} is due about now. Reply to book at {clinic}."],
+  ]),
+  flow("sf-nails", "Manicure / pedicure / nails", ["manicure", "pedicure", "nail", "gel", "acrylic"], [
+    [2, "Hi {name}, thank you for visiting {clinic}! Moisturise your hands and cuticles daily and wear gloves for chores to keep your {treatment} lasting."],
+    [18, "Hi {name}, it's nearly time for your next {treatment}. Reply to book at {clinic}."],
+  ]),
+  flow("sf-makeup", "Bridal / party makeup", ["bridal", "makeup", "make-up", "party"], [
+    [1, "Hi {name}, thank you for choosing {clinic} for your {treatment}! Cleanse your skin gently tonight and keep it moisturised. We'd love to hear how it went — reply with a photo or feedback."],
+  ]),
+];
+
+export function aftercareFlows(clinic: ClinicAutomationSettings | undefined, isClinic = true): AftercareFlow[] {
+  return Array.isArray(clinic?.aftercareFlows) ? clinic!.aftercareFlows! : isClinic ? DEFAULT_AFTERCARE_FLOWS : SALON_AFTERCARE_FLOWS;
 }
 
 /** Flows that apply to a treatment — linked by id or matched on its name. */

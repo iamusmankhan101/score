@@ -13,7 +13,7 @@ import { saveSettings, settingsStore } from "@/lib/settings-store";
 import { getStoredServices } from "@/lib/storage";
 import { getCurrentPlan } from "@/lib/plan-limits";
 import { newId, useIsClinic } from "@/lib/clinic";
-import { DEFAULT_AFTERCARE_FLOWS, aftercareFlows, type AftercareFlow, type ClinicAutomationSettings } from "@/lib/clinic-aftercare";
+import { DEFAULT_AFTERCARE_FLOWS, SALON_AFTERCARE_FLOWS, aftercareFlows, type AftercareFlow, type ClinicAutomationSettings } from "@/lib/clinic-aftercare";
 import type { Service } from "@/lib/types";
 
 const INP: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 9, border: "1px solid #e4e4ee", fontSize: 13, color: "#1a1a2e", outline: "none", background: "#fff" };
@@ -31,8 +31,8 @@ export default function AftercarePage() {
 
   useEffect(() => {
     const c = clinicSettings();
-    setFlows(aftercareFlows(c).map((f) => ({ ...f, steps: f.steps.map((s) => ({ ...s })) })));
-    setToggles({ autoAftercare: clinic ? c.autoAftercare !== false : c.salonAftercare === true, packageReminders: c.packageReminders !== false, planReminders: c.planReminders !== false });
+    setFlows(aftercareFlows(c, clinic).map((f) => ({ ...f, steps: f.steps.map((s) => ({ ...s })) })));
+    setToggles({ autoAftercare: clinic ? c.autoAftercare !== false : c.salonAftercare !== false, packageReminders: c.packageReminders !== false, planReminders: c.planReminders !== false });
     setServices(getStoredServices().filter((s) => s.isActive !== false));
     setHasWhatsApp(getCurrentPlan().whatsapp);
   }, [clinic]);
@@ -51,7 +51,7 @@ export default function AftercarePage() {
   return (
     <div className="dash-page dashboard-polish" style={{ minHeight: "100vh", background: "#fff", padding: "28px 32px 48px", display: "flex", flexDirection: "column", gap: 18 }}>
       <PageTitle icon={<HeartPulse size={24} />} title="Aftercare & Follow-ups"
-        subtitle="Automatic WhatsApp messages after each treatment, plus package and treatment-plan reminders." />
+        subtitle={clinic ? "Automatic WhatsApp messages after each treatment, plus package and treatment-plan reminders." : "Automatic WhatsApp messages after a service. Pick which services get them when you bill."} />
 
       {!hasWhatsApp && (
         <div style={{ padding: "10px 14px", borderRadius: 10, background: "#fffbeb", border: "1px solid #fde68a", fontSize: 12.5, color: "#92400e", fontWeight: 600 }}>
@@ -60,7 +60,7 @@ export default function AftercarePage() {
       )}
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <Toggle on={toggles.autoAftercare} onChange={(v) => { setToggles((t) => ({ ...t, autoAftercare: v })); setDirty(true); }} label="Aftercare messages" sub="Day 1, 7, 14… after each treatment, per the schedules below" />
+        <Toggle on={toggles.autoAftercare} onChange={(v) => { setToggles((t) => ({ ...t, autoAftercare: v })); setDirty(true); }} label="Aftercare messages" sub={clinic ? "Day 1, 7, 14… after each treatment, per the schedules below" : "Day 1, 7, 30… after each service ticked at billing, per the schedules below"} />
         {clinic && <Toggle on={toggles.packageReminders} onChange={(v) => { setToggles((t) => ({ ...t, packageReminders: v })); setDirty(true); }} label="Package reminders" sub="“You have 3 sessions left” the day after a package session is used" />}
         {clinic && <Toggle on={toggles.planReminders} onChange={(v) => { setToggles((t) => ({ ...t, planReminders: v })); setDirty(true); }} label="Plan reminders" sub="“Your next session is due” when a plan session falls due and nothing is booked" />}
       </div>
@@ -75,12 +75,12 @@ export default function AftercarePage() {
           style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 16px", borderRadius: 10, border: "1px solid #e4e4ee", background: "#fff", fontSize: 13, fontWeight: 800, color: "#6b6b8a", cursor: "pointer" }}>
           <Plus size={14} /> New schedule
         </button>
-        <button type="button" onClick={() => { if (window.confirm("Replace all schedules with the built-in ones?")) change(DEFAULT_AFTERCARE_FLOWS.map((f) => ({ ...f, steps: f.steps.map((s) => ({ ...s })) }))); }}
+        <button type="button" onClick={() => { if (window.confirm("Replace all schedules with the built-in ones?")) change((clinic ? DEFAULT_AFTERCARE_FLOWS : SALON_AFTERCARE_FLOWS).map((f) => ({ ...f, steps: f.steps.map((s) => ({ ...s })) }))); }}
           style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 16px", borderRadius: 10, border: "1px solid #e4e4ee", background: "#fff", fontSize: 13, fontWeight: 800, color: "#6b6b8a", cursor: "pointer" }}>
           <RotateCcw size={14} /> Restore built-in schedules
         </button>
       </div>
-      <div style={{ fontSize: 11.5, color: "#9898b0" }}>In messages, {"{name}"} is the patient&rsquo;s first name, {"{treatment}"} the treatment and {"{clinic}"} your clinic name. Messages wait for opening hours and are spaced out like your other WhatsApp messages.</div>
+      <div style={{ fontSize: 11.5, color: "#9898b0" }}>In messages, {"{name}"} is the {clinic ? "patient" : "client"}&rsquo;s first name, {"{treatment}"} the {clinic ? "treatment" : "service"} and {"{clinic}"} your {clinic ? "clinic" : "salon"} name. Messages wait for opening hours and are spaced out like your other WhatsApp messages.</div>
 
       {flows.map((f) => {
         const open = openId === f.id;
@@ -96,11 +96,11 @@ export default function AftercarePage() {
               <div style={{ padding: "4px 16px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 10 }}>
                   <label><Small>Name</Small><input value={f.name} onChange={(e) => update(f.id, { name: e.target.value })} style={INP} /></label>
-                  <label><Small>Applies to treatment names containing</Small>
-                    <input value={f.keywords.join(", ")} onChange={(e) => update(f.id, { keywords: e.target.value.split(",").map((k) => k.trim()).filter(Boolean) })} placeholder="botox, anti-wrinkle" style={INP} /></label>
+                  <label><Small>Applies to {clinic ? "treatment" : "service"} names containing</Small>
+                    <input value={f.keywords.join(", ")} onChange={(e) => update(f.id, { keywords: e.target.value.split(",").map((k) => k.trim()).filter(Boolean) })} placeholder={clinic ? "botox, anti-wrinkle" : "colour, highlights"} style={INP} /></label>
                 </div>
                 <div>
-                  <Small>Or these treatments</Small>
+                  <Small>Or these {clinic ? "treatments" : "services"}</Small>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {services.map((s) => {
                       const on = f.serviceIds.includes(s.id);
