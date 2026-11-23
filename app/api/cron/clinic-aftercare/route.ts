@@ -19,7 +19,7 @@ import { timezoneFromSettings } from "@/lib/appointment-time";
 import { activeWhatsAppCredential, ycloudConfigOf, type WhatsAppProviderConfig } from "@/lib/whatsapp-provider";
 import { listPerformances } from "@/lib/inventory-usage";
 import { addDays, businessTypeOf, packagesForClient, planProgress } from "@/lib/clinic-core";
-import { aftercareFlows, fillAftercare, flowsForService, type ClinicAutomationSettings } from "@/lib/clinic-aftercare";
+import { aftercareFlows, fillAftercare, flowsForService, revisitSettings, type ClinicAutomationSettings } from "@/lib/clinic-aftercare";
 import { ensureWinbackTables } from "@/lib/winback-queue";
 import type { TreatmentPlan } from "@/lib/clinic";
 import type { Appointment, Client, Service } from "@/lib/types";
@@ -94,6 +94,12 @@ async function runForBranch(userId: string, locationId: string, settings: Record
       if (!isClinic && ![...chosen].some((s) => p.ref.startsWith(s))) continue;
       const client = p.clientId ? clientById.get(p.clientId) : undefined;
       if (!client) continue;
+      // "Time to revisit" nudge for the same service, N days after the visit.
+      const rv = revisitSettings(clinicSettings);
+      if (rv.enabled && rv.days >= 1 && inWindow(addDays(p.date, rv.days))) {
+        await queue(`aftercare_${client.id}_revisit_${p.service.id}_${p.date}`, client,
+          fillAftercare(rv.message, { name: first(client), treatment: p.service.name, clinic: clinicName }), p.date);
+      }
       for (const f of flowsForService(p.service, flows)) {
         for (const step of f.steps) {
           if (step.day < 1 || !inWindow(addDays(p.date, step.day))) continue;

@@ -13,7 +13,7 @@ import { saveSettings, settingsStore } from "@/lib/settings-store";
 import { getStoredServices } from "@/lib/storage";
 import { getCurrentPlan } from "@/lib/plan-limits";
 import { newId, useIsClinic } from "@/lib/clinic";
-import { DEFAULT_AFTERCARE_FLOWS, SALON_AFTERCARE_FLOWS, aftercareFlows, type AftercareFlow, type ClinicAutomationSettings } from "@/lib/clinic-aftercare";
+import { DEFAULT_AFTERCARE_FLOWS, SALON_AFTERCARE_FLOWS, DEFAULT_REVISIT, revisitSettings, type RevisitSettings, aftercareFlows, type AftercareFlow, type ClinicAutomationSettings } from "@/lib/clinic-aftercare";
 import type { Service } from "@/lib/types";
 
 const INP: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 9, border: "1px solid #e4e4ee", fontSize: 13, color: "#1a1a2e", outline: "none", background: "#fff" };
@@ -22,6 +22,7 @@ const clinicSettings = () => settingsStore.clinic as ClinicAutomationSettings;
 export default function AftercarePage() {
   const [flows, setFlows] = useState<AftercareFlow[]>([]);
   const [toggles, setToggles] = useState({ autoAftercare: true, packageReminders: true, planReminders: true });
+  const [revisit, setRevisit] = useState<RevisitSettings>(DEFAULT_REVISIT);
   const [services, setServices] = useState<Service[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -33,6 +34,7 @@ export default function AftercarePage() {
     const c = clinicSettings();
     setFlows(aftercareFlows(c, clinic).map((f) => ({ ...f, steps: f.steps.map((s) => ({ ...s })) })));
     setToggles({ autoAftercare: clinic ? c.autoAftercare !== false : c.salonAftercare !== false, packageReminders: c.packageReminders !== false, planReminders: c.planReminders !== false });
+    setRevisit(revisitSettings(c));
     setServices(getStoredServices().filter((s) => s.isActive !== false));
     setHasWhatsApp(getCurrentPlan().whatsapp);
   }, [clinic]);
@@ -41,7 +43,7 @@ export default function AftercarePage() {
   const update = (id: string, patch: Partial<AftercareFlow>) => change(flows.map((f) => f.id === id ? { ...f, ...patch } : f));
 
   async function save() {
-    Object.assign(settingsStore.clinic, { ...toggles, ...(clinic ? {} : { autoAftercare: true, salonAftercare: toggles.autoAftercare }), aftercareFlows: flows });
+    Object.assign(settingsStore.clinic, { ...toggles, ...(clinic ? {} : { autoAftercare: true, salonAftercare: toggles.autoAftercare }), aftercareFlows: flows, revisit });
     await saveSettings();
     setDirty(false);
     setSaved(true);
@@ -63,6 +65,17 @@ export default function AftercarePage() {
         <Toggle on={toggles.autoAftercare} onChange={(v) => { setToggles((t) => ({ ...t, autoAftercare: v })); setDirty(true); }} label="Aftercare messages" sub={clinic ? "Day 1, 7, 14… after each treatment, per the schedules below" : "Day 1, 7, 30… after each service ticked at billing, per the schedules below"} />
         {clinic && <Toggle on={toggles.packageReminders} onChange={(v) => { setToggles((t) => ({ ...t, packageReminders: v })); setDirty(true); }} label="Package reminders" sub="“You have 3 sessions left” the day after a package session is used" />}
         {clinic && <Toggle on={toggles.planReminders} onChange={(v) => { setToggles((t) => ({ ...t, planReminders: v })); setDirty(true); }} label="Plan reminders" sub="“Your next session is due” when a plan session falls due and nothing is booked" />}
+      </div>
+
+      <div style={{ border: "1px solid #e4e4ee", borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+        <Toggle on={revisit.enabled} onChange={(v) => { setRevisit((r) => ({ ...r, enabled: v })); setDirty(true); }} label="2nd follow-up: time to revisit"
+          sub={`${revisit.days} days after a ${clinic ? "treatment" : "service"} (for the ones ticked at billing), remind the client it's time to come back for it`} />
+        {revisit.enabled && (
+          <div style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 10, alignItems: "start" }}>
+            <label><Small>After days</Small><input type="number" min={1} max={365} value={revisit.days} onChange={(e) => { setRevisit((r) => ({ ...r, days: Math.max(1, Math.round(Number(e.target.value) || 25)) })); setDirty(true); }} style={INP} /></label>
+            <label><Small>Message</Small><textarea rows={3} value={revisit.message} onChange={(e) => { setRevisit((r) => ({ ...r, message: e.target.value })); setDirty(true); }} style={{ ...INP, resize: "vertical", lineHeight: 1.5 }} /></label>
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
