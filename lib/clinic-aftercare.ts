@@ -29,7 +29,7 @@ export interface AftercareFlow {
 export interface RevisitSettings { enabled: boolean; days: number; message: string }
 
 export const DEFAULT_REVISIT: RevisitSettings = {
-  enabled: false, days: 25,
+  enabled: true, days: 25,
   message: "Hi {name}, it's been about a month since your {treatment} at {clinic} — it's time for your next visit! Reply here to book 💜",
 };
 
@@ -44,7 +44,7 @@ export interface ClinicAutomationSettings {
   aftercareFlows?: AftercareFlow[] | null;
   /** "You have N sessions left" the day after a package session is used. */
   packageReminders?: boolean;
-  /** "Time to come back" for every aftercare-enabled service, `days` after the visit (off unless enabled). */
+  /** "Time to come back" for every aftercare-enabled service, `days` after the visit (on by default). */
   revisit?: RevisitSettings;
   /** "Your next session is due" a few days before a plan session falls due. */
   planReminders?: boolean;
