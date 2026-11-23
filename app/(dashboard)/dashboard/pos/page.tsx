@@ -20,7 +20,7 @@ import {
 } from "@/lib/storage";
 import { getHeldSales, saveHeldSale, removeHeldSale, type HeldSale } from "@/lib/held-sales";
 import {
-  createSalonInvoice, calcTotals, reportInvoiceToFbr,
+  createSalonInvoice, calcTotals, reportInvoiceToFbr, createBalancePaymentInvoice, markSalonInvoicePaid, balanceDue,
   localDateKey, getSalonInvoices, saveSalonInvoices,
   ADVANCE_NON_REFUNDABLE_NOTE, CARD_TERMINALS,
   type SalonInvoice, type SalonInvoiceItem,
@@ -357,6 +357,12 @@ export default function POSPage() {
   const [editingInvoice,   setEditingInvoice]   = useState<SalonInvoice | null>(null);
   const [completed,        setCompleted]        = useState(false);
   const [lastInvoice,      setLastInvoice]      = useState<SalonInvoice | null>(null);
+  // Advance invoices this client still owes the balance on — collected here, with its own slip.
+  const [balanceTick, setBalanceTick] = useState(0);
+  const [balanceBusy, setBalanceBusy] = useState(false);
+  const advanceDue = useMemo(() => (selectedClient?.id ? getSalonInvoices().filter((i) => i.status === "partial" && i.clientId === selectedClient.id) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- balanceTick re-reads after a balance is collected
+    [selectedClient?.id, balanceTick]);
   const [waStatus,         setWaStatus]         = useState<"idle" | "queued" | "sending" | "sent" | "failed">("idle");
   const [waPdfStatus,      setWaPdfStatus]       = useState<"idle" | "working" | "shared" | "downloaded" | "failed">("idle");
   const [syncFailed,       setSyncFailed]       = useState(false);
@@ -778,6 +784,18 @@ export default function POSPage() {
   }
 
   // ── Complete sale ─────────────────────────────────────────────────────────
+  async function collectBalance(inv: SalonInvoice) {
+    if (!payMethod) return;
+    setBalanceBusy(true);
+    const today = localDateKey();
+    const { invoice, alreadyExists } = await createBalancePaymentInvoice(inv, payMethod, today);
+    markSalonInvoicePaid(inv.id, payMethod, today);
+    if (!alreadyExists && selectedClient?.phone) void queueInvoiceReceipt(invoice, { name: selectedClient.name, phone: selectedClient.phone });
+    setBalanceTick((t) => t + 1);
+    setBalanceBusy(false);
+    setPrintInvoice(invoice);
+  }
+
   async function completeSale() {
     if (cart.length === 0 || completing) return;
     // Mirrors the Complete Sale button's disabled condition — a payment method (or
@@ -2208,6 +2226,23 @@ export default function POSPage() {
                 <Clock size={13} />
                 {isCredit ? "Pay Later — Credit Sale" : "Pay Later / Credit"}
               </button>
+
+              {advanceDue.length > 0 && (
+                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 11, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#92400e" }}>Remaining balance — {selectedClient?.name}</div>
+                  {advanceDue.map((inv) => (
+                    <div key={inv.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ flex: 1, fontSize: 12, color: "#78350f" }}>{inv.number} · balance <b>{pkr(balanceDue(inv))}</b></span>
+                      <button type="button" disabled={!payMethod || balanceBusy} onClick={() => void collectBalance(inv)}
+                        title={payMethod ? "" : "Pick a payment method first"}
+                        style={{ border: "none", borderRadius: 8, padding: "7px 11px", fontSize: 11, fontWeight: 800, cursor: !payMethod || balanceBusy ? "not-allowed" : "pointer", background: !payMethod || balanceBusy ? "#e8e8f0" : "#d97706", color: !payMethod || balanceBusy ? "#aaaabc" : "#fff", whiteSpace: "nowrap" }}>
+                        {balanceBusy ? "…" : "Collect & print slip"}
+                      </button>
+                    </div>
+                  ))}
+                  {!payMethod && <div style={{ fontSize: 10.5, color: "#b45309" }}>Pick how the balance is paid below first.</div>}
+                </div>
+              )}
 
               {/* Advance toggle — mutually exclusive with Pay Later, since an
                   advance means money is collected now and credit means none is. */}

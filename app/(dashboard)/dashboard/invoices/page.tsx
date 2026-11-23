@@ -95,7 +95,6 @@ export default function InvoicesPage() {
   const [refunding, setRefunding]           = useState<SalonInvoice | null>(null);
   const [markPaidPromptId, setMarkPaidPromptId] = useState<string | null>(null);
   const [markUnpaidConfirmId, setMarkUnpaidConfirmId] = useState<string | null>(null);
-  const [createBalanceReceipt, setCreateBalanceReceipt] = useState(false);
   const [creatingBalanceReceipt, setCreatingBalanceReceipt] = useState(false);
   const [markPaidDate, setMarkPaidDate] = useState(() => localDateKey());
   const [editDateInvoice, setEditDateInvoice] = useState<SalonInvoice | null>(null);
@@ -191,7 +190,7 @@ export default function InvoicesPage() {
     const id = markPaidPromptId;
     const invoiceBeingPaid = invoices.find((inv) => inv.id === id);
     const wasPartial = invoiceBeingPaid?.status === "partial";
-    if (wasPartial && createBalanceReceipt && invoiceBeingPaid) {
+    if (wasPartial && invoiceBeingPaid) {
       setCreatingBalanceReceipt(true);
       const created = await createBalancePaymentInvoice(invoiceBeingPaid, method, markPaidDate);
       if (created.invoice) setViewingInvoice(created.invoice);
@@ -222,13 +221,8 @@ export default function InvoicesPage() {
       setViewingInvoice((prev) => prev ? { ...prev, status: "paid", paymentMethod: method, paidDate: markPaidDate } : prev);
     }
     setMarkPaidPromptId(null);
-    setCreateBalanceReceipt(false);
-    // Collecting the balance settles an invoice the client already has a copy
-    // of, so send the paid-in-full version the same way an edit does.
-    if (wasPartial) {
-      const settled = getSalonInvoices().find((inv) => inv.id === id);
-      if (settled) void resendEditedInvoice(settled);
-    }
+    // The balance has its own receipt (created and queued above), so the advance
+    // invoice is not re-sent as a second, overlapping slip.
   }
 
   function confirmMarkUnpaid() {
@@ -538,13 +532,10 @@ export default function InvoicesPage() {
                     Balance due {fmt(balance)}
                   </div>
                   <div style={{ fontSize: 13, color: "#6b6b8a", marginBottom: 16 }}>How was the balance paid?</div>
-                  <label style={{ display: "flex", alignItems: "flex-start", gap: 9, textAlign: "left", marginBottom: 14, padding: "10px 12px", borderRadius: 10, background: "#f0f9ff", border: "1px solid #bae6fd", cursor: "pointer" }}>
-                    <input type="checkbox" checked={createBalanceReceipt} onChange={(e) => setCreateBalanceReceipt(e.target.checked)} style={{ marginTop: 2, accentColor: "#0284c7" }} />
-                    <span>
-                      <span style={{ display: "block", fontSize: 12, fontWeight: 800, color: "#075985" }}>Create a separate balance invoice</span>
-                      <span style={{ display: "block", fontSize: 11, color: "#0369a1", marginTop: 3, lineHeight: 1.4 }}>Creates a paid receipt for only the remaining amount and links it to the original invoice.</span>
-                    </span>
-                  </label>
+                  <div style={{ textAlign: "left", marginBottom: 14, padding: "10px 12px", borderRadius: 10, background: "#f0f9ff", border: "1px solid #bae6fd", fontSize: 11, color: "#0369a1", lineHeight: 1.4 }}>
+                    <b style={{ display: "block", fontSize: 12, color: "#075985" }}>Separate balance receipt</b>
+                    A paid receipt for only the remaining {fmt(balance)} is created and opened for printing. The advance receipt stays as it was.
+                  </div>
                 </>
               ) : (
                 <>
