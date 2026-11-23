@@ -134,6 +134,8 @@ export interface SalonInvoice {
   section?: string;
   /** Set on a separate receipt created for the balance of an advance invoice. */
   balanceInvoiceOf?: string;
+  /** Derived on read: the separate receipt that collected this advance invoice's balance (see getSalonInvoices). */
+  balanceInvoiceId?: string;
   /** Fiscal invoice number FBR issued for this sale; printed with its QR code. */
   fbrInvoiceNumber?: string;
   /** Why the last FBR report failed; cleared once it goes through. */
@@ -230,9 +232,15 @@ export const refundedTotal = (inv: Pick<SalonInvoice, "refunds">) => (inv.refund
  * the revenue screens), so introducing advances doesn't quietly restate
  * historical figures.
  */
-export function revenueAmount(inv: Pick<SalonInvoice, "status" | "total" | "advanceAmount" | "balanceInvoiceOf">): number {
-  if (inv.balanceInvoiceOf) return 0;
+export function revenueAmount(inv: Pick<SalonInvoice, "status" | "total" | "advanceAmount" | "balanceInvoiceOf" | "balanceInvoiceId">): number {
+  if (inv.balanceInvoiceOf) return inv.total; // the balance, paid on its own receipt
+  if (inv.balanceInvoiceId && inv.status === "paid") return inv.advanceAmount ?? 0; // balance is on that receipt
   return inv.status === "partial" ? (inv.advanceAmount ?? 0) : inv.total;
+}
+
+/** The day revenueAmount() belongs to: an advance-only invoice counts on the day it was issued, not when the balance was paid. */
+export function revenueDate(inv: Pick<SalonInvoice, "date" | "paidDate" | "balanceInvoiceId">): string {
+  return inv.balanceInvoiceId ? inv.date : inv.paidDate || inv.date;
 }
 
 /** Still owed on a partial sale; 0 for anything else. */
@@ -289,6 +297,11 @@ export function localDateKey(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+/** "Remaining balance — <services> (<date>)" for the receipt that collects an advance invoice's balance. */
+function balanceDescription(parent: Pick<SalonInvoice, "items" | "date">): string {
+  return `Remaining balance — ${parent.items.filter((i) => i.type === "service").map((i) => i.description).join(", ") || parent.items.map((i) => i.description).join(", ")} (${new Date(`${parent.date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })})`;
+}
+
 export function getSalonInvoices(): SalonInvoice[] {
   if (typeof window === "undefined") return [];
   try {
@@ -308,7 +321,19 @@ export function getSalonInvoices(): SalonInvoice[] {
     if (migrated) {
       persistEntity("salon_invoices", invoices);
     }
-    return invoices;
+    // An advance invoice whose balance was collected on its own receipt counts only
+    // the advance; the receipt counts the balance on the day it was paid.
+    const balanceReceipt = new Map(invoices.filter((i) => i.balanceInvoiceOf).map((i) => [i.balanceInvoiceOf!, i.id]));
+    if (!balanceReceipt.size) return invoices;
+    const byId = new Map(invoices.map((i) => [i.id, i]));
+    return invoices.map((i) => {
+      if (balanceReceipt.has(i.id)) return { ...i, balanceInvoiceId: balanceReceipt.get(i.id) };
+      const parent = i.balanceInvoiceOf ? byId.get(i.balanceInvoiceOf) : undefined;
+      // Receipts made before the wording changed still say "Remaining balance for SI-…".
+      return parent && i.items.some((l) => l.description.startsWith("Remaining balance for "))
+        ? { ...i, items: i.items.map((l) => (l.description.startsWith("Remaining balance for ") ? { ...l, description: balanceDescription(parent) } : l)) }
+        : i;
+    });
   } catch {
     return [];
   }
@@ -378,8 +403,7 @@ export async function createBalancePaymentInvoice(
   const item: SalonInvoiceItem = {
     id: crypto.randomUUID(),
     type: "service",
-    // Service(s) and date of the visit, not the advance invoice number.
-    description: `Remaining balance — ${parent.items.filter((i) => i.type === "service").map((i) => i.description).join(", ") || parent.items.map((i) => i.description).join(", ")} (${new Date(`${parent.date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })})`,
+    description: balanceDescription(parent),
     qty: 1,
     unitPrice: balance,
     total: balance,

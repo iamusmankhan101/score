@@ -4,7 +4,7 @@ import { appointmentHasStaff } from "@/lib/appointment-staff";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredAppointments, getStoredClients, getStoredStaff } from "@/lib/storage";
-import { getSalonInvoices, revenueAmount } from "@/lib/salon-invoices";
+import { getSalonInvoices, revenueAmount, revenueDate } from "@/lib/salon-invoices";
 import type { AppointmentStatus, Appointment, Client, Staff } from "@/lib/types";
 import type { SalonInvoice } from "@/lib/salon-invoices";
 import DashboardHeader from "@/components/dashboard-header";
@@ -146,8 +146,8 @@ export default function DashboardPage() {
     posInvoicesForRevenue.forEach((invoice) => {
       // A credit invoice paid off later counts toward the day it was actually
       // paid, not the day it was originally issued.
-      const revenueDate = invoice.paidDate || invoice.date;
-      totals.set(revenueDate, (totals.get(revenueDate) ?? 0) + revenueAmount(invoice));
+      const day = revenueDate(invoice);
+      totals.set(day, (totals.get(day) ?? 0) + revenueAmount(invoice));
     });
 
     const endDate = new Date(`${today}T12:00:00`);
@@ -162,7 +162,7 @@ export default function DashboardPage() {
   const sumMonth = (m: string) => {
     let t = 0;
     posInvoicesForRevenue.forEach((inv) => {
-      if ((inv.paidDate || inv.date).startsWith(m)) t += revenueAmount(inv);
+      if (revenueDate(inv).startsWith(m)) t += revenueAmount(inv);
     });
     return t;
   };
@@ -178,7 +178,7 @@ export default function DashboardPage() {
   if (clinic) posInvoices.forEach((inv) => { if (inv.clientId) billedSpend.set(inv.clientId, (billedSpend.get(inv.clientId) ?? 0) + revenueAmount(inv)); });
   const spendOf = (c: { id: string; totalSpend: number }) => clinic ? (billedSpend.get(c.id) ?? 0) : c.totalSpend;
   const topClients = [...clientsScoped].sort((a, b) => spendOf(b) - spendOf(a)).slice(0, 5);
-    const todayPosInvoices = posInvoicesForRevenue.filter((invoice) => (invoice.paidDate || invoice.date) === today);
+    const todayPosInvoices = posInvoicesForRevenue.filter((invoice) => revenueDate(invoice) === today);
   const todayTotal = todayPosInvoices.reduce((s, invoice) => s + revenueAmount(invoice), 0);
   const todayTransactionCount = todayPosInvoices.length;
   const activeStaffCount = staffListScoped.length;

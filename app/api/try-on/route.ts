@@ -1,5 +1,8 @@
 import { NextRequest } from "next/server";
 import { resolveActor } from "@/lib/api-auth";
+import { rateLimit } from "@/lib/rate-limit";
+import { getBillingUser } from "@/lib/billing-db";
+import { PLAN_CONFIGS } from "@/lib/plan-limits";
 
 export const maxDuration = 60;
 
@@ -8,8 +11,20 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GE
 
 export async function POST(request: NextRequest) {
   // Every call spends Gemini credits — signed-in salons only.
-  if (!(await resolveActor(request))) {
+  const actor = await resolveActor(request);
+  if (!actor) {
     return Response.json({ error: "Not authenticated." }, { status: 401 });
+  }
+  // The plan comes from the billing table, never from the browser's saved copy.
+  const billing = await getBillingUser(actor.userId).catch(() => null);
+  const planId = billing?.planId === "basic" ? "pro" : billing?.planId ?? "free";
+  if (!PLAN_CONFIGS[planId as keyof typeof PLAN_CONFIGS]?.tryOn) {
+    return Response.json({ error: "AI try-on is not included in your plan." }, { status: 403 });
+  }
+  // Per salon, so one account can't run up the Gemini bill: 30 images an hour.
+  const limit = await rateLimit("try-on", actor.userId, { maxAttempts: 30, windowMs: 60 * 60 * 1000, blockMs: 60 * 60 * 1000 });
+  if (limit.blocked) {
+    return Response.json({ error: "Too many try-on requests. Please try again later." }, { status: 429, headers: { "Retry-After": String(limit.retryAfter ?? 0) } });
   }
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -21,6 +36,10 @@ export async function POST(request: NextRequest) {
 
   if (!imageBase64 || !prompt) {
     return Response.json({ error: "Image and prompt are required." }, { status: 400 });
+  }
+  // ~8 MB of base64 and a short prompt are plenty for a photo and a style request.
+  if (typeof imageBase64 !== "string" || typeof prompt !== "string" || imageBase64.length > 8_000_000 || prompt.length > 500) {
+    return Response.json({ error: "Image or prompt is too large." }, { status: 413 });
   }
 
   const startTime = Date.now();

@@ -18,6 +18,7 @@
 
 import { NextRequest } from "next/server";
 import { resolveActor } from "@/lib/api-auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { API_KEY, CLOUD_NAME, cloudinaryConfigured, sign } from "@/lib/cloudinary";
 
 /** Refuse anything that isn't a small inline image, before it reaches Cloudinary. */
@@ -27,6 +28,11 @@ const ALLOWED_FOLDERS = new Set(["clients", "staff", "salon", "patients", "bills
 export async function POST(req: NextRequest) {
   const actor = await resolveActor(req);
   if (!actor) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+
+  // Storage and bandwidth cost money: 300 uploads an hour per salon is far above real use.
+  if ((await rateLimit("upload-image", actor.userId, { maxAttempts: 300, windowMs: 60 * 60 * 1000, blockMs: 30 * 60 * 1000 })).blocked) {
+    return Response.json({ ok: false, error: "Too many uploads. Please try again later." }, { status: 429 });
+  }
 
   if (!cloudinaryConfigured()) {
     return Response.json(
