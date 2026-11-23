@@ -430,8 +430,8 @@ function MessagesPageContent() {
   // Everyone the picker can offer: lapsed first (longest gone at the top), then
   // never-visited — listed whatever that checkbox says, since picking is explicit.
   const winbackCandidates = useMemo<WinbackCandidate[]>(() => [
-    ...(winbackAudience?.lapsed ?? []).map(({ client, lastVisit, daysSinceVisit }) => ({ id: client.id, name: client.name, phone: client.phone ?? "", note: `Last visit ${lastVisit} · ${daysSinceVisit} days ago` })),
-    ...(winbackAudience?.neverVisited ?? []).map((client) => ({ id: client.id, name: client.name, phone: client.phone ?? "", note: "Never visited" })),
+    ...(winbackAudience?.lapsed ?? []).map(({ client, lastVisit, daysSinceVisit }) => ({ id: client.id, name: client.name, phone: client.phone ?? "", tags: client.tags, note: `Last visit ${lastVisit} · ${daysSinceVisit} days ago` })),
+    ...(winbackAudience?.neverVisited ?? []).map((client) => ({ id: client.id, name: client.name, phone: client.phone ?? "", tags: client.tags, note: "Never visited" })),
   ], [winbackAudience]);
 
   // "Nobody qualifies" is often the correct answer, so say which rule produced it
@@ -1431,7 +1431,7 @@ function formatWhen(iso: string): { absolute: string; relative: string; overdue:
   return { absolute, relative: overdue ? `${relative} overdue` : `in ${relative}`, overdue };
 }
 
-interface WinbackCandidate { id: string; name: string; phone: string; note: string }
+interface WinbackCandidate { id: string; name: string; phone: string; note: string; tags?: string[] }
 
 /**
  * Hand-pick who gets a win-back. Lists everyone the automation could reach;
@@ -1448,7 +1448,7 @@ function WinbackPickerModal({ candidates, sending, result, onClose, onQueue }: {
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const q = query.trim().toLowerCase();
-  const shown = q ? candidates.filter((c) => c.name.toLowerCase().includes(q) || c.phone.includes(q.replace(/\D/g, "") || q)) : candidates;
+  const shown = q ? candidates.filter((c) => c.name.toLowerCase().includes(q) || c.phone.includes(q.replace(/\D/g, "") || q) || (c.tags ?? []).some((t) => t.toLowerCase().includes(q))) : candidates;
   const toggle = (id: string) => setPicked((prev) => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -1474,7 +1474,7 @@ function WinbackPickerModal({ candidates, sending, result, onClose, onQueue }: {
         <div style={{ padding: "12px 16px 8px", display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, border: "1px solid #e4e4ee", borderRadius: 9, padding: "0 10px", height: 36 }}>
             <Search size={14} color="#9999b0" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name or phone"
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, phone or label"
               style={{ flex: 1, border: "none", outline: "none", fontSize: 13, color: "#29293d", minWidth: 0 }} />
           </div>
           <button type="button" disabled={shown.length === 0}
@@ -1496,7 +1496,7 @@ function WinbackPickerModal({ candidates, sending, result, onClose, onQueue }: {
               <input type="checkbox" checked={picked.has(c.id)} onChange={() => toggle(c.id)} style={{ accentColor: "#0d9488", width: 15, height: 15, flexShrink: 0 }} />
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#1d1d2f", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-                <span style={{ display: "block", fontSize: 11, color: "#9999b0" }}>{c.phone} · {c.note}</span>
+                <span style={{ display: "block", fontSize: 11, color: "#9999b0" }}>{c.phone} · {c.note}{(c.tags ?? []).map((t) => <span key={t} style={{ marginLeft: 6, padding: "1px 7px", borderRadius: 20, background: "#f0fdfa", color: "#0d9488", fontWeight: 800, fontSize: 10 }}>{t}</span>)}</span>
               </span>
             </label>
           ))}

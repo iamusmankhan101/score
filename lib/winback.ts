@@ -68,6 +68,7 @@ export interface WinbackClient {
   totalVisits?: number;
   whatsappOptedOut?: boolean;
   section?: string;
+  tags?: string[];
 }
 
 export interface WinbackAppointment {
