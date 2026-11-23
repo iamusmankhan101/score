@@ -395,6 +395,7 @@ export default function POSPage() {
   // sourceId keeps the Service/InventoryItem this line was rung up from, so
   // back-bar consumption stays countable after a rename (lib/inventory-usage.ts).
   // Grouped by person so the invoice prints each person's services together.
+  const clinic = useIsClinic();
   const cartLineItems: SalonInvoiceItem[] = [...cart]
     .sort((a, b) => ["", ...guests.map(g => g.name)].indexOf(a.guestName ?? "") - ["", ...guests.map(g => g.name)].indexOf(b.guestName ?? ""))
     .map(e => ({
@@ -495,7 +496,6 @@ export default function POSPage() {
   // Prices are editable per line, so guard every line — not just the variable-priced ones.
   const hasUnpricedLine = cart.some(e => e.unitPrice <= 0 && !e.packageId && !e.membershipUse);
   // ── Session packages (aesthetic clinics) ──
-  const clinic = useIsClinic();
   // Re-read after each sale so a session just used is no longer offered.
   const clientInvoices = useMemo(() => (selectedClient?.id ? getSalonInvoices() : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- lastInvoice marks "a sale just happened"
