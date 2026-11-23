@@ -573,6 +573,11 @@ function DashboardSectionSwitcher({ onSectionChange, compact = false }: { onSect
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
+/** Salons told in advance that a payment is coming up (shown as the invoice banner until its due date). */
+const PAYMENT_NOTICES: Record<string, { dueDate: string; amount: number }> = {
+  user_1784843074997_n9ws9os: { dueDate: "2026-12-13", amount: 5000 }, // Sonia's The Bridal Expert — 5-month plan renewal
+};
+
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
   const pathname = usePathname();
@@ -807,6 +812,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             // not the moment it's issued, which can be weeks before the due date.
             const today = new Date().toISOString().slice(0, 10);
             const unpaid = data.invoices.filter((inv) => inv.status !== "paid" && inv.dueDate <= today);
+            const notice = PAYMENT_NOTICES[dataOwnerId];
+            if (unpaid.length === 0 && notice && notice.dueDate >= today) {
+              setUnpaidInvoice({ number: "Plan renewal", amount: notice.amount, status: "due", dueDate: notice.dueDate });
+              setInvoiceBadgeDismissed(false);
+            }
             if (unpaid.length > 0) {
               const oldest = unpaid[unpaid.length - 1]; // oldest = last in desc-sorted list
               setUnpaidInvoice({ number: oldest.number, amount: oldest.total, status: oldest.status, dueDate: oldest.dueDate });
