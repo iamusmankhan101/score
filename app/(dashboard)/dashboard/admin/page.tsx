@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, XCircle, Clock, ImageIcon, ChevronDown, ChevronUp, Shield, Store, Pencil, Save, Ban, Trash2, AlertTriangle, X, ReceiptText, Users as UsersIcon, BadgeCheck, Landmark, Archive, Database, RotateCcw, Lock, LockOpen, Snowflake, KeyRound, Copy, LayoutDashboard, Banknote, LogOut, RefreshCw, FileText, ShoppingCart, Monitor, Smartphone, Tablet } from "lucide-react";
+import { CheckCircle, XCircle, Clock, ImageIcon, ChevronDown, ChevronUp, Shield, Store, Pencil, Save, Ban, Trash2, AlertTriangle, X, ReceiptText, Users as UsersIcon, BadgeCheck, Landmark, Archive, Database, RotateCcw, Lock, LockOpen, Snowflake, KeyRound, Mail, Copy, LayoutDashboard, Banknote, LogOut, RefreshCw, FileText, ShoppingCart, Monitor, Smartphone, Tablet } from "lucide-react";
 import { getCurrentUser, signOut } from "@/lib/auth";
 import PointlyConsole from "@/components/pointly-admin/console";
 import {
@@ -1177,6 +1177,41 @@ function FreezeAccountModal({ row, onClose, onFrozen }: {
   );
 }
 
+function ChangeEmailModal({ row, onClose, onChanged }: { row: AccountUserRow; onClose: () => void; onChanged: (email: string) => void }) {
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    if (busy) return;
+    setBusy(true); setError("");
+    try {
+      const res = await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: row.id, action: "change-email", email }) });
+      const data = await res.json();
+      if (!data.ok) setError(data.error || "Could not change the email.");
+      else { onChanged(data.email); onClose(); }
+    } catch { setError("Could not reach the server."); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, width: 440, maxWidth: "100%", padding: "28px", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ fontWeight: 800, fontSize: 17, color: "#1a1a2e", marginBottom: 4 }}>Change login email</div>
+        <div style={{ fontSize: 12, color: "#9898b0", marginBottom: 14 }}>{row.ownerName} · currently {row.email}</div>
+        <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="New email address" autoFocus
+          style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #e4e4ee", fontSize: 13, outline: "none" }} />
+        <div style={{ fontSize: 11, color: "#6b6b8a", marginTop: 8, lineHeight: 1.5 }}>They will be signed out everywhere and must sign in with the new address. Their password stays the same.</div>
+        {error && <div style={{ fontSize: 12, fontWeight: 700, color: "#dc2626", marginTop: 10 }}>{error}</div>}
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button type="button" onClick={save} disabled={busy || !email.trim()} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "none", background: busy || !email.trim() ? "#e4e4ee" : "#7C3AED", color: "#fff", fontSize: 13, fontWeight: 800, cursor: busy ? "not-allowed" : "pointer" }}>{busy ? "Saving…" : "Change email"}</button>
+          <button type="button" onClick={onClose} style={{ padding: "10px 16px", borderRadius: 10, border: "1px solid #e4e4ee", background: "#fff", color: "#6b6b8a", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ResetPasswordModal({ row, onClose }: { row: AccountUserRow; onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [password, setPassword] = useState("");
@@ -1638,6 +1673,7 @@ function UsersPanel() {
   const [updatingApproval, setUpdatingApproval] = useState<string | null>(null);
   const [freezeTarget, setFreezeTarget] = useState<AccountUserRow | null>(null);
   const [resetTarget, setResetTarget] = useState<AccountUserRow | null>(null);
+  const [emailTarget, setEmailTarget] = useState<AccountUserRow | null>(null);
   const [devicesTarget, setDevicesTarget] = useState<AccountUserRow | null>(null);
   const [whatsAppTarget, setWhatsAppTarget] = useState<AccountUserRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AccountUserRow | null>(null);
@@ -1793,6 +1829,7 @@ function UsersPanel() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {resetTarget && <ResetPasswordModal row={resetTarget} onClose={() => setResetTarget(null)} />}
+      {emailTarget && <ChangeEmailModal row={emailTarget} onClose={() => setEmailTarget(null)} onChanged={(email) => setRows((prev) => prev.map((r) => (r.id === emailTarget.id ? { ...r, email } : r)))} />}
       {deleteTarget && (
         <DeleteAccountModal
           row={deleteTarget}
@@ -2001,6 +2038,12 @@ function UsersPanel() {
                         color: row.twoFactor.enabled ? "#6d28d9" : "#9898b0",
                         cursor: updatingApproval === row.id ? "not-allowed" : "pointer" }}>
                       {row.twoFactor.enabled ? <Lock size={12} /> : <LockOpen size={12} />} 2FA {row.twoFactor.enabled ? "On" : "Off"}
+                    </button>
+                  )}
+                  {row.role !== "admin" && (
+                    <button onClick={() => setEmailTarget(row)} title="Change the email this account signs in with"
+                      style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #e9e3fb", background: "#fff", color: "#7c3aed", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                      <Mail size={12} /> Change email
                     </button>
                   )}
                   {row.role !== "admin" && (

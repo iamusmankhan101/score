@@ -11,7 +11,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { createUser, getAllUsers, getUserById, updateUserApprovalStatus, updateAccountFreeze, resetUserPassword, countActiveSessionsByUser, type ApprovalStatus } from "@/lib/auth-db";
+import { changeUserEmail, createUser, getAllUsers, getUserById, updateUserApprovalStatus, updateAccountFreeze, resetUserPassword, countActiveSessionsByUser, type ApprovalStatus } from "@/lib/auth-db";
 import { sendWelcomeEmail } from "@/lib/welcome-email";
 import { canUseTwoFactor, getAllTwoFactorStatuses, setTwoFactorEnabled } from "@/lib/two-factor";
 import { requireAdmin } from "@/lib/api-auth";
@@ -83,7 +83,7 @@ export async function PATCH(req: NextRequest) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 403 });
   }
 
-  let body: { userId?: string; approvalStatus?: ApprovalStatus; action?: "freeze" | "unfreeze" | "reset-password" | "twofa-on" | "twofa-off"; reason?: string };
+  let body: { userId?: string; approvalStatus?: ApprovalStatus; action?: "freeze" | "unfreeze" | "reset-password" | "twofa-on" | "twofa-off" | "change-email"; reason?: string; email?: string };
   try {
     body = await req.json();
   } catch {
@@ -102,6 +102,12 @@ export async function PATCH(req: NextRequest) {
       }
       await setTwoFactorEnabled(target.id, body.action === "twofa-on");
       return Response.json({ ok: true, enabled: body.action === "twofa-on" });
+    }
+
+    if (body.action === "change-email") {
+      const result = await changeUserEmail(body.userId, body.email ?? "");
+      console.log(`[admin] email changed for ${body.userId}: ${result.oldEmail} -> ${result.email}`);
+      return Response.json({ ok: true, email: result.email });
     }
 
     if (body.action === "reset-password") {

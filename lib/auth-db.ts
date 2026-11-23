@@ -368,6 +368,26 @@ export async function resetUserPassword(id: string): Promise<string> {
   return password;
 }
 
+/**
+ * Admin action: change the email an account signs in with. Refuses admin accounts and
+ * addresses already in use, marks the new address verified (the admin vouches for it),
+ * keeps the salon's billing record in step, and signs the account out everywhere.
+ */
+export async function changeUserEmail(id: string, newEmail: string): Promise<{ oldEmail: string; email: string }> {
+  await ensureAuthTables();
+  const email = newEmail.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+  const user = await getUserById(id);
+  if (!user) throw new Error("User not found.");
+  if (user.role === "admin") throw new Error("Admin emails can't be changed here.");
+  if (user.email === email) throw new Error("That is already this account's email.");
+  if (await getUserByEmail(email)) throw new Error("Another account already uses that email.");
+  await db.execute({ sql: "UPDATE users SET email = ?, email_verified = 1 WHERE id = ?", args: [email, id] });
+  await db.execute({ sql: "UPDATE billing_users SET email = ? WHERE id = ?", args: [email, id] }).catch(() => {});
+  await revokeAllSessionsForUser(id);
+  return { oldEmail: user.email, email };
+}
+
 /** Revoke every active session for a user (used when an account is frozen). */
 export async function revokeAllSessionsForUser(userId: string): Promise<void> {
   await ensureSessionsTable();
