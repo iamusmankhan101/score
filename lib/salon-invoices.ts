@@ -378,7 +378,8 @@ export async function createBalancePaymentInvoice(
   const item: SalonInvoiceItem = {
     id: crypto.randomUUID(),
     type: "service",
-    description: `Remaining balance for ${parent.number}`,
+    // Service(s) and date of the visit, not the advance invoice number.
+    description: `Remaining balance — ${parent.items.filter((i) => i.type === "service").map((i) => i.description).join(", ") || parent.items.map((i) => i.description).join(", ")} (${new Date(`${parent.date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })})`,
     qty: 1,
     unitPrice: balance,
     total: balance,
