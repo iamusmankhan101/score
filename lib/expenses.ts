@@ -1,5 +1,6 @@
 import { locationUserKey } from "./locations";
 import { persistEntity } from "./turso-sync";
+import { cacheGet, cacheSet, entityStorageKey } from "./sync-records";
 import { getStoredInventory, saveInventory } from "./storage";
 import type { InventoryItem } from "./types";
 
@@ -53,7 +54,12 @@ const KEY = "werzio_expenses";
 
 export function getExpenses(): Expense[] {
   if (typeof window === "undefined") return [];
-  try { return JSON.parse(localStorage.getItem(locationUserKey(KEY)) ?? "[]"); } catch { return []; }
+  try { return JSON.parse(cacheGet(locationUserKey(KEY)) ?? "[]"); } catch { return []; }
+}
+
+/** Puts this device's copy back as it was (used when the database refused a save). */
+export function restoreExpensesCache(list: Expense[]): void {
+  cacheSet(entityStorageKey("expenses"), JSON.stringify(list));
 }
 
 /**

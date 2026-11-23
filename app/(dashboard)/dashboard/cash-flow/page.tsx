@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { getStoredAppointments, getStoredInventory } from "@/lib/storage";
 import { getSalonInvoices, revenueAmount } from "@/lib/salon-invoices";
-import { getExpenses, saveExpenses, addExpense, updateExpense, applyExpenseStock, expenseItemsTotal, linkExpenseItemsToInventory, type Expense, type ExpenseCategory, type ExpenseItem } from "@/lib/expenses";
+import { getExpenses, restoreExpensesCache, saveExpenses, addExpense, updateExpense, applyExpenseStock, expenseItemsTotal, linkExpenseItemsToInventory, type Expense, type ExpenseCategory, type ExpenseItem } from "@/lib/expenses";
 import { getManualCashIncome, saveManualCashIncome, PETTY_CASH_CATEGORY, type ManualCashIncome } from "@/lib/cash-flow-income";
 import type { Appointment, InventoryItem } from "@/lib/types";
 import MobilePageHeader from "@/components/mobile-page-header";
@@ -517,6 +517,8 @@ export default function CashFlowPage() {
 
     try {
       let dbSaved: boolean;
+      let previousItems: ExpenseItem[] | undefined;
+      const before = getExpenses(); // to put back if the database refuses the save
       // Products Inventory doesn't have yet are created there (zero stock),
       // then get this purchase's quantity like any other linked product.
       // Stock bookkeeping must never block saving the expense itself (a full
@@ -525,21 +527,27 @@ export default function CashFlowPage() {
       const linkedItems = safe(() => linkExpenseItemsToInventory(items, expenseSection), items);
       const itemsPatch = { items: linkedItems.length ? linkedItems : undefined };
       if (editId) {
-        const previousItems = getExpenses().find(e => e.id === editId)?.items;
-        dbSaved = await withinSeconds(8, updateExpense(editId, { date: form.date, category: form.category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch }), false);
-        safe(() => applyExpenseStock(previousItems, linkedItems), undefined);
+        previousItems = before.find(e => e.id === editId)?.items;
+        dbSaved = await withinSeconds(20, updateExpense(editId, { date: form.date, category: form.category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch }), false);
+        
       } else {
-        ({ dbSaved } = (await withinSeconds(8, addExpense({ date: form.date, category: form.category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch }), undefined)) ?? { dbSaved: false });
-        safe(() => applyExpenseStock([], linkedItems), undefined);
+        ({ dbSaved } = (await withinSeconds(20, addExpense({ date: form.date, category: form.category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch }), undefined)) ?? { dbSaved: false });
+        
       }
-      setExpenseSyncFailed(!dbSaved);
+      if (!dbSaved) {
+        // Expenses live in the database — never keep one only on this device.
+        restoreExpensesCache(before);
+        setExpenses(before.filter(e => !cashFlowScoped || e.section === activeSection));
+        setFormError("The expense was NOT saved — the server could not be reached. Check your internet and press Save again.");
+        return;
+      }
+      safe(() => applyExpenseStock(previousItems, linkedItems), undefined);
+      setExpenseSyncFailed(false);
       setExpenses(getExpenses().filter(e => !cashFlowScoped || e.section === activeSection));
       setFormError("");
       setShowForm(false);
       setEditId(null);
-      setFileMessage(dbSaved
-        ? { type: "success", text: editId ? "Expense updated." : "Expense saved." }
-        : { type: "error", text: "Expense saved on this device only — it could not reach the server. Check your internet and tap Retry Sync." });
+      setFileMessage({ type: "success", text: editId ? "Expense updated." : "Expense saved." });
       setTimeout(() => setFileMessage(null), 6000);
     } catch (e) {
       console.error("expense save failed", e);
