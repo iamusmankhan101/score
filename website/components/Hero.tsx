@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
 import styles from "./Hero.module.css";
 
 /* ── decorative salon-tool line icons ─────────────────────── */
@@ -46,10 +45,6 @@ export default function Hero() {
 
       {/* ── headline + subtitle + buttons ── */}
       <div className={styles.content}>
-        <div className={styles.kicker} data-animate data-delay="0">
-          <span className={styles.kickerIconWrap}><ShieldCheck size={12} /></span>
-          Trusted by salons across Pakistan
-        </div>
         <h1 className={styles.title} data-animate data-delay="0.1">
           Simplify Salon Operations<br />
           <span className={styles.revenueLine}>
