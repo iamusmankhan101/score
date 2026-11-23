@@ -22,6 +22,8 @@
  */
 
 import { NextRequest } from "next/server";
+import { getBillingUser } from "@/lib/billing-db";
+import { PLAN_CONFIGS } from "@/lib/plan-limits";
 import { db } from "@/lib/db";
 import { activeWhatsAppCredential, isFakePlaceholderPhone, sendWhatsAppMessage, type WhatsAppProviderConfig, ycloudConfigOf } from "@/lib/whatsapp-provider";
 import { sendSalonInvoiceWhatsApp } from "@/lib/whatsapp-invoice-send";
@@ -582,6 +584,21 @@ async function getLastAnySentAtMs(
   return cache.get(key) ?? null;
 }
 
+async function planAllowsWhatsApp(userId: string, cache: Map<string, boolean>): Promise<boolean> {
+  const hit = cache.get(userId);
+  if (hit !== undefined) return hit;
+  let allowed = true;
+  try {
+    const billing = await getBillingUser(userId);
+    if (billing) {
+      const planId = billing.planId === "basic" ? "pro" : billing.planId;
+      allowed = PLAN_CONFIGS[planId as keyof typeof PLAN_CONFIGS]?.whatsapp === true;
+    }
+  } catch { /* fail open: a billing lookup error must not stop a paying salon's messages */ }
+  cache.set(userId, allowed);
+  return allowed;
+}
+
 async function runBookingQueueCron(): Promise<{ sent: number; failed: number; skipped: number; expired: number; posSent: number; posFailed: number; posExpired: number }> {
   const items = await getDueItems();
   let sent = 0, failed = 0, skipped = 0, expired = 0, posSent = 0, posFailed = 0, posExpired = 0;
@@ -595,6 +612,7 @@ async function runBookingQueueCron(): Promise<{ sent: number; failed: number; sk
   const settingsCache = new Map<string, Record<string, unknown> | null>();
   const optedInCache = new Map<string, Map<string, boolean>>();
   const lastSentCache = new Map<string, number | null>();
+  const planCache = new Map<string, boolean>();
 
   for (const item of items) {
     if (Date.now() - new Date(item.scheduledAt).getTime() > EXPIRE_AFTER_MS) {
@@ -604,6 +622,15 @@ async function runBookingQueueCron(): Promise<{ sent: number; failed: number; sk
     }
 
     const settings = await getSettings(item.userId, settingsCache);
+
+    // WhatsApp automation is a Pro/Premium feature. The plan comes from the billing
+    // table, so a salon can't unlock it by saving credentials through the API.
+    // A missing billing row or a failed lookup lets the message through.
+    if (!(await planAllowsWhatsApp(item.userId, planCache))) {
+      await updateItem(item, "expired", "WhatsApp automation is not included in this salon's plan.");
+      expired++;
+      continue;
+    }
 
     // Confirmation/reminder/group-alert messages are tied to the appointment
     // start. Once that time has passed in the salon's timezone, do not send
