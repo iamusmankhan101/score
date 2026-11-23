@@ -360,9 +360,10 @@ export default function POSPage() {
   // Advance invoices this client still owes the balance on — collected here, with its own slip.
   const [balanceTick, setBalanceTick] = useState(0);
   const [balanceBusy, setBalanceBusy] = useState(false);
-  const advanceDue = useMemo(() => (selectedClient?.id ? getSalonInvoices().filter((i) => i.status === "partial" && i.clientId === selectedClient.id) : []),
+  // Walk-ins have no client record, so their advances are the ones saved with no client.
+  const advanceDue = useMemo(() => (selectedClient ? getSalonInvoices().filter((i) => i.status === "partial" && (selectedClient.id ? i.clientId === selectedClient.id : !i.clientId)) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- balanceTick re-reads after a balance is collected
-    [selectedClient?.id, balanceTick]);
+    [selectedClient, balanceTick]);
   const [waStatus,         setWaStatus]         = useState<"idle" | "queued" | "sending" | "sent" | "failed">("idle");
   const [waPdfStatus,      setWaPdfStatus]       = useState<"idle" | "working" | "shared" | "downloaded" | "failed">("idle");
   const [syncFailed,       setSyncFailed]       = useState(false);
@@ -546,11 +547,11 @@ export default function POSPage() {
     ? missingConsents(selectedClient.id, cart.filter(e => e.type === "service" && !e.guestName).map(e => ({ id: e.itemId, name: e.name })), getConsents())
     : [];
   const noPaymentSelected = !isCredit && !payMethod;
-  // An advance invoice is the client's only receipt for the money just taken —
-  // with no phone number it can't reach them and nothing else surfaces that
-  // failure (the row is never even queued), so this is required up front
-  // rather than silently skipped after checkout.
-  const advanceNoPhone = isAdvance && !isCredit && !selectedClient?.phone;
+  // An advance invoice is the client's receipt for the money just taken. With no
+  // phone (walk-ins) it can't go on WhatsApp, so it's printed at the desk instead —
+  // shown as a hint, not a block.
+  const advanceNoPhone = false;
+  const advanceHandSlip = isAdvance && !isCredit && !selectedClient?.phone;
   const isCard = !isCredit && payMethod === "card";
   const cardNoTerminal = isCard && !cardTerminal;
 
@@ -2232,7 +2233,7 @@ export default function POSPage() {
                   <div style={{ fontSize: 11, fontWeight: 800, color: "#92400e" }}>Remaining balance — {selectedClient?.name}</div>
                   {advanceDue.map((inv) => (
                     <div key={inv.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ flex: 1, fontSize: 12, color: "#78350f" }}>{inv.number} · balance <b>{pkr(balanceDue(inv))}</b></span>
+                      <span style={{ flex: 1, fontSize: 12, color: "#78350f" }}>{inv.number}{!inv.clientId ? ` · ${inv.date}` : ""} · balance <b>{pkr(balanceDue(inv))}</b></span>
                       <button type="button" disabled={!payMethod || balanceBusy} onClick={() => void collectBalance(inv)}
                         title={payMethod ? "" : "Pick a payment method first"}
                         style={{ border: "none", borderRadius: 8, padding: "7px 11px", fontSize: 11, fontWeight: 800, cursor: !payMethod || balanceBusy ? "not-allowed" : "pointer", background: !payMethod || balanceBusy ? "#e8e8f0" : "#d97706", color: !payMethod || balanceBusy ? "#aaaabc" : "#fff", whiteSpace: "nowrap" }}>
@@ -2324,9 +2325,9 @@ export default function POSPage() {
                   <AlertCircle size={13} style={{ flexShrink: 0, marginTop: 1 }} /> Consent not signed: {consentGaps.map(t => t.title).join(", ")}. Sign it on the patient&rsquo;s profile before treatment.
                 </div>
               )}
-              {!hasUnpricedLine && !noPaymentSelected && advanceNoPhone && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, fontSize: 11, fontWeight: 700, color: "#d97706" }}>
-                  <AlertCircle size={13} /> Add a phone number for the client — the advance invoice is sent on WhatsApp and can't reach them without one
+              {!hasUnpricedLine && !noPaymentSelected && advanceHandSlip && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, fontSize: 11, fontWeight: 700, color: "#0369a1" }}>
+                  <AlertCircle size={13} /> No phone number — print the advance slip and hand it to the client
                 </div>
               )}
               {/* Complete button */}
