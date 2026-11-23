@@ -459,6 +459,10 @@ export default function CashFlowPage() {
         saveManualCashIncome(getManualCashIncome()),
       ]);
       setExpenseSyncFailed(!expensesSaved || !incomeSaved);
+      setFileMessage(expensesSaved && incomeSaved
+        ? { type: "success", text: "Everything is synced to the server." }
+        : { type: "error", text: "Still could not reach the server. Check your internet and try again." });
+      setTimeout(() => setFileMessage(null), 6000);
     } finally {
       setRetryingExpenseSync(false);
     }
@@ -533,9 +537,16 @@ export default function CashFlowPage() {
       setFormError("");
       setShowForm(false);
       setEditId(null);
+      setFileMessage(dbSaved
+        ? { type: "success", text: editId ? "Expense updated." : "Expense saved." }
+        : { type: "error", text: "Expense saved on this device only — it could not reach the server. Check your internet and tap Retry Sync." });
+      setTimeout(() => setFileMessage(null), 6000);
     } catch (e) {
       console.error("expense save failed", e);
-      setFormError(`The expense could not be saved${e instanceof Error && e.message ? ` (${e.message})` : ""}. Please try again.`);
+      const reason = e instanceof Error ? e.message : "";
+      setFormError(/quota/i.test(reason)
+        ? "This device's browser storage is full. Clear site data for this app (browser settings) and try again."
+        : `The expense could not be saved${reason ? ` (${reason})` : ""}. Please check your internet and try again.`);
     }
   }
 

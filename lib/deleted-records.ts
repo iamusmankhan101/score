@@ -17,6 +17,7 @@
 // before the delete cannot bring the record back either.
 
 import { locationUserKey } from "@/lib/locations";
+import { cacheGet, cacheSet } from "@/lib/sync-records";
 
 export interface DeletedRecord {
   id: string;        // id of the deleted record
@@ -41,7 +42,7 @@ const MAX_TOMBSTONES = 5000;
 export function getDeletedRecords(locationId?: string): DeletedRecord[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(locationUserKey(BASE_KEY, locationId));
+    const raw = cacheGet(locationUserKey(BASE_KEY, locationId));
     const parsed = JSON.parse(raw || "[]") as DeletedRecord[];
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((r) => r && typeof r.id === "string" && r.id);
@@ -84,6 +85,6 @@ export function appendDeletions(entity: string, ids: string[]): DeletedRecord[] 
   // A fresh tombstone replaces a restored one for the same id (deleted again after a restore).
   const addedIds = new Set(added.map((r) => r.id));
   const list = [...added, ...existing.filter((r) => !addedIds.has(r.id))].slice(0, MAX_TOMBSTONES);
-  localStorage.setItem(locationUserKey(BASE_KEY), JSON.stringify(list));
+  cacheSet(locationUserKey(BASE_KEY), JSON.stringify(list)); // full browser storage keeps it in memory instead of throwing
   return list;
 }
