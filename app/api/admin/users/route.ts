@@ -4,13 +4,18 @@
  * managers, and staff — for the Admin panel's Users tab. Distinct from
  * /api/billing/users, which is one row per salon's billing record, not
  * every individual account that can log in to it.
+ *
+ * POST /api/admin/users
+ * Admin-only: creates another admin account. This is the only way an admin account
+ * can be created — public sign-up always makes a salon owner.
  */
 
 import { NextRequest } from "next/server";
-import { getAllUsers, getUserById, updateUserApprovalStatus, updateAccountFreeze, resetUserPassword, countActiveSessionsByUser, type ApprovalStatus } from "@/lib/auth-db";
+import { createUser, getAllUsers, getUserById, updateUserApprovalStatus, updateAccountFreeze, resetUserPassword, countActiveSessionsByUser, type ApprovalStatus } from "@/lib/auth-db";
 import { sendWelcomeEmail } from "@/lib/welcome-email";
 import { canUseTwoFactor, getAllTwoFactorStatuses, setTwoFactorEnabled } from "@/lib/two-factor";
 import { requireAdmin } from "@/lib/api-auth";
+import { validatePasswordStrength } from "@/lib/password-policy";
 import { getBillingAdminSummaries } from "@/lib/billing-db";
 
 export async function GET(req: NextRequest) {
@@ -44,6 +49,32 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error("[admin/users] Error fetching users:", err);
     return Response.json({ ok: false, error: "Failed to fetch users." }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  if (!(await requireAdmin(req))) {
+    return Response.json({ ok: false, error: "Unauthorized" }, { status: 403 });
+  }
+
+  let body: { email?: string; password?: string; ownerName?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ ok: false, error: "Invalid request body." }, { status: 400 });
+  }
+  const { email, password, ownerName } = body;
+  if (!email || !password || !ownerName) {
+    return Response.json({ ok: false, error: "Email, password and name are required." }, { status: 400 });
+  }
+  const passwordError = validatePasswordStrength(password);
+  if (passwordError) return Response.json({ ok: false, error: passwordError }, { status: 400 });
+
+  try {
+    const user = await createUser({ email, password, ownerName, salonName: ownerName, phone: "", role: "admin", emailVerified: true, approvalStatus: "approved" });
+    return Response.json({ ok: true, user: { id: user.id, email: user.email, ownerName: user.ownerName } });
+  } catch (err) {
+    return Response.json({ ok: false, error: err instanceof Error ? err.message : "Could not create the admin." }, { status: 400 });
   }
 }
 

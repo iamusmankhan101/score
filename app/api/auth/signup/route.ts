@@ -4,7 +4,6 @@
  */
 
 import { NextRequest } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { createUser } from "@/lib/auth-db";
 import { db } from "@/lib/db";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
@@ -26,19 +25,8 @@ function planFor(requested: string | undefined) {
   return config && id ? { id, name: config.name, price: config.price, isDemoSignup } : null;
 }
 
-// Set ADMIN_ACCESS_CODE in .env.local — never hard-code secrets in source.
-const ADMIN_ACCESS_CODE = process.env.ADMIN_ACCESS_CODE ?? "";
-
-// Timing-safe compare that also fails closed when ADMIN_ACCESS_CODE is unset —
-// a plain `adminCode === ADMIN_ACCESS_CODE` would let anyone submit adminCode: ""
-// and match an empty/misconfigured env var, self-granting the admin role.
-function validAdminCode(code: string | undefined): boolean {
-  if (!ADMIN_ACCESS_CODE || !code) return false;
-  const a = Buffer.from(code);
-  const b = Buffer.from(ADMIN_ACCESS_CODE);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
+// Admin accounts are never created here: only an existing admin can create one
+// (POST /api/admin/users). Any adminCode sent to this public route is ignored.
 
 export async function POST(req: NextRequest) {
   const limit = await rateLimit("signup", clientIp(req), { maxAttempts: 8, windowMs: 15 * 60 * 1000, blockMs: 30 * 60 * 1000 });
@@ -55,7 +43,6 @@ export async function POST(req: NextRequest) {
     ownerName: string;
     salonName: string;
     phone: string;
-    adminCode?: string;
     planId?: string;
     businessType?: string;
   };
@@ -66,7 +53,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: "Invalid request body." }, { status: 400 });
   }
 
-  const { email, password, ownerName, salonName, phone, adminCode } = body;
+  const { email, password, ownerName, salonName, phone } = body;
 
   if (!email || !password || !ownerName) {
     return Response.json({ ok: false, error: "Missing required fields." }, { status: 400 });
@@ -77,14 +64,8 @@ export async function POST(req: NextRequest) {
     return Response.json({ ok: false, error: passwordError }, { status: 400 });
   }
 
-  // Check admin code if provided
-  if (adminCode && !validAdminCode(adminCode)) {
-    return Response.json({ ok: false, error: "Invalid admin access code." }, { status: 400 });
-  }
-
-  const isAdmin = validAdminCode(adminCode);
-  const plan = isAdmin ? null : planFor(body.planId);
-  if (!isAdmin && !plan) {
+  const plan = planFor(body.planId);
+  if (!plan) {
     return Response.json({ ok: false, error: "Please choose a valid plan." }, { status: 400 });
   }
 
@@ -95,9 +76,9 @@ export async function POST(req: NextRequest) {
       ownerName,
       salonName: salonName || ownerName,
       phone: phone || "",
-      role: isAdmin ? "admin" : "owner",
+      role: "owner",
       emailVerified: true,
-      approvalStatus: isAdmin ? "approved" : "pending",
+      approvalStatus: "pending",
     });
 
     // Clinic mode lives in the salon's settings (lib/clinic.ts), so a clinic

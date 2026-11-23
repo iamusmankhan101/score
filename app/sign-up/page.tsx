@@ -93,9 +93,7 @@ export default function SignUpPage() {
   const [selectedPlan, setSelectedPlan] = useState<PlanId>("demo");
   const [form, setForm] = useState({ ownerName: "", salonName: "", email: "", phone: "", password: "" });
   const [businessType, setBusinessType] = useState<"salon" | "clinic">("salon");
-  const [adminCode, setAdminCode] = useState("");
-  const [showAdmin, setShowAdmin] = useState(false);
-  const [codeValid, setCodeValid] = useState<boolean | null>(null);
+  const showAdmin = false; // admin accounts are created only from the server/admin side
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -123,7 +121,6 @@ export default function SignUpPage() {
           salonName: form.salonName || form.ownerName,
           phone: form.phone,
           businessType,
-          adminCode: showAdmin && adminCode ? adminCode : undefined,
           planId: plan.billingPlanId,
         }),
       });
@@ -138,13 +135,6 @@ export default function SignUpPage() {
 
       const newUser = signupData.user;
 
-      if (showAdmin) {
-        localStorage.setItem("werzio_auth_session", newUser.id);
-        localStorage.setItem(`werzio_user_cache_${newUser.id}`, JSON.stringify(newUser));
-        router.replace("/dashboard");
-        return;
-      }
-
       setSending(false);
       setStep("pending");
     } catch (err) {
@@ -156,7 +146,6 @@ export default function SignUpPage() {
         return;
       }
 
-      if (msg.toLowerCase().includes("admin")) setCodeValid(false);
       setError(msg);
     }
   }
@@ -272,81 +261,9 @@ export default function SignUpPage() {
                   </a>
                 </div>
 
-                {/* Admin toggle */}
-                <div style={{ marginTop: 14 }}>
-                  <button
-                    type="button"
-                    onClick={() => { setShowAdmin(true); setStep("details"); }}
-                    style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px", borderRadius: 10, border: "1.5px solid #e8e8f0", background: "#fafafa", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#7C3AED" }}
-                  >
-                    <Shield size={13} /> Register as Admin instead
-                  </button>
-                </div>
               </>
             )}
 
-            {/* ── STEP 2 (admin): Admin registration details ── */}
-            {step === "details" && showAdmin && (
-              <>
-                {/* Admin notice */}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, background: "#f0e8ff", border: "1.5px solid #ddd6fe", marginBottom: 16 }}>
-                  <Shield size={15} color="#7C3AED" />
-                  <div style={{ fontSize: 12, color: "#5B21B6", fontWeight: 600 }}>
-                    Admin accounts have access to payment approvals and plan management.
-                  </div>
-                </div>
-
-                {/* Fields */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
-                  {[
-                    { id: "ownerName", label: "Full name", icon: User, type: "text", placeholder: "Muhammad Usman" },
-                    { id: "email", label: "Email", icon: Mail, type: "email", placeholder: "admin@example.com" },
-                    { id: "phone", label: "Phone", icon: Phone, type: "tel", placeholder: "+92 300 0000000" },
-                    { id: "password", label: "Password", icon: LockKeyhole, type: "password", placeholder: "Min. 10 chars, letter + number" },
-                  ].map(({ id, label, icon: Icon, type, placeholder }) => (
-                    <label key={id}>
-                      <span className={styles.label}>{label}</span>
-                      <div className={styles.inputWrap}>
-                        <Icon size={16} className={styles.inputIcon} />
-                        <input className={styles.input} type={type} placeholder={placeholder}
-                          value={form[id as keyof typeof form]}
-                          onChange={(e) => setField(id as keyof typeof form, e.target.value)} required />
-                      </div>
-                    </label>
-                  ))}
-                </div>
-
-                {/* Admin code */}
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 6 }}>
-                    Admin Access Code
-                  </label>
-                  <div style={{ display: "flex", alignItems: "center", border: `1.5px solid ${codeValid === false ? "#fca5a5" : "#d1d5db"}`, borderRadius: 9, overflow: "hidden", background: "#fff" }}>
-                    <div style={{ padding: "0 12px", display: "flex", alignItems: "center", borderRight: "1px solid #e8e8f0" }}>
-                      <Shield size={14} color={codeValid === false ? "#dc2626" : "#9898b0"} />
-                    </div>
-                    <input type="password" value={adminCode} onChange={(e) => { setAdminCode(e.target.value); setCodeValid(null); }}
-                      placeholder="Enter admin access code" required
-                      style={{ flex: 1, padding: "10px 12px", border: "none", outline: "none", fontSize: 13, color: "#1a1a2e", background: "transparent", fontFamily: "inherit" }} />
-                  </div>
-                  {codeValid === false && <div style={{ fontSize: 11, color: "#dc2626", marginTop: 5, fontWeight: 600 }}>Invalid access code. Contact Salon Central support.</div>}
-                </div>
-
-                {error && <div className={`${styles.error} ${styles.signupError}`}>{error}</div>}
-
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button type="button" onClick={() => { setShowAdmin(false); setStep("plan"); }}
-                    style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1.5px solid #e8e8f0", background: "#fff", fontSize: 13, fontWeight: 700, color: "#6b6b8a", cursor: "pointer" }}>
-                    Back
-                  </button>
-                  <button type="submit" className={styles.primaryButton} style={{ flex: 2, marginTop: 0 }}>
-                    Create admin account <ArrowRight size={14} />
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* ── STEP 2 (regular): Salon details ── */}
             {step === "details" && !showAdmin && (
               <>
                 {/* Selected plan chip */}

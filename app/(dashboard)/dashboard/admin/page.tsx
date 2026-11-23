@@ -1589,6 +1589,47 @@ function AdminDashboardPanel() {
   );
 }
 
+function CreateAdminBox({ onCreated }: { onCreated: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ ownerName: "", email: "", password: "" });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const field = { padding: "9px 12px", borderRadius: 9, border: "1px solid #e4e4ee", fontSize: 13, outline: "none", minWidth: 180, flex: 1 } as const;
+
+  async function create() {
+    setBusy(true); setMsg(null);
+    try {
+      const res = await fetch("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Could not create the admin.");
+      setMsg({ ok: true, text: `Admin created: ${data.user.email}` });
+      setForm({ ownerName: "", email: "", password: "" });
+      onCreated();
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Could not create the admin." });
+    } finally { setBusy(false); }
+  }
+
+  if (!open) {
+    return <button type="button" onClick={() => setOpen(true)} style={{ alignSelf: "flex-start", padding: "8px 14px", borderRadius: 9, border: "1px solid #ddd6fe", background: "#f5f3ff", color: "#6d28d9", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>+ Create admin</button>;
+  }
+  return (
+    <div style={{ background: "#fff", border: "1px solid #ebebf0", borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a2e" }}>Create admin account</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input placeholder="Full name" value={form.ownerName} onChange={(e) => setForm((f) => ({ ...f, ownerName: e.target.value }))} style={field} />
+        <input placeholder="Email" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} style={field} />
+        <input placeholder="Password" type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} style={field} />
+      </div>
+      {msg && <div style={{ fontSize: 12, fontWeight: 700, color: msg.ok ? "#059669" : "#dc2626" }}>{msg.text}</div>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button type="button" onClick={create} disabled={busy || !form.ownerName || !form.email || !form.password} style={{ padding: "8px 14px", borderRadius: 9, border: "none", background: busy ? "#e4e4ee" : "#7C3AED", color: "#fff", fontSize: 12, fontWeight: 800, cursor: busy ? "not-allowed" : "pointer" }}>{busy ? "Creating…" : "Create admin"}</button>
+        <button type="button" onClick={() => { setOpen(false); setMsg(null); }} style={{ padding: "8px 14px", borderRadius: 9, border: "1px solid #e4e4ee", background: "#fff", color: "#6b6b8a", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Close</button>
+      </div>
+    </div>
+  );
+}
+
 function UsersPanel() {
   const [rows, setRows] = useState<AccountUserRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1788,6 +1829,7 @@ function UsersPanel() {
           {dueError}
         </div>
       )}
+      <CreateAdminBox onCreated={loadUsers} />
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <input
           value={search}
