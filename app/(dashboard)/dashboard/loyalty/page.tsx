@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { getStoredClients, saveClients, getStoredAppointments, getStoredServices } from "@/lib/storage";
-import { getSalonInvoices } from "@/lib/salon-invoices";
+import { getSalonInvoices, revenueAmount } from "@/lib/salon-invoices";
 import type { Client } from "@/lib/types";
 import {
   getTier, TIER_META, nextTierThreshold, pointsToRupees,
@@ -762,7 +762,7 @@ export default function LoyaltyPage() {
           .reduce((s, a) => s + a.totalAmount, 0);
         const posSpend = storedInvoices
           .filter((inv) => inv.clientId === c.id && inv.source === "pos")
-          .reduce((s, inv) => s + inv.total, 0);
+          .reduce((s, inv) => s + revenueAmount(inv), 0);
         const liveSpend   = Math.max(c.totalSpend ?? 0, apptSpend + posSpend);
         const computed    = Math.floor(liveSpend * ls.pointsPerRupee);
         const newEarned   = Math.max(c.loyaltyPointsEarned ?? 0, computed);
@@ -807,7 +807,7 @@ export default function LoyaltyPage() {
         .reduce((s, a) => s + a.totalAmount, 0);
       const posSpend = allInvoices
         .filter((inv) => inv.clientId === c.id && inv.source === "pos")
-        .reduce((s, inv) => s + inv.total, 0);
+        .reduce((s, inv) => s + revenueAmount(inv), 0);
       const liveSpend    = Math.max(c.totalSpend ?? 0, apptSpend + posSpend);
       const computed     = Math.floor(liveSpend * (ls.pointsPerRupee ?? 0.01));
       const earned       = Math.max(c.loyaltyPointsEarned ?? 0, computed);

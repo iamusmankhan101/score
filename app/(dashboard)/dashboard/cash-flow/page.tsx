@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { getStoredAppointments, getStoredInventory } from "@/lib/storage";
-import { getSalonInvoices } from "@/lib/salon-invoices";
+import { getSalonInvoices, revenueAmount } from "@/lib/salon-invoices";
 import { getExpenses, saveExpenses, addExpense, updateExpense, applyExpenseStock, expenseItemsTotal, linkExpenseItemsToInventory, type Expense, type ExpenseCategory, type ExpenseItem } from "@/lib/expenses";
 import { getManualCashIncome, saveManualCashIncome, PETTY_CASH_CATEGORY, type ManualCashIncome } from "@/lib/cash-flow-income";
 import type { Appointment, InventoryItem } from "@/lib/types";
@@ -170,7 +170,7 @@ export default function CashFlowPage() {
         .filter(inv => !inv.source || inv.source === "pos")
         .filter(inv => !cashFlowScoped || inv.section === activeSection);
       setPosInvoiceAppointmentIds(allPosInvoices.map(inv => inv.appointmentId).filter((id): id is string => !!id));
-      setPosInvoices(allPosInvoices.filter(inv => inv.status === "paid"));
+      setPosInvoices(allPosInvoices.filter(inv => inv.status === "paid" || inv.status === "partial"));
       // Petty cash shares the manual-income store but is kept out of income — it's
       // money put into the drawer, not money earned.
       const storedIncome = cashFlowScoped ? [] : getManualCashIncome();
@@ -212,7 +212,7 @@ export default function CashFlowPage() {
     const appts = appointments.filter(a => a.status === "completed" && !posLinkedAppointmentIds.has(a.id) && a.date >= rangeStart && a.date <= filterEnd);
     const pos   = posInvoices.filter(inv => inv.date >= rangeStart && inv.date <= filterEnd);
     const manual = manualIncome.filter(entry => entry.date >= rangeStart && entry.date <= filterEnd);
-    return appts.reduce((s, a) => s + a.totalAmount, 0) + pos.reduce((s, inv) => s + inv.total, 0) + manual.reduce((s, entry) => s + entry.amount, 0);
+    return appts.reduce((s, a) => s + a.totalAmount, 0) + pos.reduce((s, inv) => s + revenueAmount(inv), 0) + manual.reduce((s, entry) => s + entry.amount, 0);
   }, [appointments, posInvoices, posLinkedAppointmentIds, manualIncome, rangeStart, filterEnd, period, customStart, customEnd]);
 
   const periodIncomeRows = useMemo(() => {
@@ -333,7 +333,7 @@ export default function CashFlowPage() {
         return monthlyBarsRange(customStart, customEnd).map(({ label, key }) => {
           const income =
             appointments.filter(a => a.status === "completed" && !posInvoices.some(inv => inv.appointmentId === a.id) && a.date.startsWith(key)).reduce((s, a) => s + a.totalAmount, 0) +
-            posInvoices.filter(inv => inv.date.startsWith(key)).reduce((s, inv) => s + inv.total, 0) +
+            posInvoices.filter(inv => inv.date.startsWith(key)).reduce((s, inv) => s + revenueAmount(inv), 0) +
             manualIncome.filter(entry => entry.date.startsWith(key)).reduce((s, entry) => s + entry.amount, 0);
           const expense = expenses.filter(e => e.date.startsWith(key) && expensePaymentStatus(e) === "paid").reduce((s, e) => s + e.amount, 0);
           return { label, income, expense };
@@ -344,7 +344,7 @@ export default function CashFlowPage() {
         const label = days.length > 14 ? String(d.getDate()) : d.toLocaleDateString("en-PK", { weekday: "short" });
         const income =
           appointments.filter(a => a.status === "completed" && !posInvoices.some(inv => inv.appointmentId === a.id) && a.date === date).reduce((s, a) => s + a.totalAmount, 0) +
-          posInvoices.filter(inv => inv.date === date).reduce((s, inv) => s + inv.total, 0) +
+          posInvoices.filter(inv => inv.date === date).reduce((s, inv) => s + revenueAmount(inv), 0) +
           manualIncome.filter(entry => entry.date === date).reduce((s, entry) => s + entry.amount, 0);
         const expense = expenses.filter(e => e.date === date && expensePaymentStatus(e) === "paid").reduce((s, e) => s + e.amount, 0);
         return { label, income, expense };
@@ -356,7 +356,7 @@ export default function CashFlowPage() {
         const key = toDateStr(d).substring(0, 7);
         const income =
           appointments.filter(a => a.status === "completed" && !posInvoices.some(inv => inv.appointmentId === a.id) && a.date.startsWith(key)).reduce((s, a) => s + a.totalAmount, 0) +
-          posInvoices.filter(inv => inv.date.startsWith(key)).reduce((s, inv) => s + inv.total, 0) +
+          posInvoices.filter(inv => inv.date.startsWith(key)).reduce((s, inv) => s + revenueAmount(inv), 0) +
           manualIncome.filter(entry => entry.date.startsWith(key)).reduce((s, entry) => s + entry.amount, 0);
         const expense = expenses.filter(e => e.date.startsWith(key) && expensePaymentStatus(e) === "paid").reduce((s, e) => s + e.amount, 0);
         return { label: d.toLocaleDateString("en-PK", { month: "short" }), income, expense };
@@ -367,7 +367,7 @@ export default function CashFlowPage() {
       const label = period === "30d" ? String(d.getDate()) : d.toLocaleDateString("en-PK", { weekday: "short" });
       const income =
         appointments.filter(a => a.status === "completed" && !posInvoices.some(inv => inv.appointmentId === a.id) && a.date === date).reduce((s, a) => s + a.totalAmount, 0) +
-        posInvoices.filter(inv => inv.date === date).reduce((s, inv) => s + inv.total, 0) +
+        posInvoices.filter(inv => inv.date === date).reduce((s, inv) => s + revenueAmount(inv), 0) +
         manualIncome.filter(entry => entry.date === date).reduce((s, entry) => s + entry.amount, 0);
       const expense = expenses.filter(e => e.date === date && expensePaymentStatus(e) === "paid").reduce((s, e) => s + e.amount, 0);
       return { label, income, expense };

@@ -14,6 +14,7 @@ import { db } from "@/lib/db";
 import { getAllActiveBillingUsers } from "@/lib/billing-db";
 import { generateDailyReportPdf } from "@/lib/report-pdf";
 import { brandLogo } from "@/lib/email-logo";
+import { linkBalanceReceipts, revenueAmount } from "@/lib/invoice-revenue";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -159,6 +160,7 @@ function buildLedger(
   income: CashEntry[],
   expenses: CashEntry[],
 ): Ledger {
+  posInvoices = linkBalanceReceipts(posInvoices);
   const linked = new Set(posInvoices.map((inv) => (inv as { appointmentId?: string }).appointmentId).filter(Boolean));
   const time = (iso?: string) => (iso ?? "").slice(11, 16) || "00:00";
   const all: LedgerRow[] = [
@@ -171,7 +173,7 @@ function buildLedger(
       .filter((inv) => inv.status === "paid")
       .map((inv) => ({ sortKey: inv.date + "T" + time((inv as { createdAt?: string }).createdAt), date: inv.date,
         description: inv.clientName || "POS Sale", detail: `POS · ${METHOD_LABELS[inv.paymentMethod] ?? inv.paymentMethod ?? "Cash"}`,
-        moneyIn: inv.total || 0, moneyOut: 0 })),
+        moneyIn: revenueAmount(inv) || 0, moneyOut: 0 })),
     ...income
       .filter((e) => e.category !== "Petty Cash")
       .map((e) => ({ sortKey: e.date + "T" + time(e.createdAt), date: e.date,
@@ -235,10 +237,11 @@ function buildReportEmail(
   hasSalonLogo = false,
   logoImg = "",
 ): { subject: string; html: string; text: string } {
+  invoices = linkBalanceReceipts(invoices);
   const paid   = invoices.filter((i) => i.status === "paid");
   const unpaid = invoices.filter((i) => i.status === "unpaid");
 
-  const revenue     = paid.reduce((s, i) => s + i.total, 0);
+  const revenue     = paid.reduce((s, i) => s + revenueAmount(i), 0);
   const outstanding = unpaid.reduce((s, i) => s + i.total, 0);
   const avgTicket   = paid.length > 0 ? revenue / paid.length : 0;
   const totalDisc   = invoices.reduce((s, i) => s + i.discountAmount, 0);
@@ -250,7 +253,7 @@ function buildReportEmail(
     const m = inv.paymentMethod === "card" && inv.cardTerminal ? `Card · ${inv.cardTerminal}` : inv.paymentMethod || "other";
     if (!byMethod[m]) byMethod[m] = { count: 0, amount: 0 };
     byMethod[m].count++;
-    byMethod[m].amount += inv.total;
+    byMethod[m].amount += revenueAmount(inv);
   }
 
   // Top items
@@ -272,7 +275,7 @@ function buildReportEmail(
     const s = inv.staffName || "Unassigned";
     if (!staffMap[s]) staffMap[s] = { count: 0, revenue: 0 };
     staffMap[s].count++;
-    staffMap[s].revenue += inv.total;
+    staffMap[s].revenue += revenueAmount(inv);
   }
   const staffRows = Object.entries(staffMap).sort((a, b) => b[1].revenue - a[1].revenue);
 

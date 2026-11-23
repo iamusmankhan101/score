@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getStoredClients, getStoredAppointments, saveClients } from "@/lib/storage";
 import { syncWalletPass } from "@/lib/turso-sync";
-import { getSalonInvoices, type SalonInvoice } from "@/lib/salon-invoices";
+import { getSalonInvoices, revenueAmount, type SalonInvoice } from "@/lib/salon-invoices";
 import { BEAUTY_PROFILES } from "@/lib/mock-data";
 import type { Client, Appointment } from "@/lib/types";
 import { fmtCurrency as fmt } from "@/lib/format";
@@ -122,7 +122,7 @@ export default function ClientProfilePage() {
           .reduce((s, a) => s + a.totalAmount, 0);
         const posSpend = allInvoices
           .filter((inv) => inv.clientId === clientId && inv.source === "pos")
-          .reduce((s, inv) => s + inv.total, 0);
+          .reduce((s, inv) => s + revenueAmount(inv), 0);
         const totalSpend = Math.max(found.totalSpend ?? 0, apptSpend + posSpend);
         const totalEarned = Math.floor(totalSpend * ls.pointsPerRupee);
         if (totalEarned > (found.loyaltyPointsEarned ?? 0)) {

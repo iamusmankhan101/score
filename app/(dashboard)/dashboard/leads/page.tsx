@@ -13,7 +13,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, Megaphone, Plus, Send, Trash2, UserPlus, X } from "lucide-react";
 import PageTitle from "@/components/page-title";
 import { getStoredClients, saveClients, subscribeToStoredData } from "@/lib/storage";
-import { getSalonInvoices, type SalonInvoice } from "@/lib/salon-invoices";
+import { getSalonInvoices, revenueAmount, type SalonInvoice } from "@/lib/salon-invoices";
 import { normalizePhone } from "@/lib/whatsapp-scheduler";
 import { fmtCurrency as fmt } from "@/lib/format";
 import {
@@ -85,7 +85,7 @@ export default function LeadsPage() {
       const consulted = !!lead.clientId && consultations.some((c) => c.clientId === lead.clientId);
       if (consulted || (lead.stage !== "lost" && stageIndex(lead.stage) >= stageIndex("consultation"))) r.consultations++;
       if (paid.length > 0 || (lead.stage !== "lost" && stageIndex(lead.stage) >= stageIndex("treatment"))) r.treatments++;
-      r.revenue += paid.reduce((sum, inv) => sum + (inv.total || 0), 0);
+      r.revenue += paid.reduce((sum, inv) => sum + (revenueAmount(inv) || 0), 0);
       rows.set(lead.source, r);
     }
     return [...rows.entries()].sort((a, b) => b[1].revenue - a[1].revenue || b[1].leads - a[1].leads);

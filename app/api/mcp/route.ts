@@ -3,6 +3,10 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { verifyMcpToken, mcpActorFrom, blobKey, type McpKeyActor } from "@/lib/mcp-auth";
 import { rateLimit } from "@/lib/rate-limit";
+import { linkBalanceReceipts, revenueAmount } from "@/lib/invoice-revenue";
+
+// Unchanged from before except advance/balance pairs: the advance counts its advance, the balance receipt its balance.
+const posAmount = (inv: Parameters<typeof revenueAmount>[0]) => (inv.balanceInvoiceId || inv.balanceInvoiceOf ? revenueAmount(inv) : inv.total);
 import { appointmentStartMs, appointmentStartHasPassed, timezoneFromSettings, type SalonHoursDay } from "@/lib/appointment-time";
 import { createBooking } from "@/lib/booking";
 import type { Client, Appointment, Staff, Service, InventoryItem } from "@/lib/types";
@@ -423,10 +427,10 @@ const baseHandler = createMcpHandler(
         // and including both would double-count that visit.
         const inRange = (d: string) => d >= startDate && d <= rangeEnd;
         const completedAppts = appointments.filter((a) => a.status === "completed" && inRange(a.date));
-        const standaloneInvoices = invoices.filter((inv) => !inv.appointmentId && inRange(inv.date));
+        const standaloneInvoices = linkBalanceReceipts(invoices).filter((inv) => !inv.appointmentId && inRange(inv.date));
 
         const appointmentRevenue = completedAppts.reduce((s, a) => s + a.totalAmount, 0);
-        const posRevenue = standaloneInvoices.reduce((s, inv) => s + inv.total, 0);
+        const posRevenue = standaloneInvoices.reduce((s, inv) => s + posAmount(inv), 0);
         const unpaidPosInvoices = standaloneInvoices.filter((inv) => inv.status === "unpaid");
         const unpaidPosRevenue = unpaidPosInvoices.reduce((s, inv) => s + inv.total, 0);
         const totalRevenue = appointmentRevenue + posRevenue;
@@ -478,7 +482,7 @@ const baseHandler = createMcpHandler(
         // Same recognized-revenue definition as get_revenue_summary, just bucketed per day.
         const inRange = (d: string) => d >= startDate && d <= rangeEnd;
         const completedAppts = appointments.filter((a) => a.status === "completed" && inRange(a.date));
-        const standaloneInvoices = invoices.filter((inv) => !inv.appointmentId && inRange(inv.date));
+        const standaloneInvoices = linkBalanceReceipts(invoices).filter((inv) => !inv.appointmentId && inRange(inv.date));
 
         const byDay = new Map<string, { appointmentRevenue: number; posRevenue: number; appointmentCount: number; invoiceCount: number }>();
         for (let t = new Date(`${startDate}T00:00:00Z`).getTime(); t <= new Date(`${rangeEnd}T00:00:00Z`).getTime(); t += 86_400_000) {
@@ -490,7 +494,7 @@ const baseHandler = createMcpHandler(
         });
         standaloneInvoices.forEach((inv) => {
           const bucket = byDay.get(inv.date);
-          if (bucket) { bucket.posRevenue += inv.total; bucket.invoiceCount++; }
+          if (bucket) { bucket.posRevenue += posAmount(inv); bucket.invoiceCount++; }
         });
 
         const days = Array.from(byDay.entries()).map(([date, d]) => ({

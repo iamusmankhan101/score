@@ -187,7 +187,7 @@ export function revenueInPeriod(
     .filter((inv) => !inv.appointmentId && inv.date >= start && inv.date <= end)
     .filter((inv) => invoiceBelongsTo(inv, staff))
     // Shared walk-ins split evenly, like team-service appointments.
-    .reduce((sum, inv) => sum + (inv.total || 0) / (inv.staffIds?.length || 1), 0);
+    .reduce((sum, inv) => sum + (inv.balanceInvoiceOf ? 0 : inv.total || 0) / (inv.staffIds?.length || 1), 0);
 
   return fromAppointments + fromWalkIns;
 }

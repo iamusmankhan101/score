@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { BEAUTY_PROFILES } from "@/lib/mock-data";
 import { getStoredAppointments, getStoredClients, saveClients, subscribeToStoredData } from "@/lib/storage";
-import { getSalonInvoices, type SalonInvoice } from "@/lib/salon-invoices";
+import { getSalonInvoices, revenueAmount, type SalonInvoice } from "@/lib/salon-invoices";
 import type { Client, Appointment } from "@/lib/types";
 import { Search, X, Plus, Phone, Mail, Calendar, Heart, Tag, MapPin, ChevronDown, Camera, ExternalLink, Trash2, Download, Upload, FileSpreadsheet } from "lucide-react";
 import { getCurrentPlan, isAtLimit } from "@/lib/plan-limits";
@@ -184,7 +184,7 @@ function ClientPanel({ client, onClose, appointments, locations, onUpdate, onDel
   const apptVisits   = completedAppts.length;
   const apptSpend    = completedAppts.reduce((s, a) => s + a.totalAmount, 0);
   const liveVisits   = Math.max(client.totalVisits ?? 0, apptVisits + posInvoices.length);
-  const liveSpend    = Math.max(client.totalSpend  ?? 0, apptSpend + posInvoices.reduce((s, inv) => s + inv.total, 0));
+  const liveSpend    = Math.max(client.totalSpend  ?? 0, apptSpend + posInvoices.reduce((s, inv) => s + revenueAmount(inv), 0));
   const liveLastVisit = client.lastVisitDate ?? completedAppts[0]?.date;
   const liveAvgTicket = liveVisits ? Math.round(liveSpend / liveVisits) : 0;
 

@@ -7,6 +7,7 @@ import type { PaymentMethod } from "@/lib/types";
 import { persistEntity, recordDeletions } from "@/lib/turso-sync";
 import { locationUserKey } from "@/lib/locations";
 import { cacheGet } from "@/lib/sync-records";
+import { linkBalanceReceipts } from "./invoice-revenue";
 
 export type SalonInvoiceStatus = "paid" | "unpaid" | "partial";
 
@@ -223,25 +224,8 @@ export interface InvoiceRefund {
 
 export const refundedTotal = (inv: Pick<SalonInvoice, "refunds">) => (inv.refunds ?? []).reduce((s, r) => s + r.amount, 0);
 
-/**
- * What this sale contributes to revenue totals.
- *
- * Only "partial" is special-cased, deliberately: it counts the advance actually
- * collected rather than the full ticket. "paid" and "unpaid" keep exactly the
- * behaviour they had before advances existed (both count their full total in
- * the revenue screens), so introducing advances doesn't quietly restate
- * historical figures.
- */
-export function revenueAmount(inv: Pick<SalonInvoice, "status" | "total" | "advanceAmount" | "balanceInvoiceOf" | "balanceInvoiceId">): number {
-  if (inv.balanceInvoiceOf) return inv.total; // the balance, paid on its own receipt
-  if (inv.balanceInvoiceId && inv.status === "paid") return inv.advanceAmount ?? 0; // balance is on that receipt
-  return inv.status === "partial" ? (inv.advanceAmount ?? 0) : inv.total;
-}
-
-/** The day revenueAmount() belongs to: an advance-only invoice counts on the day it was issued, not when the balance was paid. */
-export function revenueDate(inv: Pick<SalonInvoice, "date" | "paidDate" | "balanceInvoiceId">): string {
-  return inv.balanceInvoiceId ? inv.date : inv.paidDate || inv.date;
-}
+// revenueAmount / revenueDate / linkBalanceReceipts live in ./invoice-revenue (shared with server reports).
+export { revenueAmount, revenueDate, linkBalanceReceipts } from "./invoice-revenue";
 
 /** Still owed on a partial sale; 0 for anything else. */
 export function balanceDue(inv: Pick<SalonInvoice, "status" | "total" | "advanceAmount">): number {
@@ -321,15 +305,13 @@ export function getSalonInvoices(): SalonInvoice[] {
     if (migrated) {
       persistEntity("salon_invoices", invoices);
     }
-    // An advance invoice whose balance was collected on its own receipt counts only
-    // the advance; the receipt counts the balance on the day it was paid.
-    const balanceReceipt = new Map(invoices.filter((i) => i.balanceInvoiceOf).map((i) => [i.balanceInvoiceOf!, i.id]));
-    if (!balanceReceipt.size) return invoices;
-    const byId = new Map(invoices.map((i) => [i.id, i]));
-    return invoices.map((i) => {
-      if (balanceReceipt.has(i.id)) return { ...i, balanceInvoiceId: balanceReceipt.get(i.id) };
+    // Advance invoices whose balance was collected on its own receipt are linked here
+    // (see invoice-revenue.ts), and receipts made before the wording changed are rewritten.
+    const linked = linkBalanceReceipts(invoices);
+    if (linked === invoices) return invoices;
+    const byId = new Map(linked.map((i) => [i.id, i]));
+    return linked.map((i) => {
       const parent = i.balanceInvoiceOf ? byId.get(i.balanceInvoiceOf) : undefined;
-      // Receipts made before the wording changed still say "Remaining balance for SI-…".
       return parent && i.items.some((l) => l.description.startsWith("Remaining balance for "))
         ? { ...i, items: i.items.map((l) => (l.description.startsWith("Remaining balance for ") ? { ...l, description: balanceDescription(parent) } : l)) }
         : i;

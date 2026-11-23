@@ -335,7 +335,7 @@ export default function RevenuePage() {
       rows.push({
         date, dow,
         count:   appts.length + pos.length + manual.length,
-        revenue: appts.reduce((s, a) => s + a.totalAmount, 0) + pos.reduce((s, inv) => s + inv.total, 0) + manual.reduce((s, e) => s + e.amount, 0),
+        revenue: appts.reduce((s, a) => s + a.totalAmount, 0) + pos.reduce((s, inv) => s + revenueAmount(inv), 0) + manual.reduce((s, e) => s + e.amount, 0),
       });
     }
     return rows.reverse();
@@ -425,7 +425,7 @@ export default function RevenuePage() {
       .sort((a, b) => `${a.date}T${a.createdAt}`.localeCompare(`${b.date}T${b.createdAt}`)),
     [manualIncome, reportStart, reportEnd]);
 
-  const reportRevenue = reportAppts.reduce((s, a) => s + a.totalAmount, 0) + reportPos.reduce((s, inv) => s + inv.total, 0) + reportManual.reduce((s, e) => s + e.amount, 0);
+  const reportRevenue = reportAppts.reduce((s, a) => s + a.totalAmount, 0) + reportPos.reduce((s, inv) => s + revenueAmount(inv), 0) + reportManual.reduce((s, e) => s + e.amount, 0);
   const reportCount   = reportAppts.length + reportPos.length + reportManual.length;
   const reportAvg     = reportCount ? reportRevenue / reportCount : 0;
 
