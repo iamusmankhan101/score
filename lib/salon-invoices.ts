@@ -48,7 +48,7 @@ export interface SalonInvoiceItem {
   packageId?: string;
   /** Clinics: don't send the automatic aftercare messages for this treatment line. */
   noAftercare?: boolean;
-  /** Salons: send aftercare messages for this service line (ticked by default at billing). */
+  /** Salons: send aftercare messages for this service line (unticked by default at billing). */
   aftercare?: boolean;
   description: string;
   qty: number;

@@ -78,7 +78,7 @@ interface CartEntry {
   priceRangeMax?: number;
   /** Clinics: skip the automatic aftercare messages for this treatment. */
   noAftercare?: boolean;
-  /** Salons: false = skip aftercare messages for this service (ticked by default). */
+  /** Salons: true = send aftercare messages for this service (unticked by default). */
   aftercare?: boolean;
   /** Paid for by a session package the client already bought (lib/clinic.ts) — priced at 0. */
   packageId?: string;
@@ -411,7 +411,7 @@ export default function POSPage() {
       ...(e.guestName ? { guestName: e.guestName } : {}),
       ...(e.packageId ? { packageId: e.packageId } : {}),
       ...(e.noAftercare && e.type === "service" ? { noAftercare: true } : {}),
-      ...(!clinic && e.type === "service" ? { aftercare: e.aftercare !== false } : {}),
+      ...(!clinic && e.type === "service" ? { aftercare: e.aftercare === true } : {}),
       ...(e.membershipUse ? { membershipUse: e.membershipUse } : {}),
       // Selling a membership: it runs from today, or on from the end of the
       // one the client already has, so renewing early loses nothing.
@@ -1855,8 +1855,8 @@ export default function POSPage() {
                           )}
                           {entry.type === "service" && (
                             <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, fontSize: 11, fontWeight: 700, color: "#5b5b7a", cursor: "pointer" }}>
-                              <input type="checkbox" checked={clinic ? !entry.noAftercare : entry.aftercare !== false}
-                                onChange={() => setCart(prev => prev.map(en => en.cartId === entry.cartId ? (clinic ? { ...en, noAftercare: !en.noAftercare } : { ...en, aftercare: en.aftercare === false }) : en))} />
+                              <input type="checkbox" checked={clinic ? !entry.noAftercare : entry.aftercare === true}
+                                onChange={() => setCart(prev => prev.map(en => en.cartId === entry.cartId ? (clinic ? { ...en, noAftercare: !en.noAftercare } : { ...en, aftercare: en.aftercare !== true }) : en))} />
                               Send aftercare messages
                             </label>
                           )}
