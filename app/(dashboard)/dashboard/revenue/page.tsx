@@ -1192,7 +1192,14 @@ export default function RevenuePage() {
                         {METHOD_LABELS[inv.paymentMethod] ?? inv.paymentMethod ?? "—"}
                       </span>
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#7C3AED" }}>{fmt(inv.total)}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#7C3AED" }}>
+                      {fmt(revenueAmount(inv))}
+                      {inv.status === "partial" && (
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#b45309", background: "#fef3c7", padding: "1px 6px", borderRadius: 20, marginTop: 2, display: "inline-block" }}>
+                          Advance · of {fmt(inv.total)}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
 
@@ -1816,7 +1823,7 @@ function LedgerView({ rangeStart, filterEnd, today, appointments, posLinkedAppoi
         account: "cash", category: "Appointments", moneyIn: a.totalAmount, moneyOut: 0 })),
     ...posInvoices.map(inv => ({ id: inv.id, date: inv.date, sortKey: inv.date + "T" + inv.createdAt.slice(11, 16),
       description: inv.clientName || "POS Sale",
-      detail: `POS ${inv.number} · ${inv.paymentMethod ? paymentMethodLabel(inv, METHOD_LABELS) : "Cash"}`,
+      detail: `POS ${inv.number}${inv.status === "partial" ? " · advance" : ""} · ${inv.paymentMethod ? paymentMethodLabel(inv, METHOD_LABELS) : "Cash"}`,
       account: inv.paymentMethod || "cash", category: "POS Sales", moneyIn: revenueAmount(inv), moneyOut: 0 })),
     ...manualIncome.map(entry => ({ id: entry.id, date: entry.date, sortKey: entry.date + "T" + entry.createdAt.slice(11, 16),
       description: entry.description || "Income", detail: entry.category || "Imported income",
