@@ -16,7 +16,7 @@ export interface ReportInvoice {
   total: number;
   paymentMethod: string;
   cardTerminal?: string;
-  status: "paid" | "unpaid";
+  status: "paid" | "unpaid" | "partial";
 }
 
 export interface DailyReportData {

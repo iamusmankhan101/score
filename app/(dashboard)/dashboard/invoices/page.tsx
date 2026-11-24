@@ -155,7 +155,7 @@ export default function InvoicesPage() {
       total:        monthInvoices.length,
       paidCount:    paid.length,
       unpaidCount:  unpaid.length,
-      revenue:      paid.reduce((s, i) => s + revenueAmount(i), 0),
+      revenue:      [...paid, ...partial].reduce((s, i) => s + revenueAmount(i), 0), // advances count on the day they were taken
       outstanding:  unpaid.reduce((s, i) => s + i.total, 0) + partial.reduce((s, i) => s + balanceDue(i), 0),
       uniqueClients,
       billedAmount,

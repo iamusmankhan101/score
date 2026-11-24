@@ -814,18 +814,18 @@ export default function CashFlowPage() {
 
       // All paid invoices (appointments + POS — both carry paymentMethod)
       const allPaidInvoices = getSalonInvoices().filter(
-        inv => inv.status === "paid" && inv.date >= (rangeStart || filterEnd) && inv.date <= filterEnd
+        inv => (inv.status === "paid" || inv.status === "partial") && inv.date >= (rangeStart || filterEnd) && inv.date <= filterEnd
           && (!cashFlowScoped || inv.section === activeSection),
       );
       allPaidInvoices.forEach(inv => {
         if (!dayMap[inv.date]) dayMap[inv.date] = { card: 0, cash: 0, bank: 0, newAccount: 0, expense: 0 };
         const pm = inv.paymentMethod ?? "";
-        if      (pm === "card")                                   dayMap[inv.date].card       += inv.total;
-        else if (pm === "cash")                                   dayMap[inv.date].cash       += inv.total;
-        else if (pm === "bank")                                   dayMap[inv.date].bank       += inv.total;
+        if      (pm === "card")                                   dayMap[inv.date].card       += revenueAmount(inv);
+        else if (pm === "cash")                                   dayMap[inv.date].cash       += revenueAmount(inv);
+        else if (pm === "bank")                                   dayMap[inv.date].bank       += revenueAmount(inv);
         else if (pm === "jazzcash" || pm === "easypaisa" || pm === "raast")
-                                                                  dayMap[inv.date].newAccount += inv.total;
-        else                                                      dayMap[inv.date].cash       += inv.total; // untracked → cash
+                                                                  dayMap[inv.date].newAccount += revenueAmount(inv);
+        else                                                      dayMap[inv.date].cash       += revenueAmount(inv); // untracked → cash
       });
 
       // Completed appointments not linked to a POS invoice — same "Appointment" source

@@ -46,7 +46,7 @@ interface SalonInvoice {
   paymentMethod: string;
   cardTerminal?: string;
   date: string;
-  status: "paid" | "unpaid";
+  status: "paid" | "unpaid" | "partial";
   source?: "pos" | "manual";
 }
 
@@ -170,7 +170,7 @@ function buildLedger(
         description: a.clientName || "Appointment", detail: a.serviceNames?.join(", ") || "Appointment",
         moneyIn: a.totalAmount || 0, moneyOut: 0 })),
     ...posInvoices
-      .filter((inv) => inv.status === "paid")
+      .filter((inv) => inv.status === "paid" || inv.status === "partial")
       .map((inv) => ({ sortKey: inv.date + "T" + time((inv as { createdAt?: string }).createdAt), date: inv.date,
         description: inv.clientName || "POS Sale", detail: `POS · ${METHOD_LABELS[inv.paymentMethod] ?? inv.paymentMethod ?? "Cash"}`,
         moneyIn: revenueAmount(inv) || 0, moneyOut: 0 })),
@@ -238,7 +238,7 @@ function buildReportEmail(
   logoImg = "",
 ): { subject: string; html: string; text: string } {
   invoices = linkBalanceReceipts(invoices);
-  const paid   = invoices.filter((i) => i.status === "paid");
+  const paid   = invoices.filter((i) => i.status === "paid" || i.status === "partial"); // partial = advance taken
   const unpaid = invoices.filter((i) => i.status === "unpaid");
 
   const revenue     = paid.reduce((s, i) => s + revenueAmount(i), 0);
