@@ -109,15 +109,15 @@ const rxStyles = StyleSheet.create({
 
 // Clinics with their own pre-designed pad (the PNG is the whole page; we only write the patient's details onto it).
 // ponytail: matched by clinic name, add a settings field if a second clinic wants a pad.
-const PADS: { match: RegExp; file: string }[] = [{ match: /mehak/i, file: "public/templates/mehak-rx-pad.png" }];
+const PADS: { match: RegExp }[] = [{ match: /mehak/i }];
 
-function drawPadPrescriptionPdf(file: string, patientName: string, rx: Prescription): Promise<Buffer> {
+function drawPadPrescriptionPdf(patientName: string, rx: Prescription): Promise<Buffer> {
   const at = (left: number, top: number, width: number, height: number, size = 10) => ({ position: "absolute" as const, left, top, width, height, fontSize: size, overflow: "hidden" as const });
   return renderToBuffer(
     <Document title={`Prescription — ${patientName}`}>
       <Page size="A4" style={{ fontFamily: "Helvetica", color: "#111111", lineHeight: 1.3 }}>
         {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt */}
-        <Image src={path.join(process.cwd(), file)} style={{ position: "absolute", left: 0, top: 0, width: 595, height: 841 }} />
+        <Image src={path.join(process.cwd(), "public", "templates", "mehak-rx-pad.png")} style={{ position: "absolute", left: 0, top: 0, width: 595, height: 841 }} />
         <Text style={at(148, 233, 255, 30, 11)}>{patientName}</Text>
         <Text style={at(446, 233, 125, 30, 11)}>{rx.date}</Text>
         <Text style={at(40, 321, 520, 40, 10)}>{[rx.diagnosis, rx.treatment ? `(after ${rx.treatment})` : ""].filter(Boolean).join(" ")}</Text>
@@ -137,7 +137,7 @@ function drawPadPrescriptionPdf(file: string, patientName: string, rx: Prescript
 
 function drawPrescriptionPdf(clinic: ClinicPdfHeader, patientName: string, rx: Prescription): Promise<Buffer> {
   const pad = PADS.find((p) => p.match.test(clinic.name));
-  if (pad) return drawPadPrescriptionPdf(pad.file, patientName, rx);
+  if (pad) return drawPadPrescriptionPdf(patientName, rx);
   const col = (label: string, value?: string) => value ? (
     <View style={rxStyles.cell}>
       <Text style={rxStyles.cellLabel}>{label}</Text>
