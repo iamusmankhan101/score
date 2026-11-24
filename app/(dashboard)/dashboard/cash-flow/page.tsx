@@ -238,7 +238,7 @@ export default function CashFlowPage() {
         description: inv.items.map(it => it.description).join(", ") || "POS Sale",
         source: "pos" as const,
         paymentMethod: inv.paymentMethod,
-        amount: inv.total,
+        amount: revenueAmount(inv),
         sortKey: inv.date + "T" + inv.createdAt.slice(11, 16),
       }));
     const manualRows = manualIncome
@@ -267,8 +267,8 @@ export default function CashFlowPage() {
     let cash = appts.reduce((s, a) => s + a.totalAmount, 0) + manual.reduce((s, e) => s + e.amount, 0);
     let online = 0;
     pos.forEach(inv => {
-      if ((inv.paymentMethod || "cash") === "cash") cash += inv.total;
-      else online += inv.total;
+      if ((inv.paymentMethod || "cash") === "cash") cash += revenueAmount(inv);
+      else online += revenueAmount(inv);
     });
     return { cash, online };
   }, [appointments, posInvoices, posLinkedAppointmentIds, manualIncome, rangeStart, filterEnd, period, customStart, customEnd]);
