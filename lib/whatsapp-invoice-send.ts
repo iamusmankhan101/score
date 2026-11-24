@@ -1,4 +1,4 @@
-import type { SalonInvoice } from "@/lib/salon-invoices";
+import { balanceDue, isAdvanceInvoice, type SalonInvoice } from "@/lib/salon-invoices";
 import { generateSalonInvoicePdf } from "@/lib/salon-invoice-pdf";
 import { isFakePlaceholderPhone, isNonWhatsAppRecipientError, type WhatsAppProviderConfig } from "@/lib/whatsapp-provider";
 
@@ -34,7 +34,10 @@ export async function sendSalonInvoiceWhatsApp({
   }
 
   const pdf = await generateSalonInvoicePdf(invoice, salon);
-  const invoiceLine = `Invoice ${invoice.number} from ${salon.name} — PKR ${invoice.total.toLocaleString("en-PK")}`;
+  const pkr = (n: number) => `PKR ${n.toLocaleString("en-PK")}`;
+  const invoiceLine = isAdvanceInvoice(invoice)
+    ? `Advance receipt ${invoice.number} from ${salon.name} — advance received ${pkr(invoice.advanceAmount ?? 0)} of ${pkr(invoice.total)}. Balance due: ${pkr(balanceDue(invoice))}`
+    : `Invoice ${invoice.number} from ${salon.name} — ${pkr(invoice.total)}`;
   const caption = thankYouText ? `${thankYouText}\n\n${invoiceLine}` : invoiceLine;
   return sendWhatsAppDocument({ pdf, fileName: `${invoice.number}.pdf`, caption, phone, providerConfig });
 }

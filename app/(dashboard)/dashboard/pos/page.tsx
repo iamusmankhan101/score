@@ -20,7 +20,7 @@ import {
 } from "@/lib/storage";
 import { getHeldSales, saveHeldSale, removeHeldSale, type HeldSale } from "@/lib/held-sales";
 import {
-  createSalonInvoice, calcTotals, reportInvoiceToFbr, createBalancePaymentInvoice, markSalonInvoicePaid, balanceDue,
+  createSalonInvoice, calcTotals, isAdvanceInvoice, advanceThanks, reportInvoiceToFbr, createBalancePaymentInvoice, markSalonInvoicePaid, balanceDue,
   localDateKey, getSalonInvoices, saveSalonInvoices,
   ADVANCE_NON_REFUNDABLE_NOTE, CARD_TERMINALS,
   type SalonInvoice, type SalonInvoiceItem,
@@ -1031,7 +1031,9 @@ export default function POSPage() {
   // prefilled.
   function buildThankYouMessage(invoice: SalonInvoice, client: Client): string {
     const thankYouTpl = (settingsStore.whatsapp as { posThankYou?: string }).posThankYou;
-    const thankYou = thankYouTpl
+    const thankYou = isAdvanceInvoice(invoice)
+      ? advanceThanks(client.name, salon.name)
+      : thankYouTpl
       ? fillTemplate(thankYouTpl, { name: client.name, salon_name: salon.name })
       : `Thank you so much for visiting ${salon.name} today, ${client.name}!`;
     const itemLines = invoice.items.map(it =>
@@ -1042,7 +1044,7 @@ export default function POSPage() {
     const rawMessage = [
       thankYou,
       "",
-      `Invoice ${invoice.number} · ${dateLabel}`,
+      `${isAdvanceInvoice(invoice) ? "Advance receipt" : "Invoice"} ${invoice.number} · ${dateLabel}`,
       itemLines,
       "",
       ...(discount > 0 || invoice.taxAmount > 0 ? [`Subtotal: ${pkr(invoice.subtotal)}`] : []),

@@ -263,6 +263,14 @@ export function invoiceTimeLabel(inv: Pick<SalonInvoice, "date" | "createdAt">):
   return created.toLocaleTimeString("en-PK", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Karachi" });
 }
 
+/** True for an advance receipt: money taken up front, balance still owed. */
+export const isAdvanceInvoice = (inv: Pick<SalonInvoice, "status" | "advanceAmount">) => inv.status === "partial" && (inv.advanceAmount ?? 0) > 0;
+
+/** WhatsApp wording for an advance receipt — what was received and what is left, not "thanks for visiting". */
+export function advanceThanks(name: string, salonName: string): string {
+  return `Hi ${name}, thank you for your advance payment to ${salonName}. We have received it; the remaining balance is due at your visit.`;
+}
+
 /** Shown on any invoice carrying an advance, on screen and on the PDF. */
 export const ADVANCE_NON_REFUNDABLE_NOTE = "Advance payment is non-refundable.";
 

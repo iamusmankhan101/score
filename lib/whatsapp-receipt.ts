@@ -1,4 +1,4 @@
-import type { SalonInvoice } from "@/lib/salon-invoices";
+import { advanceThanks, isAdvanceInvoice, type SalonInvoice } from "@/lib/salon-invoices";
 import { settingsStore } from "@/lib/settings-store";
 import { fillTemplate, normalizePhone } from "@/lib/whatsapp-scheduler";
 
@@ -31,7 +31,9 @@ export async function queueInvoiceReceipt(
     // The thank-you text is prepended to the invoice caption so the client gets
     // one WhatsApp message (PDF + caption), not two separate texts back to back.
     const thankYouTpl = (settingsStore.whatsapp as { posThankYou?: string }).posThankYou;
-    if (ws.autoPosThankYou !== false && thankYouTpl) {
+    if (isAdvanceInvoice(invoice)) {
+      thankYouText = advanceThanks(client.name, salon.name); // not "thanks for visiting today" — nothing has been done yet
+    } else if (ws.autoPosThankYou !== false && thankYouTpl) {
       thankYouText = fillTemplate(thankYouTpl, { name: client.name, salon_name: salon.name });
     }
   }
