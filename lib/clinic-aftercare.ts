@@ -126,8 +126,10 @@ export function aftercareFlows(clinic: ClinicAutomationSettings | undefined, isC
 }
 
 /** Flows that apply to a treatment — linked by id or matched on its name. */
-export function flowsForService(service: Pick<Service, "id" | "name">, flows: AftercareFlow[]): AftercareFlow[] {
+export function flowsForService(service: Pick<Service, "id" | "name">, flows: AftercareFlow[], explicitOnly = false): AftercareFlow[] {
   const name = service.name.toLowerCase();
+  // explicitOnly (salons): only flows the owner linked to this exact service, never a keyword guess.
+  if (explicitOnly) return flows.filter((f) => f.serviceIds.includes(service.id));
   return flows.filter((f) => f.serviceIds.includes(service.id) || f.keywords.some((k) => k.trim() && name.includes(k.trim().toLowerCase())));
 }
 
