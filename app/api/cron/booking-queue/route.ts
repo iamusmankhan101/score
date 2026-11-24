@@ -241,13 +241,35 @@ async function updateItem(item: QueueRow, status: "sent" | "pending" | "expired"
   });
 }
 
+// Deferred messages used to all land on "last send + gap", i.e. 1-2 min apart once the
+// queue drained. Push each one at least 5-10 min (random) past any other pending message
+// of this salon, so a deferred batch never goes out in a burst. Confirmations and the
+// salon's own alert stay fast.
+const DEFER_MIN_GAP_MS = 5 * MINUTE_MS;
+const DEFER_MAX_GAP_MS = 10 * MINUTE_MS;
+async function spacedFromPending(item: QueueRow, wantedMs: number): Promise<number> {
+  if (item.kind === "confirmation" || item.kind === "groupalert") return wantedMs;
+  for (let step = 0; step < 100; step++) { // each step jumps past one more row; the cap is a safety net
+    const r = await db.execute({
+      sql: `SELECT MAX(scheduled_at) AS ts FROM wa_booking_send_queue
+            WHERE user_id = ? AND status = 'pending' AND id != ? AND scheduled_at > ? AND scheduled_at < ?`,
+      args: [item.userId, item.id, new Date(wantedMs - DEFER_MIN_GAP_MS).toISOString(), new Date(wantedMs + DEFER_MIN_GAP_MS).toISOString()],
+    });
+    const clash = Date.parse(String(r.rows[0]?.ts ?? ""));
+    if (!Number.isFinite(clash)) break;
+    wantedMs = clash + randBetween(DEFER_MIN_GAP_MS, DEFER_MAX_GAP_MS);
+  }
+  return wantedMs;
+}
+
 async function deferItem(item: QueueRow, delayMs: number, reason: string) {
+  const when = await spacedFromPending(item, Date.now() + delayMs);
   await db.execute({
     sql: `UPDATE wa_booking_send_queue
           SET scheduled_at = ?, last_error = ?
           WHERE user_id = ? AND id = ? AND status = 'pending'`,
     args: [
-      new Date(Date.now() + delayMs).toISOString(),
+      new Date(when).toISOString(),
       reason,
       item.userId,
       item.id,
