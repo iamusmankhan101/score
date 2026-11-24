@@ -448,10 +448,11 @@ export default function RevenuePage() {
       map[k].count++; map[k].revenue += a.totalAmount;
     });
     currentPos.forEach(inv => {
+      const share = inv.total > 0 ? revenueAmount(inv) / inv.total : 1; // an advance counts only its share of each service
       inv.items.forEach(item => {
         const k = item.description || "POS Sale";
         if (!map[k]) map[k] = { name: k, count: 0, revenue: 0 };
-        map[k].count += item.qty; map[k].revenue += item.total;
+        map[k].count += item.qty; map[k].revenue += item.total * share;
       });
     });
     return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 6);
