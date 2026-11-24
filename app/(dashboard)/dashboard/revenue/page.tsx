@@ -169,7 +169,7 @@ export default function RevenuePage() {
       const allPosInvoices = getSalonInvoices()
         .filter(inv => !inv.source || inv.source === "pos")
         .filter(inv => !revenueScoped || inv.section === activeSection);
-      setPosInvoices(allPosInvoices.filter(inv => inv.status === "paid"));
+      setPosInvoices(allPosInvoices.filter(inv => inv.status === "paid" || inv.status === "partial"));
       setOutstandingInvoices(allPosInvoices.filter(inv => inv.status !== "paid"));
       // Cash Flow's "Import" feature records income (e.g. bulk-uploaded past
       // sales) as ManualCashIncome entries rather than salon invoices — Cash
@@ -371,7 +371,7 @@ export default function RevenuePage() {
       if (a.date in byDay) { byDay[a.date].count++; byDay[a.date].revenue += a.totalAmount; }
     });
     currentPos.forEach(inv => {
-      if (inv.date in byDay) { byDay[inv.date].count++; byDay[inv.date].revenue += inv.total; }
+      if (inv.date in byDay) { byDay[inv.date].count++; byDay[inv.date].revenue += revenueAmount(inv); }
     });
     currentManual.forEach(entry => {
       if (entry.date in byDay) { byDay[entry.date].count++; byDay[entry.date].revenue += entry.amount; }
@@ -385,7 +385,7 @@ export default function RevenuePage() {
 
   const methodBreakdown = useMemo(() => {
     const invoices = getSalonInvoices().filter((inv) => {
-      if (inv.status !== "paid") return false;
+      if (inv.status !== "paid" && inv.status !== "partial") return false;
       if (inv.source && inv.source !== "pos") return false;
       if (revenueScoped && inv.section !== activeSection) return false;
       return inv.date >= rangeStart && inv.date <= filterEnd;
@@ -393,7 +393,7 @@ export default function RevenuePage() {
     const totals: Record<string, number> = {};
     invoices.forEach(inv => {
       if (!inv.paymentMethod) return;
-      totals[inv.paymentMethod] = (totals[inv.paymentMethod] ?? 0) + inv.total;
+      totals[inv.paymentMethod] = (totals[inv.paymentMethod] ?? 0) + revenueAmount(inv);
     });
     const grand = Object.values(totals).reduce((s, v) => s + v, 0) || 1;
     return Object.entries(totals)
@@ -433,7 +433,7 @@ export default function RevenuePage() {
     const totals: Record<string, number> = {};
     reportPos.forEach(inv => {
       if (!inv.paymentMethod) return;
-      totals[inv.paymentMethod] = (totals[inv.paymentMethod] ?? 0) + inv.total;
+      totals[inv.paymentMethod] = (totals[inv.paymentMethod] ?? 0) + revenueAmount(inv);
     });
     return Object.entries(totals)
       .map(([method, amount]) => ({ method, amount }))
@@ -488,8 +488,8 @@ export default function RevenuePage() {
     let cash = currentAppts.reduce((s, a) => s + a.totalAmount, 0) + currentManual.reduce((s, e) => s + e.amount, 0);
     let online = 0;
     currentPos.forEach(inv => {
-      if ((inv.paymentMethod || "cash") === "cash") cash += inv.total;
-      else online += inv.total;
+      if ((inv.paymentMethod || "cash") === "cash") cash += revenueAmount(inv);
+      else online += revenueAmount(inv);
     });
     return { cash, online };
   }, [currentAppts, currentPos, currentManual]);
@@ -525,7 +525,7 @@ export default function RevenuePage() {
     });
     currentPos.forEach(inv => {
       const h = new Date(inv.createdAt).getHours();
-      if (h >= 0 && h < 24) byHour[h] += inv.total;
+      if (h >= 0 && h < 24) byHour[h] += revenueAmount(inv);
     });
     currentManual.forEach(entry => {
       const h = new Date(entry.createdAt).getHours();
@@ -587,7 +587,7 @@ export default function RevenuePage() {
       });
       currentPos.forEach(inv => {
         const key = inv.date.substring(0, 7);
-        if (key in monthlyMap) { monthlyMap[key].count++; monthlyMap[key].revenue += inv.total; }
+        if (key in monthlyMap) { monthlyMap[key].count++; monthlyMap[key].revenue += revenueAmount(inv); }
       });
       currentManual.forEach(entry => {
         const key = entry.date.substring(0, 7);
@@ -608,7 +608,7 @@ export default function RevenuePage() {
         if (a.date in byDay) { byDay[a.date].count++; byDay[a.date].revenue += a.totalAmount; }
       });
       currentPos.forEach(inv => {
-        if (inv.date in byDay) { byDay[inv.date].count++; byDay[inv.date].revenue += inv.total; }
+        if (inv.date in byDay) { byDay[inv.date].count++; byDay[inv.date].revenue += revenueAmount(inv); }
       });
       currentManual.forEach(entry => {
         if (entry.date in byDay) { byDay[entry.date].count++; byDay[entry.date].revenue += entry.amount; }
