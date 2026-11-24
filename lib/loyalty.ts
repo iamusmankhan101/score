@@ -139,6 +139,21 @@ export function redeemPoints(
   return updated;
 }
 
+/** Takes back the points a POS sale earned (history entries stamped with its invoice id) when that invoice is deleted. */
+export function reverseInvoicePoints(client: Client, invoiceId: string, note: string): Client {
+  const pts = getClientHistory(client.id)
+    .filter((t) => t.appointmentId === invoiceId)
+    .reduce((s, t) => s + (t.type === "earn" ? t.points : t.type === "adjust" && t.points < 0 ? t.points : 0), 0);
+  if (pts <= 0) return client;
+  const updated = {
+    ...client,
+    loyaltyPoints: Math.max(0, (client.loyaltyPoints ?? 0) - pts),
+    loyaltyPointsEarned: Math.max(0, (client.loyaltyPointsEarned ?? 0) - pts),
+  };
+  appendHistory({ clientId: client.id, type: "adjust", points: -pts, note, appointmentId: invoiceId }, updated);
+  return updated;
+}
+
 export function adjustPoints(
   client: Client,
   points: number,

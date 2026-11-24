@@ -8,6 +8,7 @@ import {
 import { addExpense } from "@/lib/expenses";
 import { getCurrentUser } from "@/lib/auth";
 import { useCanDelete } from "@/lib/use-can-delete";
+import { reverseInvoicePoints } from "@/lib/loyalty";
 import {
   getSalonInvoices, deleteSalonInvoice, cancelInvoiceOnFbr, markSalonInvoicePaid, markSalonInvoiceUnpaid, updateSalonInvoice, createBalancePaymentInvoice, localDateKey, balanceDue, advancePercent,
   paymentMethodLabel, refundedTotal, revenueAmount, type SalonInvoice,
@@ -341,7 +342,7 @@ export default function InvoicesPage() {
       const clients = getStoredClients();
       const updatedClients = clients.map((c) =>
         c.id === invoice.clientId
-          ? { ...c, totalVisits: Math.max(0, c.totalVisits - 1), totalSpend: Math.max(0, c.totalSpend - invoice.total) }
+          ? reverseInvoicePoints({ ...c, totalVisits: Math.max(0, c.totalVisits - 1), totalSpend: Math.max(0, c.totalSpend - invoice.total) }, invoice.id, `Invoice ${invoice.number} deleted`)
           : c
       );
       saveClients(updatedClients);
