@@ -3,6 +3,7 @@
  * skincare plan. Rendered server-side like the invoice PDF (lib/salon-invoice-pdf.tsx).
  */
 
+import path from "node:path";
 import { Document, Image, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import type { ConsentRecord, Prescription } from "@/lib/clinic";
 
@@ -106,7 +107,37 @@ const rxStyles = StyleSheet.create({
   signLabel: { fontSize: 8, color: "#6b7a72" },
 });
 
+// Clinics with their own pre-designed pad (the PNG is the whole page; we only write the patient's details onto it).
+// ponytail: matched by clinic name, add a settings field if a second clinic wants a pad.
+const PADS: { match: RegExp; file: string }[] = [{ match: /mehak/i, file: "public/templates/mehak-rx-pad.png" }];
+
+function drawPadPrescriptionPdf(file: string, patientName: string, rx: Prescription): Promise<Buffer> {
+  const at = (left: number, top: number, width: number, height: number, size = 10) => ({ position: "absolute" as const, left, top, width, height, fontSize: size, overflow: "hidden" as const });
+  return renderToBuffer(
+    <Document title={`Prescription — ${patientName}`}>
+      <Page size="A4" style={{ fontFamily: "Helvetica", color: "#111111", lineHeight: 1.3 }}>
+        {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt */}
+        <Image src={path.join(process.cwd(), file)} style={{ position: "absolute", left: 0, top: 0, width: 595, height: 841 }} />
+        <Text style={at(148, 233, 255, 30, 11)}>{patientName}</Text>
+        <Text style={at(446, 233, 125, 30, 11)}>{rx.date}</Text>
+        <Text style={at(40, 321, 520, 40, 10)}>{[rx.diagnosis, rx.treatment ? `(after ${rx.treatment})` : ""].filter(Boolean).join(" ")}</Text>
+        <View style={at(46, 420, 330, 135)}>
+          {rx.items.map((i, idx) => (
+            <View key={idx} style={{ marginBottom: 4 }} wrap={false}>
+              <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 10 }}>{idx + 1}. {i.product}{[i.dosage, i.frequency, i.duration, i.time].filter(Boolean).length ? ` — ${[i.dosage, i.frequency, i.duration, i.time].filter(Boolean).join(", ")}` : ""}</Text>
+              {i.instructions ? <Text style={{ fontSize: 8.5, color: "#444444", marginLeft: 10 }}>{i.instructions}</Text> : null}
+            </View>
+          ))}
+        </View>
+        <Text style={at(245, 570, 320, 50, 9)}>{rx.notes ?? ""}</Text>
+      </Page>
+    </Document>,
+  );
+}
+
 function drawPrescriptionPdf(clinic: ClinicPdfHeader, patientName: string, rx: Prescription): Promise<Buffer> {
+  const pad = PADS.find((p) => p.match.test(clinic.name));
+  if (pad) return drawPadPrescriptionPdf(pad.file, patientName, rx);
   const col = (label: string, value?: string) => value ? (
     <View style={rxStyles.cell}>
       <Text style={rxStyles.cellLabel}>{label}</Text>
