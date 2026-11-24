@@ -133,11 +133,6 @@ export function downloadPDF() {
       <div class="stat-value">${fmt(totalTips)}</div>
       <div class="stat-sub">Today</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-label">Avg Ticket</div>
-      <div class="stat-value">${fmt(todayAppts.length ? Math.round(totalRevenue / todayAppts.length) : 0)}</div>
-      <div class="stat-sub">Per appointment</div>
-    </div>
   </div>
 
   <!-- Appointments Table -->

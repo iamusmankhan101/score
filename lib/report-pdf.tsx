@@ -191,7 +191,6 @@ function DailyReportPDF({ data, logo }: { data: DailyReportData; logo?: Buffer }
   const unpaid   = invoices.filter((i) => i.status === "unpaid");
   const revenue  = paid.reduce((s, i) => s + got(i), 0);
   const outstanding = unpaid.reduce((s, i) => s + i.total, 0);
-  const avgTicket   = paid.length > 0 ? revenue / paid.length : 0;
   const totalDisc   = invoices.reduce((s, i) => s + i.discountAmount, 0);
 
   // Payment method breakdown
@@ -288,7 +287,6 @@ function DailyReportPDF({ data, logo }: { data: DailyReportData; logo?: Buffer }
           <SectionHead title="Summary" />
           <View style={s.statRow}>
             <StatCard label="Paid Sales" value={String(paid.length)} sub={`${unpaid.length} unpaid`} color="#7C3AED" />
-            <StatCard label="Average Ticket" value={avgTicket > 0 ? pkr(avgTicket) : "—"} sub="per paid sale" color="#0284c7" />
             <StatCard label="Discounts Given" value={totalDisc > 0 ? pkr(totalDisc) : "None"} color="#d97706" />
             <StatCard label="Still Owed" value={outstanding > 0 ? pkr(outstanding) : "None"} sub="unpaid today" color="#dc2626" />
           </View>

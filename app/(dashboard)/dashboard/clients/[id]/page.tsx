@@ -225,7 +225,6 @@ export default function ClientProfilePage() {
   // Use stored accumulated values (include POS + all devices) — they're always >= local appointment count
   const totalVisits = Math.max(client.totalVisits ?? 0, completedAppts.length);
   const totalSpend  = Math.max(client.totalSpend  ?? 0, completedAppts.reduce((s, a) => s + a.totalAmount, 0));
-  const avgTicket   = totalVisits ? Math.round(totalSpend / totalVisits) : 0;
   const lastVisit   = client.lastVisitDate ?? completedAppts[0]?.date;
 
   const serviceFreq: Record<string, { count: number; spend: number }> = {};
@@ -309,11 +308,10 @@ export default function ClientProfilePage() {
         </div>
 
         {/* ── Stats row ─────────────────────────────────────────────────────────── */}
-        <div className="cd-stats" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12 }}>
+        <div className="cd-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
           {[
             { label: "Total Visits",  value: totalVisits,                      color: "#7C3AED", bg: "#f5f3ff",  icon: <CheckCircle2 size={18} color="#7C3AED" /> },
             { label: "Total Spend",   value: fmt(totalSpend),                  color: "#059669", bg: "#ecfdf5",  icon: <TrendingUp size={18} color="#059669" /> },
-            { label: "Avg Ticket",    value: avgTicket ? fmt(avgTicket) : "—", color: "#0284c7", bg: "#f0f9ff",  icon: <Star size={18} color="#0284c7" /> },
             { label: "Last Visit",    value: fmtDate(lastVisit),               color: "#d97706", bg: "#fffbeb",  icon: <Calendar size={18} color="#d97706" /> },
             { label: "Photos Saved",  value: totalPhotos,                      color: "#db2777", bg: "#fdf2f8",  icon: <Camera size={18} color="#db2777" /> },
           ].map((s) => (

@@ -591,7 +591,6 @@ export default function StaffProfilePage() {
           <StatCard label="Total Revenue"      value={fmt(stats.totalRev)}    sub="appointments + POS sales"     icon={TrendingUp}   color="#7C3AED" />
           <StatCard label="Services Done"      value={stats.servicesDone}      sub="completed + sold at POS"      icon={CheckCircle2} color="#059669" />
           <StatCard label="Total Appointments" value={stats.total}             sub={`${stats.upcoming.length} upcoming`} icon={Calendar}  color="#0284c7" />
-          <StatCard label="Avg Ticket"         value={fmt(stats.avgTicket)}    sub="per sale"                     icon={Star}         color="#d97706" />
           <StatCard label="Unique Clients"     value={stats.uniqueClients}     sub="clients served"               icon={Users}        color="#db2777" />
           <StatCard label="No-show Rate"       value={`${stats.noShowRate}%`}  sub={`${stats.noShow} no-shows`}  icon={XCircle}      color={stats.noShowRate > 20 ? "#dc2626" : "#9ca3af"} />
           <StatCard

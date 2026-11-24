@@ -390,11 +390,6 @@ export function exportClientPdf(
         <div class="kpi-lbl">Total Spend</div>
       </div>
       <div class="kpi-item">
-        <div class="kpi-icon">🎯</div>
-        <div class="kpi-val" style="color:#0284c7">${avgTicket ? fmtCur(avgTicket) : "—"}</div>
-        <div class="kpi-lbl">Avg Ticket</div>
-      </div>
-      <div class="kpi-item">
         <div class="kpi-icon">⭐</div>
         <div class="kpi-val" style="color:#d97706">${balance.toLocaleString()}</div>
         <div class="kpi-lbl">Loyalty Pts</div>
@@ -639,11 +634,6 @@ export function exportStaffPdf(
         <div class="kpi-icon">📅</div>
         <div class="kpi-val" style="color:#0284c7">${allMine.length}</div>
         <div class="kpi-lbl">Total Appts</div>
-      </div>
-      <div class="kpi-item">
-        <div class="kpi-icon">🎯</div>
-        <div class="kpi-val" style="color:#d97706">${avgTicket ? fmtCur(avgTicket) : "—"}</div>
-        <div class="kpi-lbl">Avg Ticket</div>
       </div>
       <div class="kpi-item">
         <div class="kpi-icon">👥</div>

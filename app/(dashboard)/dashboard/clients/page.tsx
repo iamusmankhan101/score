@@ -186,7 +186,6 @@ function ClientPanel({ client, onClose, appointments, locations, onUpdate, onDel
   const liveVisits   = Math.max(client.totalVisits ?? 0, apptVisits + posInvoices.length);
   const liveSpend    = Math.max(client.totalSpend  ?? 0, apptSpend + posInvoices.reduce((s, inv) => s + revenueAmount(inv), 0));
   const liveLastVisit = client.lastVisitDate ?? completedAppts[0]?.date;
-  const liveAvgTicket = liveVisits ? Math.round(liveSpend / liveVisits) : 0;
 
   // Loyalty — use the stored earned/balance fields (maintained by the loyalty system),
   // but floor-reconcile upward from liveSpend so un-synced older records still show correctly
@@ -302,11 +301,10 @@ function ClientPanel({ client, onClose, appointments, locations, onUpdate, onDel
 
           {/* Stats — live-computed from appointment history */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
               {[
                 { label: "Visits",     value: liveVisits,            color: "#7C3AED", bg: "#f5f3ff" },
                 { label: "Total Spend",value: fmt(liveSpend),        color: "#059669", bg: "#ecfdf5" },
-                { label: "Avg Ticket", value: liveAvgTicket ? fmt(liveAvgTicket) : "—", color: "#0284c7", bg: "#f0f9ff" },
                 { label: "Upcoming",   value: upcomingAppts.length,  color: "#d97706", bg: "#fffbeb" },
               ].map((s) => (
                 <div key={s.label} style={{ background: s.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>

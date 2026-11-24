@@ -243,7 +243,6 @@ function buildReportEmail(
 
   const revenue     = paid.reduce((s, i) => s + revenueAmount(i), 0);
   const outstanding = unpaid.reduce((s, i) => s + i.total, 0);
-  const avgTicket   = paid.length > 0 ? revenue / paid.length : 0;
   const totalDisc   = invoices.reduce((s, i) => s + i.discountAmount, 0);
 
   // Payment method breakdown
@@ -403,7 +402,6 @@ function buildReportEmail(
         <tr>
           ${statCard("Transactions", String(paid.length), `${unpaid.length} unpaid`, "#7C3AED")}
           ${statCard("Revenue", paid.length > 0 ? (revenue >= 100000 ? `${(revenue/1000).toFixed(1)}k` : pkr(revenue).replace("PKR ", "")) : "—", paid.length > 0 ? "PKR" : "", "#059669")}
-          ${statCard("Avg Ticket", avgTicket > 0 ? pkr(avgTicket).replace("PKR ", "") : "—", avgTicket > 0 ? "PKR" : "", "#0284c7")}
           ${statCard("Discounts", totalDisc > 0 ? pkr(totalDisc).replace("PKR ","") : "0", totalDisc > 0 ? "PKR saved" : "", "#d97706")}
         </tr>
       </table>
@@ -467,7 +465,7 @@ function buildReportEmail(
   const text = hasData
     ? `Daily Sales Report — ${salonName}\n${fmtDate(date)}\n\n` +
       `Transactions: ${paid.length} (${unpaid.length} unpaid)\n` +
-      `Revenue: ${pkr(revenue)}\nOutstanding: ${pkr(outstanding)}\nAvg Ticket: ${pkr(avgTicket)}\n\n` +
+      `Revenue: ${pkr(revenue)}\nOutstanding: ${pkr(outstanding)}\n\n` +
       `Top Items:\n${topItems.map(([n, d]) => `  • ${n}: ${d.qty}× — ${pkr(d.revenue)}`).join("\n")}\n\n` +
       ledgerText + `— Salon Central`
     : `Daily Sales Report — ${salonName}\n${fmtDate(date)}\n\nNo POS transactions recorded today.\n\n` + ledgerText + `— Salon Central`;

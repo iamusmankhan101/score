@@ -257,12 +257,9 @@ export default function RevenuePage() {
 
   const totalCount = currentAppts.length + currentPos.length + currentManual.length;
   const prevCount  = prevAppts.length  + prevPos.length  + prevManual.length;
-  const avgTicket  = totalCount ? totalRevenue / totalCount : 0;
-  const prevAvg    = prevCount  ? prevRevenue  / prevCount  : 0;
 
   const revChange = prevRevenue ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : 0;
   const cntChange = prevCount   ? ((totalCount   - prevCount)   / prevCount)   * 100 : 0;
-  const avgChange = prevAvg     ? ((avgTicket    - prevAvg)     / prevAvg)     * 100 : 0;
 
   // ── Chart data (1y / custom-long = monthly bars, else daily) ────────────────
   const chartData = useMemo((): ChartBar[] => {
@@ -344,7 +341,6 @@ export default function RevenuePage() {
   // Drill-down totals
   const drillTotal   = drillRows ? drillRows.reduce((s, r) => s + r.revenue, 0) : 0;
   const drillCount   = drillRows ? drillRows.reduce((s, r) => s + r.count, 0) : 0;
-  const drillAvg     = drillCount ? drillTotal / drillCount : 0;
 
   // Expenses for the drilled-into month — same paid-only filter as periodExpenses
   // below, just scoped to the selected month instead of the page's date range.
@@ -427,7 +423,6 @@ export default function RevenuePage() {
 
   const reportRevenue = reportAppts.reduce((s, a) => s + a.totalAmount, 0) + reportPos.reduce((s, inv) => s + revenueAmount(inv), 0) + reportManual.reduce((s, e) => s + e.amount, 0);
   const reportCount   = reportAppts.length + reportPos.length + reportManual.length;
-  const reportAvg     = reportCount ? reportRevenue / reportCount : 0;
 
   const reportMethodBreakdown = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -624,7 +619,6 @@ export default function RevenuePage() {
 
     const pdfTotal   = isYearDrill ? drillTotal   : totalRevenue;
     const pdfCount   = isYearDrill ? drillCount   : totalCount;
-    const pdfAvg     = isYearDrill ? drillAvg     : avgTicket;
     const pdfExpenses    = isYearDrill ? drillExpenses    : totalExpenses;
     const pdfNetProfit = isYearDrill ? drillNetProfit : netProfit;
     const pdfNetMarginPct = pdfTotal ? (pdfNetProfit / pdfTotal) * 100 : 0;
@@ -724,11 +718,6 @@ export default function RevenuePage() {
       <div class="stat-value">${pdfCount}</div>
       <div class="stat-sub">Completed services</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-label">Avg Ticket</div>
-      <div class="stat-value">${fmt(pdfAvg)}</div>
-      <div class="stat-sub">Per appointment</div>
-    </div>
   </div>
 
   ${!isYearDrill ? `
@@ -816,26 +805,22 @@ export default function RevenuePage() {
           <th>Day</th>
           <th style="text-align:center">Appts</th>
           <th style="text-align:right">Revenue</th>
-          <th style="text-align:right">Avg Ticket</th>
         </tr>
       </thead>
       <tbody>
         ${tableRows.map(row => {
-          const avg = row.count ? row.revenue / row.count : 0;
           return `
           <tr>
             <td>${row.date}</td>
             <td class="muted">${row.dow ?? ""}</td>
             <td style="text-align:center">${row.count}</td>
             <td class="amount" style="text-align:right">${fmt(row.revenue)}</td>
-            <td style="text-align:right" class="muted">${avg ? fmt(avg) : "—"}</td>
           </tr>`;
         }).join("")}
         <tr class="total-row">
           <td colspan="2"><strong>Total</strong></td>
           <td style="text-align:center"><strong>${pdfCount}</strong></td>
           <td style="text-align:right"><strong>${fmt(pdfTotal)}</strong></td>
-          <td style="text-align:right"><strong>${fmt(pdfAvg)}</strong></td>
         </tr>
       </tbody>
     </table>
@@ -856,7 +841,6 @@ export default function RevenuePage() {
   const tableRows    = selectedMonth ? (drillRows ?? []) : dailyRows;
   const tableTotal   = selectedMonth ? drillTotal   : totalRevenue;
   const tableCount   = selectedMonth ? drillCount   : totalCount;
-  const tableAvg     = selectedMonth ? drillAvg     : avgTicket;
 
   // Shared by the desktop tabs and the mobile ones.
   const netProfitView = (
@@ -948,7 +932,6 @@ export default function RevenuePage() {
         <div className="mobile-stat-scroll">
           {[
             { label: "Appointments", value: String(totalCount), color: "#3b82f6", change: cntChange },
-            { label: "Avg Ticket",   value: fmtK(avgTicket),   color: "#059669", change: avgChange },
           ].map((s) => (
             <div key={s.label} className="mobile-stat-card">
               <div className="mobile-stat-card-label">{s.label}</div>
@@ -1123,10 +1106,6 @@ export default function RevenuePage() {
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "#a0a0b8", letterSpacing: "0.06em", textTransform: "uppercase" }}>Appts</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: "#3b82f6" }}>{reportCount}</div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#a0a0b8", letterSpacing: "0.06em", textTransform: "uppercase" }}>Avg Ticket</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: "#059669" }}>{reportCount ? fmt(reportAvg) : "—"}</div>
             </div>
             <div style={{ color: "#c0c0d0" }}>
               {dailyReportOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -1533,10 +1512,6 @@ export default function RevenuePage() {
                 <div style={{ fontSize: 18, fontWeight: 800, color: "#3b82f6" }}>{drillCount}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 11, color: "#a0a0b8", fontWeight: 600 }}>AVG TICKET</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#059669" }}>{fmt(drillAvg)}</div>
-              </div>
-              <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 11, color: "#a0a0b8", fontWeight: 600 }}>TOTAL</div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: "#7C3AED" }}>{fmt(drillTotal)}</div>
               </div>
@@ -1546,8 +1521,8 @@ export default function RevenuePage() {
 
         <div className="table-scroll-inner"><div className="rev-table-inner">
         {/* Column headers */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 100px 1.2fr 1.2fr", padding: "10px 24px", background: "#fafafa", borderBottom: "1px solid #f0f0f8" }}>
-          {["DATE", "DAY", "APPTS", "REVENUE", "AVG TICKET"].map(h => (
+        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 100px 1.2fr", padding: "10px 24px", background: "#fafafa", borderBottom: "1px solid #f0f0f8" }}>
+          {["DATE", "DAY", "APPTS", "REVENUE"].map(h => (
             <div key={h} style={{ fontSize: 10, fontWeight: 700, color: "#b0b0c8", letterSpacing: "0.08em" }}>{h}</div>
           ))}
         </div>
@@ -1559,12 +1534,11 @@ export default function RevenuePage() {
           </div>
         ) : tableRows.map((row, i) => {
           const isToday = row.date === today;
-          const avg = row.count ? row.revenue / row.count : 0;
           return (
             <div
               key={row.date}
               style={{
-                display: "grid", gridTemplateColumns: "1.6fr 1fr 100px 1.2fr 1.2fr",
+                display: "grid", gridTemplateColumns: "1.6fr 1fr 100px 1.2fr",
                 padding: "11px 24px",
                 borderBottom: i === tableRows.length - 1 ? "none" : "1px solid #f8f8fc",
                 alignItems: "center",
@@ -1578,20 +1552,18 @@ export default function RevenuePage() {
               <div style={{ fontSize: 13, color: "#6b6b8a" }}>{row.dow}</div>
               <div style={{ fontSize: 13, fontWeight: 500, color: "#1a1a2e" }}>{row.count}</div>
               <div style={{ fontSize: 13, fontWeight: 700, color: row.revenue > 0 ? "#7C3AED" : "#c0c0d0" }}>{fmt(row.revenue)}</div>
-              <div style={{ fontSize: 13, color: "#6b6b8a" }}>{avg ? fmt(avg) : "—"}</div>
             </div>
           );
         })}
 
         {/* Footer totals */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 100px 1.2fr 1.2fr", padding: "13px 24px", background: "#fafafa", borderTop: "1px solid #f0f0f8" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 100px 1.2fr", padding: "13px 24px", background: "#fafafa", borderTop: "1px solid #f0f0f8" }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a2e" }}>
             {selectedMonth ? selectedMonthLabel : `Total (${cfg.label})`}
           </div>
           <div />
           <div style={{ fontSize: 13, fontWeight: 700, color: "#7C3AED" }}>{tableCount}</div>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#7C3AED" }}>{fmt(tableTotal)}</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#6b6b8a" }}>{tableAvg ? fmt(tableAvg) : "—"}</div>
         </div>
         </div></div>{/* /rev-table-inner /table-scroll-inner */}
       </div>{/* /table-scroll-wrap */}
