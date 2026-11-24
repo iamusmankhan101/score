@@ -149,12 +149,19 @@ function collectPerformances(
   const invoicedAppointmentIds = new Set<string>();
   for (const invoice of invoices) {
     if (invoice.appointmentId) invoicedAppointmentIds.add(invoice.appointmentId);
-    if (!inWindow(invoice.date, window)) continue;
+    // An advance with no booking behind it: nothing has been done yet, so it uses
+    // stock only once the balance is collected — dated and timed by that payment.
+    const advanceOnly = !invoice.appointmentId && (invoice.advanceAmount ?? 0) > 0;
+    if (advanceOnly && invoice.status === "partial") continue;
+    const receipt = advanceOnly ? invoices.find((i) => i.balanceInvoiceOf === invoice.id) : undefined;
+    const doneDate = advanceOnly ? (receipt?.date ?? invoice.paidDate ?? invoice.date) : invoice.date;
+    if (!inWindow(doneDate, window)) continue;
     for (const line of invoice.items) {
       if (line.type !== "service") continue;
       const sold = resolveService(line, byId, byName);
       if (!sold) continue;
       let at = Date.parse(invoice.createdAt) || new Date(`${invoice.date}T12:00:00`).getTime();
+      if (advanceOnly) at = Date.parse(receipt?.createdAt ?? "") || new Date(`${doneDate}T12:00:00`).getTime();
       const appointment = invoice.appointmentId ? appointmentById.get(invoice.appointmentId) : undefined;
       // An advance taken on a booking: nothing has been performed yet. It
       // counts once the appointment is completed.
@@ -170,7 +177,7 @@ function collectPerformances(
         at = booked ? doneAt : Math.max(at, doneAt);
       }
       for (const service of performedServices(sold, byId)) {
-        performances.push({ service, count: Math.max(1, line.qty), date: invoice.date, at, who: line.guestName ?? invoice.clientName ?? "", clientId: line.guestName ? undefined : invoice.clientId, ref: `inv:${invoice.id}:${line.id}:${service.id}` });
+        performances.push({ service, count: Math.max(1, line.qty), date: doneDate, at, who: line.guestName ?? invoice.clientName ?? "", clientId: line.guestName ? undefined : invoice.clientId, ref: `inv:${invoice.id}:${line.id}:${service.id}` });
       }
     }
   }
