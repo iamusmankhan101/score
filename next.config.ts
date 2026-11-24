@@ -44,7 +44,7 @@ const nextConfig: NextConfig = {
   // Files server code reads from disk aren't part of a serverless function by default:
   // the WhatsApp invoice PDF reads FBR's logo from /public.
   outputFileTracingIncludes: {
-    "/api/**": ["./public/fbr-pos-logo.png", "./public/report-logo.png"],
+    "/api/**": ["./public/fbr-pos-logo.png", "./public/report-logo.png", "./public/templates/mehak-rx-pad.png"],
     // Read at request time by app/(dashboard)/dashboard/salonflow/route.ts.
     "/dashboard/salonflow": ["./lib/salonflow.html"],
   },
