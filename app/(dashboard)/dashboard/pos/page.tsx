@@ -875,7 +875,8 @@ export default function POSPage() {
       // A booking already counted its visit and amount on the client when it was
       // made, so checking out must not count them again (only any price change).
       const bookedAmount = checkoutAppointmentId
-        ? getStoredAppointments().find(a => a.id === checkoutAppointmentId)?.totalAmount ?? 0
+        // Multi-day: every day was credited when booked, and the invoice covers them all.
+        ? getStoredAppointments().filter(a => checkoutGroupIds.length > 1 ? checkoutGroupIds.includes(a.id) : a.id === checkoutAppointmentId).reduce((s, a) => s + a.totalAmount, 0)
         : 0;
       if (checkoutAppointmentId) {
         const advanceOnly = !isCredit && isAdvance;
