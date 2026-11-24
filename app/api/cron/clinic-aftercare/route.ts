@@ -94,6 +94,10 @@ async function runForBranch(userId: string, locationId: string, settings: Record
     for (const p of perfs) {
       if (p.date !== latest.get(`${p.clientId}|${p.service.id}`) || !inWindow(addDays(p.date, rv.days))) continue;
       if ([...declined].some((s) => p.ref.startsWith(s))) continue;
+      // Only services that have an aftercare set up for them (a flow linked by id or keyword), not every service.
+      if (flowsForService(p.service, aftercareFlows(clinicSettings, isClinic)).length === 0) continue;
+      // Salons: and only lines ticked at billing, same as the aftercare steps below.
+      if (!isClinic && !invoices.some((inv) => inv.items.some((l) => l.aftercare && p.ref.startsWith(`inv:${inv.id}:${l.id}:`)))) continue;
       const client = clientById.get(p.clientId!);
       if (!client) continue;
       await queue(`aftercare_${client.id}_revisit_${p.service.id}_${p.date}`, client,
