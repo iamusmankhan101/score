@@ -17,6 +17,8 @@ export interface ReportInvoice {
   paymentMethod: string;
   cardTerminal?: string;
   status: "paid" | "unpaid" | "partial";
+  /** Money actually received (an advance's part of the total); falls back to total. */
+  received?: number;
 }
 
 export interface DailyReportData {
@@ -184,9 +186,10 @@ const keepTogether = (rows: number) => rows <= 15;
 function DailyReportPDF({ data, logo }: { data: DailyReportData; logo?: Buffer }) {
   const { salonName, ownerName, date, invoices, ledger, salonLogo } = data;
 
-  const paid     = invoices.filter((i) => i.status === "paid");
+  const paid     = invoices.filter((i) => i.status === "paid" || i.status === "partial"); // partial = advance taken
+  const got      = (i: ReportInvoice) => i.received ?? i.total;
   const unpaid   = invoices.filter((i) => i.status === "unpaid");
-  const revenue  = paid.reduce((s, i) => s + i.total, 0);
+  const revenue  = paid.reduce((s, i) => s + got(i), 0);
   const outstanding = unpaid.reduce((s, i) => s + i.total, 0);
   const avgTicket   = paid.length > 0 ? revenue / paid.length : 0;
   const totalDisc   = invoices.reduce((s, i) => s + i.discountAmount, 0);
@@ -198,7 +201,7 @@ function DailyReportPDF({ data, logo }: { data: DailyReportData; logo?: Buffer }
     const m = inv.paymentMethod === "card" && inv.cardTerminal ? `Card · ${inv.cardTerminal}` : inv.paymentMethod || "other";
     if (!byMethod[m]) byMethod[m] = { count: 0, amount: 0 };
     byMethod[m].count++;
-    byMethod[m].amount += inv.total;
+    byMethod[m].amount += got(inv);
   }
   const methodEntries = Object.entries(byMethod).sort((a, b) => b[1].amount - a[1].amount);
 
@@ -219,7 +222,7 @@ function DailyReportPDF({ data, logo }: { data: DailyReportData; logo?: Buffer }
     const name = inv.staffName || "Unassigned";
     if (!staffMap[name]) staffMap[name] = { count: 0, revenue: 0 };
     staffMap[name].count++;
-    staffMap[name].revenue += inv.total;
+    staffMap[name].revenue += got(inv);
   }
   const staffEntries = Object.entries(staffMap).sort((a, b) => b[1].revenue - a[1].revenue);
 
@@ -395,12 +398,12 @@ function DailyReportPDF({ data, logo }: { data: DailyReportData; logo?: Buffer }
                     <Text style={[s.tableCellBold, { flex: 2.5 }]}>{inv.clientName}</Text>
                     <Text style={[s.tableCell, { flex: 2 }]}>{inv.staffName || "—"}</Text>
                     <Text style={[s.tableCell, { flex: 1.5 }]}>{METHOD_LABELS[inv.paymentMethod] ?? inv.paymentMethod}</Text>
-                    <Text style={[s.tableCellBold, { flex: 1.5, textAlign: "right" }]}>{pkr(inv.total)}</Text>
+                    <Text style={[s.tableCellBold, { flex: 1.5, textAlign: "right" }]}>{pkr(got(inv))}</Text>
                     <Text style={[
                       s.tableCell, { flex: 1, textAlign: "center", fontFamily: "Helvetica-Bold",
-                        color: inv.status === "paid" ? "#059669" : "#d97706" },
+                        color: inv.status === "unpaid" ? "#d97706" : "#059669" },
                     ]}>
-                      {inv.status === "paid" ? "Paid" : "Unpaid"}
+                      {inv.status === "paid" ? "Paid" : inv.status === "partial" ? "Advance" : "Unpaid"}
                     </Text>
                   </View>
                 ))}

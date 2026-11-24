@@ -525,7 +525,7 @@ export async function GET(req: NextRequest) {
     // Generate PDF attachment
     let pdfBuffer: Buffer | undefined;
     try {
-      pdfBuffer = await generateDailyReportPdf({ salonName, ownerName: user.ownerName, date: today, invoices, ledger, salonLogo });
+      pdfBuffer = await generateDailyReportPdf({ salonName, ownerName: user.ownerName, date: today, invoices: linkBalanceReceipts(invoices).map((i) => ({ ...i, received: revenueAmount(i) })), ledger, salonLogo });
     } catch (e) {
       console.error(`[daily-report] PDF generation failed for ${user.email}:`, e);
     }
