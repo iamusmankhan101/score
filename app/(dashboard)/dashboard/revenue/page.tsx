@@ -400,8 +400,8 @@ export default function RevenuePage() {
   // Custom selections drive a combined report for their entire date range.
   // Preset periods keep this card as today's operational snapshot.
   const customReportRange = period === "custom" && customStart <= customEnd;
-  const reportStart = customReportRange ? customStart : today;
-  const reportEnd = customReportRange ? customEnd : today;
+  const reportStart = period === "custom" ? (customReportRange ? customStart : today) : rangeStart;
+  const reportEnd = period === "custom" ? (customReportRange ? customEnd : today) : filterEnd;
   const reportHasMultipleDays = reportStart !== reportEnd;
   const reportAppts = useMemo(() =>
     appointments
@@ -1092,9 +1092,9 @@ export default function RevenuePage() {
               <Receipt size={17} color="#7C3AED" />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: "#1a1a2e" }}>Daily Report</div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#1a1a2e" }}>{reportHasMultipleDays ? `${period === "custom" ? "Custom" : cfg.label} Report` : "Daily Report"}</div>
               <div style={{ fontSize: 12, color: "#a0a0b8", marginTop: 2 }}>
-                {reportHasMultipleDays ? `${reportStart} → ${reportEnd} · Combined range activity` : `${reportStart} · ${reportStart === today ? "Today’s activity" : "Selected day activity"}`}
+                {reportHasMultipleDays ? `${reportStart} → ${reportEnd} · Combined activity` : `${reportStart} · ${reportStart === today ? "Today’s activity" : "Selected day activity"}`}
               </div>
             </div>
           </div>
