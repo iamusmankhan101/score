@@ -2402,6 +2402,20 @@ export default function POSPage() {
           onSaved={(updated) => {
             setPrintInvoice(updated);
             setLastInvoice(updated);
+            // Client already has the old copy on WhatsApp — send the revised one.
+            const client = updated.clientId ? getStoredClients().find(c => c.id === updated.clientId) : undefined;
+            const phone = updated.clientPhone || client?.phone || "";
+            const name  = updated.clientName || client?.name || "";
+            if (!phone) {
+              setHoldNotice({ ok: false, message: "Invoice updated — no phone number on it, so it wasn't sent on WhatsApp." });
+            } else {
+              void queueInvoiceReceipt(updated, { name, phone }, { resend: true }).then(result =>
+                setHoldNotice(
+                  result === "queued" ? { ok: true, message: `Updated invoice ${updated.number} will be sent to ${name || phone} on WhatsApp shortly.` }
+                  : result === "skipped" ? { ok: false, message: "Invoice updated — WhatsApp automation is off, so it wasn't sent." }
+                  : { ok: false, message: "Invoice updated, but it couldn't be queued on WhatsApp. Check Settings → WhatsApp." }
+                ));
+            }
           }}
         />
       )}

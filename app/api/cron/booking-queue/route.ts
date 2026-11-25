@@ -247,13 +247,22 @@ async function updateItem(item: QueueRow, status: "sent" | "pending" | "expired"
 // salon's own alert stay fast.
 const DEFER_MIN_GAP_MS = 5 * MINUTE_MS;
 const DEFER_MAX_GAP_MS = 10 * MINUTE_MS;
-async function spacedFromPending(item: QueueRow, wantedMs: number): Promise<number> {
+// Looks across BOTH queues (booking messages and POS invoices) — checking only
+// its own table let an invoice and a confirmation land on the same minute.
+async function spacedFromPending(item: { userId: string; id: string; kind?: string; table: "b" | "p" }, wantedMs: number): Promise<number> {
   if (item.kind === "confirmation" || item.kind === "groupalert") return wantedMs;
   for (let step = 0; step < 100; step++) { // each step jumps past one more row; the cap is a safety net
+    const lo = new Date(wantedMs - DEFER_MIN_GAP_MS).toISOString();
+    const hi = new Date(wantedMs + DEFER_MIN_GAP_MS).toISOString();
     const r = await db.execute({
-      sql: `SELECT MAX(scheduled_at) AS ts FROM wa_booking_send_queue
-            WHERE user_id = ? AND status = 'pending' AND id != ? AND scheduled_at > ? AND scheduled_at < ?`,
-      args: [item.userId, item.id, new Date(wantedMs - DEFER_MIN_GAP_MS).toISOString(), new Date(wantedMs + DEFER_MIN_GAP_MS).toISOString()],
+      sql: `SELECT MAX(ts) AS ts FROM (
+              SELECT scheduled_at AS ts FROM wa_booking_send_queue
+               WHERE user_id = ? AND status = 'pending' AND NOT (? = 'b' AND id = ?) AND scheduled_at > ? AND scheduled_at < ?
+              UNION ALL
+              SELECT scheduled_at AS ts FROM wa_pos_receipt_queue
+               WHERE user_id = ? AND status = 'pending' AND NOT (? = 'p' AND invoice_id = ?) AND scheduled_at > ? AND scheduled_at < ?
+            )`,
+      args: [item.userId, item.table, item.id, lo, hi, item.userId, item.table, item.id, lo, hi],
     });
     const clash = Date.parse(String(r.rows[0]?.ts ?? ""));
     if (!Number.isFinite(clash)) break;
@@ -263,7 +272,7 @@ async function spacedFromPending(item: QueueRow, wantedMs: number): Promise<numb
 }
 
 async function deferItem(item: QueueRow, delayMs: number, reason: string) {
-  const when = await spacedFromPending(item, Date.now() + delayMs);
+  const when = await spacedFromPending({ userId: item.userId, id: item.id, kind: item.kind, table: "b" }, Date.now() + delayMs);
   await db.execute({
     sql: `UPDATE wa_booking_send_queue
           SET scheduled_at = ?, last_error = ?
@@ -436,12 +445,13 @@ async function updatePosReceipt(
 }
 
 async function deferPosReceipt(item: PosReceiptRow, delayMs: number, reason: string) {
+  const when = await spacedFromPending({ userId: item.userId, id: item.invoiceId, table: "p" }, Date.now() + delayMs);
   await db.execute({
     sql: `UPDATE wa_pos_receipt_queue
           SET scheduled_at = ?, last_error = ?
           WHERE user_id = ? AND invoice_id = ? AND status = 'pending'`,
     args: [
-      new Date(Date.now() + delayMs).toISOString(),
+      new Date(when).toISOString(),
       reason,
       item.userId,
       item.invoiceId,
