@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       suspended: user.suspended,
       reason: user.suspensionReason ?? null,
+      paymentNotice: user.paymentNotice,
     });
   } catch (err) {
     console.error("[billing/status] error:", err);

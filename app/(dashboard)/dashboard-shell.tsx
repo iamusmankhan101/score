@@ -609,6 +609,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [outStockCount,     setOutStockCount]     = useState(0);
   const [unpaidInvoice, setUnpaidInvoice] = useState<{ number: string; amount: number; status: string; dueDate: string } | null>(null);
   const [invoiceBadgeDismissed, setInvoiceBadgeDismissed] = useState(false);
+  const adminNoticeShown = useRef(false); // an admin-set notice wins over the invoice-derived one
   const [waStatus,      setWaStatus]       = useState<"unknown" | "connected" | "disconnected">("unknown");
   const [waBannerDismissed, setWaBannerDismissed] = useState(false);
   const [locationRenderKey, setLocationRenderKey] = useState(() => getActiveLocationFilter());
@@ -807,7 +808,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         fetch(`/api/billing/invoices?userId=${encodeURIComponent(dataOwnerId)}`)
           .then((r) => r.json())
           .then((data: { ok: boolean; invoices?: Invoice[] }) => {
-            if (!data.ok || !data.invoices) return;
+            if (!data.ok || !data.invoices || adminNoticeShown.current) return;
             // Only surface the banner once the invoice is actually due (or overdue) —
             // not the moment it's issued, which can be weeks before the due date.
             const today = new Date().toISOString().slice(0, 10);
@@ -831,10 +832,16 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     // Check suspension status
     if (user.role !== "staff") fetch(`/api/billing/status?userId=${encodeURIComponent(dataOwnerId)}`)
       .then((r) => r.json())
-      .then((data: { ok: boolean; suspended?: boolean; reason?: string | null }) => {
+      .then((data: { ok: boolean; suspended?: boolean; reason?: string | null; paymentNotice?: { amount: number; dueDate: string } | null }) => {
         if (data.ok && data.suspended) {
           setSuspended(true);
           setSuspReason(data.reason ?? null);
+        }
+        // Admin switched the "payment pending" banner on for this salon.
+        if (data.ok && data.paymentNotice) {
+          adminNoticeShown.current = true;
+          setUnpaidInvoice({ number: "Payment pending", amount: data.paymentNotice.amount, status: "due", dueDate: data.paymentNotice.dueDate });
+          setInvoiceBadgeDismissed(false);
         }
       })
       .catch(() => { /* fail open */ });
@@ -1246,11 +1253,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 Salon Central Subscription
               </div>
               <div style={{ fontSize: 11, color: "#9898b0", marginBottom: 10 }}>
-                {unpaidInvoice.number} · Due {unpaidInvoice.dueDate}
+                {unpaidInvoice.number}{unpaidInvoice.dueDate ? ` · Due ${unpaidInvoice.dueDate}` : ""}
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontSize: 16, fontWeight: 800, color: unpaidInvoice.status === "overdue" ? "#dc2626" : "#d97706" }}>
-                  PKR {unpaidInvoice.amount.toLocaleString()}
+                  {unpaidInvoice.amount > 0 ? `PKR ${unpaidInvoice.amount.toLocaleString()}` : ""}
                 </span>
                 <Link
                   href="/dashboard/billing"

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, XCircle, Clock, ImageIcon, ChevronDown, ChevronUp, Shield, Store, Pencil, Save, Ban, Trash2, AlertTriangle, X, ReceiptText, Users as UsersIcon, BadgeCheck, Landmark, Archive, Database, RotateCcw, Lock, LockOpen, Snowflake, KeyRound, Mail, Copy, LayoutDashboard, Banknote, LogOut, RefreshCw, FileText, ShoppingCart, Monitor, Smartphone, Tablet } from "lucide-react";
+import { CheckCircle, XCircle, Clock, ImageIcon, ChevronDown, ChevronUp, Shield, Store, Pencil, Save, Ban, Trash2, AlertTriangle, X, ReceiptText, Users as UsersIcon, BadgeCheck, Landmark, Bell, Archive, Database, RotateCcw, Lock, LockOpen, Snowflake, KeyRound, Mail, Copy, LayoutDashboard, Banknote, LogOut, RefreshCw, FileText, ShoppingCart, Monitor, Smartphone, Tablet } from "lucide-react";
 import { getCurrentUser, signOut } from "@/lib/auth";
 import PointlyConsole from "@/components/pointly-admin/console";
 import {
@@ -31,6 +31,7 @@ interface BillingUserRow {
   suspended: boolean;
   suspensionReason: string | null;
   paymentMethodId: string | null;
+  paymentNotice: { amount: number; dueDate: string } | null;
 }
 
 interface PaymentMethodRow {
@@ -571,6 +572,76 @@ function PaymentMethodModal({ row, methods, onClose, onSaved }: {
   );
 }
 
+function PaymentNoticeModal({ row, onClose, onSaved }: {
+  row: BillingUserRow;
+  onClose: () => void;
+  onSaved: (userId: string, notice: BillingUserRow["paymentNotice"]) => void;
+}) {
+  const [show, setShow] = useState(!!row.paymentNotice);
+  const [amount, setAmount] = useState(row.paymentNotice?.amount ? String(row.paymentNotice.amount) : "");
+  const [dueDate, setDueDate] = useState(row.paymentNotice?.dueDate ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/billing/set-payment-notice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: row.id, show, amount: Number(amount) || 0, dueDate }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Failed to save");
+      onSaved(row.id, show ? { amount: Number(amount) || 0, dueDate } : null);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const input = { width: "100%", padding: "10px 13px", borderRadius: 9, border: "1px solid #e4e4ee", fontSize: 13, outline: "none", boxSizing: "border-box" as const };
+  return (
+    <div onClick={saving ? undefined : onClose} style={{ position: "fixed", inset: 0, background: "rgba(17,17,27,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, width: 440, maxWidth: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.25)", overflow: "hidden" }}>
+        <div style={{ padding: "20px 24px", borderBottom: "1px solid #f0f0f8", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a2e" }}>Payment pending banner</div>
+            <div style={{ fontSize: 12, color: "#9898b0" }}>{row.salonName}</div>
+          </div>
+          <button onClick={onClose} disabled={saving} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "#9898b0" }}><X size={16} /></button>
+        </div>
+        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, fontWeight: 700, color: "#1a1a2e", cursor: "pointer" }}>
+            <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} disabled={saving} />
+            Show &quot;payment pending&quot; banner in this salon&apos;s dashboard
+          </label>
+          <div style={{ opacity: show ? 1 : 0.5 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b6b8a", marginBottom: 6 }}>Amount (PKR) — optional</div>
+            <input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} disabled={saving || !show} style={input} />
+          </div>
+          <div style={{ opacity: show ? 1 : 0.5 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b6b8a", marginBottom: 6 }}>Due date — optional</div>
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} disabled={saving || !show} style={input} />
+          </div>
+          {error && <div style={{ fontSize: 12, color: "#dc2626" }}>{error}</div>}
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={onClose} disabled={saving}
+              style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid #e8e8f0", background: "#fff", fontSize: 13, fontWeight: 700, color: "#6b6b8a", cursor: saving ? "not-allowed" : "pointer" }}>Cancel</button>
+            <button onClick={save} disabled={saving}
+              style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "none", background: saving ? "#f4f5f7" : "#7C3AED", fontSize: 13, fontWeight: 700, color: saving ? "#c4c4d4" : "#fff", cursor: saving ? "not-allowed" : "pointer" }}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function InvoicesModal({ row, onClose, onMarkedPaid }: { row: BillingUserRow; onClose: () => void; onMarkedPaid: (userId: string) => void }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -736,6 +807,7 @@ function SalonAccountsPanel() {
   const [deleteTarget, setDeleteTarget] = useState<BillingUserRow | null>(null);
   const [invoiceTarget, setInvoiceTarget] = useState<BillingUserRow | null>(null);
   const [paymentTarget, setPaymentTarget] = useState<BillingUserRow | null>(null);
+  const [noticeTarget, setNoticeTarget] = useState<BillingUserRow | null>(null);
   const [unsuspendingId, setUnsuspendingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -785,6 +857,10 @@ function SalonAccountsPanel() {
     }
   }
 
+  function handleNoticeSaved(userId: string, paymentNotice: BillingUserRow["paymentNotice"]) {
+    setRows((prev) => prev.map((r) => (r.id === userId ? { ...r, paymentNotice } : r)));
+  }
+
   function handlePaymentMethodSaved(userId: string, paymentMethodId: string | null) {
     setRows((prev) => prev.map((r) => (r.id === userId ? { ...r, paymentMethodId } : r)));
   }
@@ -812,8 +888,8 @@ function SalonAccountsPanel() {
         style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #e4e4ee", fontSize: 13, outline: "none", maxWidth: 340 }}
       />
       <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #ebebf0", overflow: "hidden", overflowX: "auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 130px 190px 210px 96px 40px 44px", minWidth: 860, padding: "10px 20px", background: "#fafafa", borderBottom: "1px solid #f0f0f8" }}>
-          {["SALON", "PLAN", "STATUS", "TERM / PRICE", "INVOICES", "", ""].map((h, i) => (
+        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 130px 190px 210px 96px 40px 40px 44px", minWidth: 860, padding: "10px 20px", background: "#fafafa", borderBottom: "1px solid #f0f0f8" }}>
+          {["SALON", "PLAN", "STATUS", "TERM / PRICE", "INVOICES", "", "", ""].map((h, i) => (
             <div key={i} style={{ fontSize: 10, fontWeight: 800, color: "#b0b0c8", letterSpacing: "0.08em" }}>{h}</div>
           ))}
         </div>
@@ -821,7 +897,7 @@ function SalonAccountsPanel() {
           <div style={{ padding: "40px", textAlign: "center", fontSize: 13, color: "#9898b0" }}>No salon accounts found</div>
         ) : (
           filtered.map((row, i) => (
-            <div key={row.id} style={{ display: "grid", gridTemplateColumns: "1.4fr 130px 190px 210px 96px 40px 44px", minWidth: 860, padding: "14px 20px", alignItems: "center", borderBottom: i < filtered.length - 1 ? "1px solid #f4f4f8" : "none" }}>
+            <div key={row.id} style={{ display: "grid", gridTemplateColumns: "1.4fr 130px 190px 210px 96px 40px 40px 44px", minWidth: 860, padding: "14px 20px", alignItems: "center", borderBottom: i < filtered.length - 1 ? "1px solid #f4f4f8" : "none" }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a2e" }}>{row.salonName}</div>
                 <div style={{ fontSize: 11, color: "#9898b0", marginTop: 1 }}>{row.ownerName} · {row.email}</div>
@@ -853,6 +929,11 @@ function SalonAccountsPanel() {
                 onMouseLeave={(e) => (e.currentTarget.style.color = row.paymentMethodId ? "#7C3AED" : "#c4c4d4")}>
                 <Landmark size={14} />
               </button>
+              <button onClick={() => setNoticeTarget(row)}
+                title={row.paymentNotice ? "Payment pending banner: ON" : "Show payment pending banner"}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 6, color: row.paymentNotice ? "#d97706" : "#c4c4d4", display: "flex", justifySelf: "start" }}>
+                <Bell size={14} />
+              </button>
               <button onClick={() => setDeleteTarget(row)} title="Delete account"
                 style={{ background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 6, color: "#c4c4d4", display: "flex", justifySelf: "start" }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = "#dc2626")}
@@ -869,6 +950,9 @@ function SalonAccountsPanel() {
       )}
       {invoiceTarget && (
         <InvoicesModal row={invoiceTarget} onClose={() => setInvoiceTarget(null)} onMarkedPaid={handleMarkedPaid} />
+      )}
+      {noticeTarget && (
+        <PaymentNoticeModal row={noticeTarget} onClose={() => setNoticeTarget(null)} onSaved={handleNoticeSaved} />
       )}
       {paymentTarget && (
         <PaymentMethodModal row={paymentTarget} methods={methods} onClose={() => setPaymentTarget(null)} onSaved={handlePaymentMethodSaved} />

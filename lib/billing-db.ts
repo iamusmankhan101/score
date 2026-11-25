@@ -118,6 +118,8 @@ export async function ensureBillingTables(): Promise<void> {
     // Which payment_methods row (if any) this salon's invoice should show —
     // null means "use DEFAULT_BANK_DETAILS", so existing accounts are unaffected.
     ["billing_users",    "payment_method_id", "TEXT"],
+    // Admin-switched "payment pending" banner for this salon: JSON {amount?, dueDate?}, null = off.
+    ["billing_users",    "payment_notice",    "TEXT"],
     // Added after payment_methods' initial release — backfills existing rows
     // with an empty string rather than leaving them without the column.
     ["payment_methods",  "bank_name",         "TEXT NOT NULL DEFAULT ''"],
@@ -153,7 +155,11 @@ export interface BillingUser {
   createdAt: string;
   /** Which payment_methods row this salon's invoice shows — null means "use DEFAULT_BANK_DETAILS". */
   paymentMethodId: string | null;
+  /** Admin-switched "payment pending" banner shown in the salon's dashboard — null means off. */
+  paymentNotice: PaymentNotice | null;
 }
+
+export interface PaymentNotice { amount: number; dueDate: string } // 0 / "" = not shown
 
 export interface PaymentMethod {
   id: string;
@@ -216,7 +222,16 @@ function rowToUser(r: any): BillingUser {
     suspensionReason: (r.suspension_reason as string) ?? null,
     createdAt:        r.created_at as string,
     paymentMethodId:  (r.payment_method_id as string) || null,
+    paymentNotice:    parsePaymentNotice(r.payment_notice),
   };
+}
+
+function parsePaymentNotice(raw: unknown): PaymentNotice | null {
+  if (typeof raw !== "string" || !raw) return null;
+  try {
+    const n = JSON.parse(raw) as Partial<PaymentNotice>;
+    return { amount: Number(n.amount) || 0, dueDate: n.dueDate || "" };
+  } catch { return null; }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -297,7 +312,7 @@ export function invoiceDueDays(termMonths: number): number {
 // ─── Billing Users ─────────────────────────────────────────────────────────────
 
 export async function upsertBillingUser(
-  user: Omit<BillingUser, "billingTermMonths" | "billingAnchor" | "suspended" | "suspensionReason" | "createdAt" | "paymentMethodId"> & { billingTermMonths?: BillingUser["billingTermMonths"] }
+  user: Omit<BillingUser, "billingTermMonths" | "billingAnchor" | "suspended" | "suspensionReason" | "createdAt" | "paymentMethodId" | "paymentNotice"> & { billingTermMonths?: BillingUser["billingTermMonths"] }
 ): Promise<void> {
   await db.execute({
     sql: `
@@ -400,6 +415,14 @@ export async function setCustomPlanPrice(userId: string, price: number, billingT
   await db.execute({
     sql: "UPDATE billing_users SET plan_price = ?, billing_term_months = ? WHERE id = ?",
     args: [price, billingTermMonths, userId],
+  });
+}
+
+/** Admin: show (or with null, hide) the "payment pending" banner in this salon's dashboard. */
+export async function setPaymentNotice(userId: string, notice: PaymentNotice | null): Promise<void> {
+  await db.execute({
+    sql: "UPDATE billing_users SET payment_notice = ? WHERE id = ?",
+    args: [notice ? JSON.stringify(notice) : null, userId],
   });
 }
 
