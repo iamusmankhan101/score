@@ -31,6 +31,23 @@ const CATEGORY_CONFIG: Record<InventoryCategory, { label: string; color: string;
   "retail":      { label: "Retail",       color: "#6b7280", bg: "#f9fafb" },
 };
 
+// Pharmacy accounts see medicine groups instead of salon ones. The stored category values stay the same.
+// ponytail: relabels the shared CATEGORY_CONFIG in render (see InventoryPage) — give pharmacies real categories if they outgrow six groups.
+const SALON_LABELS = Object.fromEntries(Object.entries(CATEGORY_CONFIG).map(([k, v]) => [k, v.label])) as Record<InventoryCategory, string>;
+const PHARMACY_LABELS: Record<InventoryCategory, string> = {
+  "hair-color": "Tablets & Capsules", "skin-care": "Creams & Ointments", "nail": "Syrups & Liquids",
+  "tools": "Injections & Devices", "consumables": "Supplies", "retail": "OTC / General",
+};
+const EXPIRY_SOON_DAYS = 60;
+/** Earliest expiry on the item or its batches: "expired", "soon" (within 60 days) or "ok". */
+function expiryState(i: InventoryItem): "expired" | "soon" | "ok" {
+  const today = new Date().toLocaleDateString("en-CA");
+  const soon = new Date(Date.now() + EXPIRY_SOON_DAYS * 864e5).toLocaleDateString("en-CA");
+  const dates = [i.expiryDate, ...(i.batches ?? []).filter((b) => b.qty > 0).map((b) => b.expiry)].filter(Boolean) as string[];
+  const first = dates.sort()[0];
+  return !first ? "ok" : first < today ? "expired" : first <= soon ? "soon" : "ok";
+}
+
 const UNITS: InventoryUnit[]      = ["ml", "l", "g", "kg", "pcs", "units", "pair", "box", "bottle", "vial", "tube"];
 const CATEGORIES = Object.keys(CATEGORY_CONFIG) as InventoryCategory[];
 
@@ -1179,7 +1196,7 @@ export default function InventoryPage() {
   const [search, setSearch]             = useState("");
   const [searchScanning, setSearchScanning] = useState(false);
   const [catFilter, setCatFilter]       = useState<InventoryCategory | "all">("all");
-  const [statusFilter, setStatusFilter] = useState<"all" | "low" | "out" | "ok">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "low" | "out" | "ok" | "soon" | "expired">("all");
   const [sectionFilter, setSectionFilter] = useState(() => getActiveSection());
   const [showFilters, setShowFilters]   = useState(false);
   const [showAdd, setShowAdd]           = useState(false);
@@ -1250,13 +1267,18 @@ export default function InventoryPage() {
 
   const totalValue = useMemo(() => items.reduce((s, i) => s + i.costPrice * i.currentStock, 0), [items]);
   const alertItems = useMemo(() => items.filter((i) => stockStatus(i) !== "ok"), [items]);
+  if (pharmacy) for (const c of CATEGORIES) CATEGORY_CONFIG[c].label = PHARMACY_LABELS[c];
+  else for (const c of CATEGORIES) CATEGORY_CONFIG[c].label = SALON_LABELS[c];
+  const soonCount    = items.filter((i) => expiryState(i) === "soon").length;
+  const expiredCount = items.filter((i) => expiryState(i) === "expired").length;
   const lowCount   = alertItems.filter((i) => stockStatus(i) === "low").length;
   const outCount   = alertItems.filter((i) => stockStatus(i) === "out").length;
 
   const filtered = useMemo(() => {
     return items.filter((item) => {
       if (catFilter !== "all" && item.category !== catFilter) return false;
-      if (statusFilter !== "all" && stockStatus(item) !== statusFilter) return false;
+      if (statusFilter === "soon" || statusFilter === "expired") { if (expiryState(item) !== statusFilter) return false; }
+      else if (statusFilter !== "all" && stockStatus(item) !== statusFilter) return false;
       if (!inSection(item, sectionFilter)) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -1417,9 +1439,9 @@ export default function InventoryPage() {
 
           {/* Status filter chips */}
           <div className="mobile-filter-row" style={{ paddingTop: 0 }}>
-            {(["all", "ok", "low", "out"] as const).map(s => (
+            {((pharmacy ? ["all", "ok", "low", "out", "soon", "expired"] : ["all", "ok", "low", "out"]) as ("all" | "ok" | "low" | "out" | "soon" | "expired")[]).map(s => (
               <button key={s} type="button" className={`mobile-filter-chip ${statusFilter === s ? "active" : ""}`} onClick={() => setStatusFilter(s)}>
-                {s === "all" ? "All Status" : s === "ok" ? "In Stock" : s === "low" ? "Low Stock" : "Out of Stock"}
+                {s === "all" ? "All Status" : s === "ok" ? "In Stock" : s === "low" ? "Low Stock" : s === "soon" ? "Expiring Soon" : s === "expired" ? "Expired" : "Out of Stock"}
               </button>
             ))}
           </div>
@@ -1776,10 +1798,12 @@ export default function InventoryPage() {
         {tab === "stock" && <>
           <div className="stats-grid-4">
             {[
-              { label: "Total Items",  value: items.length,     icon: Package,       iconColor: "var(--accent)", bg: "rgba(124, 58, 237, 0.08)", valColor: "var(--accent)" },
+              { label: pharmacy ? "Medicines" : "Total Items",  value: items.length,     icon: Package,       iconColor: "var(--accent)", bg: "rgba(124, 58, 237, 0.08)", valColor: "var(--accent)" },
               { label: "Total Value",  value: fmtV(totalValue), icon: DollarSign,    iconColor: "#059669", bg: "#ecfdf5", valColor: "#059669", small: true },
               { label: "Low Stock",    value: lowCount,         icon: TrendingDown,  iconColor: "#d97706", bg: "#fffbeb", valColor: "#d97706" },
-              { label: "Out of Stock", value: outCount,         icon: AlertTriangle, iconColor: "#dc2626", bg: "#fef2f2", valColor: "#dc2626" },
+              pharmacy
+                ? { label: "Expiring / Expired", value: `${soonCount} / ${expiredCount}`, icon: AlertTriangle, iconColor: expiredCount ? "#dc2626" : "#d97706", bg: expiredCount ? "#fef2f2" : "#fffbeb", valColor: expiredCount ? "#dc2626" : "#d97706" }
+                : { label: "Out of Stock", value: outCount,         icon: AlertTriangle, iconColor: "#dc2626", bg: "#fef2f2", valColor: "#dc2626" },
             ].map(({ label, value, icon: Icon, iconColor, bg, valColor, small }) => (
               <div key={label} style={{ background: "#fff", borderRadius: 16, border: "1px solid rgba(226,223,235,0.8)", padding: "18px 20px", display: "flex", alignItems: "center", gap: 16, boxShadow: "0 4px 12px rgba(0,0,0,0.02)" }}>
                 <div style={{ width: 46, height: 46, borderRadius: 12, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -1892,8 +1916,8 @@ export default function InventoryPage() {
                 },
                 {
                   label: "Stock Status", value: statusFilter,
-                  onChange: (v: string) => setStatusFilter(v as "all" | "low" | "out" | "ok"),
-                  options: [["all", "All"], ["ok", "In Stock"], ["low", "Low Stock"], ["out", "Out of Stock"]] as [string, string][],
+                  onChange: (v: string) => setStatusFilter(v as "all" | "low" | "out" | "ok" | "soon" | "expired"),
+                  options: [["all", "All"], ["ok", "In Stock"], ["low", "Low Stock"], ["out", "Out of Stock"], ...(pharmacy ? [["soon", "Expiring Soon"], ["expired", "Expired"]] : [])] as [string, string][],
                 },
                 {
                   // Locked to the active dashboard section when one is set — the
