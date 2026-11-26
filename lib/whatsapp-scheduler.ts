@@ -66,8 +66,8 @@ const LOW_STOCK_SENT_KEY = "werzio_wa_lowstock_sent";
 // it's triggered. Manual/test sends (Messages page "Send Now") are the one
 // exception: they call /api/whatsapp/send directly and never pass through this
 // file, so they're unaffected by design.
-const MESSAGE_JITTER_MIN_MS = 5 * 60_000;
-const MESSAGE_JITTER_MAX_MS = 10 * 60_000;
+const MESSAGE_JITTER_MIN_MS = 2 * 60_000;
+const MESSAGE_JITTER_MAX_MS = 5 * 60_000;
 const MINUTE_MS = 60_000;
 const REMINDER_TARGET_GRACE_MS = 75 * MINUTE_MS;
 const REMINDER_MIN_LEAD_MS = 30 * MINUTE_MS;
@@ -125,7 +125,7 @@ function getReminderSendAt(apptId: string): number {
   let map: Record<string, number> = {};
   try { map = JSON.parse(localStorage.getItem(key) || "{}"); } catch { /* reset below */ }
   if (map[apptId] != null) return map[apptId];
-  const sendAt = Date.now() + MESSAGE_JITTER_MIN_MS + Math.random() * (MESSAGE_JITTER_MAX_MS - MESSAGE_JITTER_MIN_MS); // 5-10 min from now
+  const sendAt = Date.now() + MESSAGE_JITTER_MIN_MS + Math.random() * (MESSAGE_JITTER_MAX_MS - MESSAGE_JITTER_MIN_MS); // 2-5 min from now
   map[apptId] = sendAt;
   localStorage.setItem(key, JSON.stringify(map));
   return sendAt;
@@ -218,7 +218,7 @@ const SEND_RATE_LIMIT_MS = 60_000;       // WaSender free plan: 1 message per mi
 // queues (e.g. a follow-up and a cancellation due in the same scheduler tick) fire
 // back-to-back with no gap at all.
 //
-// Base pacing is a random 5-10 minutes between every message. On top of that, every
+// Base pacing is a random 2-5 minutes between every message. On top of that, every
 // 10th/50th/100th message gets a longer break before the next one — only the largest
 // matching tier applies (e.g. message #100 gets the 60-90 min break, not all three).
 function randBetween(minMs: number, maxMs: number): number {
@@ -238,8 +238,8 @@ let schedulerRunning = false;
 // Confirmations, new-booking group alerts, reminders, and follow-ups each get their own independent pacing
 // clock and gap range, so a burst of one type never eats into or waits on another
 // type's spacing.
-const FAST_JITTER_MIN_MS = MESSAGE_JITTER_MIN_MS;       // 5 min
-const FAST_JITTER_MAX_MS = MESSAGE_JITTER_MAX_MS;        // 7 min
+const FAST_JITTER_MIN_MS = MESSAGE_JITTER_MIN_MS;       // 2 min
+const FAST_JITTER_MAX_MS = MESSAGE_JITTER_MAX_MS;        // 5 min
 const REMINDER_TIER_MIN_MS = 25 * 60_000;
 const REMINDER_TIER_MAX_MS = 30 * 60_000;
 const FOLLOWUP_TIER_MIN_MS = 20 * 60_000;
@@ -539,7 +539,7 @@ export async function enqueueWhatsAppConfirmation(apptId: string): Promise<void>
   if (!response.ok) throw new Error(`Queue confirmation failed: HTTP ${response.status}`);
 }
 
-export type ResendConfirmationResult = "queued" | "already-sent" | "no-phone" | "not-found" | "disabled" | "failed";
+export type ResendConfirmationResult = "queued" | "already-sent" | "no-phone" | "not-found" | "disabled" | "auto-off" | "started" | "failed";
 
 /**
  * Manually (re)sends a booking confirmation — the "Send Confirmation" button in
@@ -569,10 +569,42 @@ export async function resendWhatsAppConfirmation(apptId: string): Promise<Resend
     const data = await response.json().catch(() => ({})) as { ok?: boolean; queued?: boolean; reason?: string };
     if (!response.ok || !data.ok) return "failed";
     if (data.queued) return "queued";
-    return data.reason === "already-sent" || data.reason === "already-sent-same-visit" ? "already-sent" : "disabled";
+    if (data.reason === "already-sent" || data.reason === "already-sent-same-visit") return "already-sent";
+    if (data.reason === "appointment-started") return "started";
+    if (data.reason === "auto-confirmation-disabled") return "auto-off";
+    if (data.reason === "missing-phone" || data.reason === "fake-placeholder-phone") return "no-phone";
+    if (data.reason === "automation-disabled") return "disabled";
+    return "failed";
   } catch {
     return "failed";
   }
+}
+
+const RESEND_ERRORS: Record<string, string> = {
+  "no-phone": "No valid phone number on file.",
+  disabled: "WhatsApp automation is off in Settings.",
+  "auto-off": "Booking confirmations are switched off in Settings → WhatsApp.",
+  started: "This appointment has already started, so a confirmation isn't sent.",
+  "not-found": "Appointment not found.",
+};
+
+/**
+ * What every "Send Confirmation" button calls: resends the confirmation for an
+ * appointment (every day of a multi-day booking) and returns a ready-to-show message.
+ */
+export async function resendConfirmationWithNote(appt: { id: string; bookingGroupId?: string }): Promise<{ tone: "sent" | "info" | "error"; note: string }> {
+  const ids = appt.bookingGroupId
+    ? getStoredAppointments().filter((a) => a.bookingGroupId === appt.bookingGroupId).map((a) => a.id)
+    : [appt.id];
+  const results = await Promise.all(ids.map((id) => resendWhatsAppConfirmation(id)));
+  const queued = results.filter((r) => r === "queued").length;
+  const already = results.filter((r) => r === "already-sent").length;
+  if (queued > 0) {
+    return { tone: "sent", note: ids.length > 1 ? `Sending ${queued} of ${ids.length} days${already > 0 ? ` (${already} already sent)` : ""} shortly.` : "Will send shortly." };
+  }
+  if (already === results.length) return { tone: "info", note: "Already sent." };
+  const reason = results.find((r) => r !== "queued" && r !== "already-sent") ?? "failed";
+  return { tone: "error", note: RESEND_ERRORS[reason] ?? "Couldn't send — check Settings → WhatsApp." };
 }
 
 /** Call when an appointment is marked completed — sends follow-up after the configured delay. */
@@ -679,7 +711,7 @@ type ProviderConfig = WhatsAppSafetyConfig & {
 // exactly like an unpaced burst even though only one real message went out.
 //
 // Base pacing (for anything not in one of the dedicated tiers below — cancellation,
-// birthday, lowstock, invoice) is a random 5-10 minutes between every logged item,
+// birthday, lowstock, invoice) is a random 2-5 minutes between every logged item,
 // with longer escalating breaks every 10th/50th/100th one (see minNaturalGapMs).
 // This floor always applies regardless of the optional WhatsApp Safety toggle or
 // provider — the Safety setting and WaSender's rate limit can only make the gap
@@ -689,7 +721,7 @@ type ProviderConfig = WhatsAppSafetyConfig & {
 // pacing kicks in for the rest. Runs client-side via setTimeout — never inside the
 // API route — so it can never block a serverless request into a platform timeout.
 //
-// Confirmation (5-10 min), new-booking group alert (5-10 min with random seconds),
+// Confirmation (2-5 min), new-booking group alert (2-5 min with random seconds),
 // reminder (25-30 min), and
 // follow-up (20-35 min) each use their own dedicated gate/clock instead of this
 // shared floor — see the tier gates above.

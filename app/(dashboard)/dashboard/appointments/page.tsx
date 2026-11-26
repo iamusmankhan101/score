@@ -8,7 +8,7 @@ import { getSalonInvoices, saveSalonInvoices } from "@/lib/salon-invoices";
 import { recordDeletions } from "@/lib/turso-sync";
 import type { Appointment, AppointmentFeedback, AppointmentStatus, Client, Staff, Service } from "@/lib/types";
 import { Search, Filter, X, Clock, User, Users, Scissors, Tag, ChevronDown, Plus, CalendarDays, CheckCircle2, ArrowRight, ShoppingCart, Camera, Trash2, Upload, Download, FileSpreadsheet, Check, Star, AlertTriangle, MessageSquare, ListOrdered } from "lucide-react";
-import { enqueueWhatsAppConfirmation, enqueueWhatsAppFollowup, enqueueWhatsAppCancellation, sendGroupBookingAlert, purgeQueuedAppointmentMessages, normalizePhone, resendWhatsAppConfirmation } from "@/lib/whatsapp-scheduler";
+import { enqueueWhatsAppConfirmation, enqueueWhatsAppFollowup, enqueueWhatsAppCancellation, sendGroupBookingAlert, purgeQueuedAppointmentMessages, normalizePhone, resendConfirmationWithNote } from "@/lib/whatsapp-scheduler";
 import { awardPoints } from "@/lib/loyalty";
 import { settingsStore } from "@/lib/settings-store";
 import { getCurrentPlan, isAtLimit, thisMonthCount } from "@/lib/plan-limits";
@@ -601,32 +601,9 @@ function DetailModal({ appt, onClose, clients, staffList, allServices, onStatusC
               onClick={async () => {
                 setConfirmSendStatus("sending");
                 setConfirmSendNote("");
-                const groupIds = appt.bookingGroupId
-                  ? getStoredAppointments().filter((a) => a.bookingGroupId === appt.bookingGroupId).map((a) => a.id)
-                  : [appt.id];
-                const results = await Promise.all(groupIds.map((id) => resendWhatsAppConfirmation(id)));
-                const queued = results.filter((r) => r === "queued").length;
-                const already = results.filter((r) => r === "already-sent").length;
-                if (queued > 0) {
-                  setConfirmSendStatus("sent");
-                  setConfirmSendNote(
-                    groupIds.length > 1
-                      ? `Sending ${queued} of ${groupIds.length} day${groupIds.length > 1 ? "s" : ""}${already > 0 ? ` (${already} already sent)` : ""} shortly.`
-                      : "Will send shortly."
-                  );
-                } else if (already === results.length) {
-                  setConfirmSendStatus("info");
-                  setConfirmSendNote("Already sent.");
-                } else {
-                  const reason = results.find((r) => r !== "queued" && r !== "already-sent");
-                  setConfirmSendStatus("error");
-                  setConfirmSendNote(
-                    reason === "no-phone" ? "No phone number on file."
-                    : reason === "disabled" ? "WhatsApp automation is off in Settings."
-                    : reason === "not-found" ? "Appointment not found."
-                    : "Couldn't send — check Settings → WhatsApp."
-                  );
-                }
+                const { tone, note } = await resendConfirmationWithNote(appt);
+                setConfirmSendStatus(tone);
+                setConfirmSendNote(note);
               }}
               style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 9, border: "1px solid #ddd6fe", background: "#f5f3ff", color: "#7C3AED", fontSize: 12, fontWeight: 700, cursor: confirmSendStatus === "sending" ? "default" : "pointer", opacity: confirmSendStatus === "sending" ? 0.6 : 1 }}>
               <MessageSquare size={13} />
@@ -2060,6 +2037,14 @@ export default function AppointmentsPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [invoicedApptIds, setInvoicedApptIds] = useState<Set<string>>(new Set());
 
+  // Quick "resend confirmation" from the list rows; the result shows as a small notice.
+  const [resendToast, setResendToast] = useState<{ tone: "sent" | "info" | "error"; note: string } | null>(null);
+  async function quickResendConfirmation(appt: Appointment) {
+    setResendToast({ tone: "info", note: `Sending confirmation to ${appt.clientName}…` });
+    const result = await resendConfirmationWithNote(appt);
+    setResendToast({ tone: result.tone, note: `${appt.clientName}: ${result.note}` });
+    window.setTimeout(() => setResendToast(null), 5000);
+  }
   const plan         = getCurrentPlan();
   const monthCount   = thisMonthCount(appointments);
   const apptLimited  = isAtLimit(plan.appointmentsPerMonth, monthCount);
@@ -2212,6 +2197,11 @@ export default function AppointmentsPage() {
   return (
     <div className="dash-page dashboard-polish" style={{ background: "#ffffff", minHeight: "100vh", display: "flex", flexDirection: "column", gap: 20 }}>
 
+      {resendToast && (
+        <div role="status" style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 300, background: "#fff", border: `1px solid ${resendToast.tone === "error" ? "#fecaca" : resendToast.tone === "sent" ? "#bbf7d0" : "#e5e7eb"}`, color: resendToast.tone === "error" ? "#b91c1c" : resendToast.tone === "sent" ? "#047857" : "#4b5563", borderRadius: 12, padding: "10px 16px", fontSize: 13, fontWeight: 700, boxShadow: "0 8px 28px rgba(0,0,0,0.14)", maxWidth: "90vw" }}>
+          {resendToast.note}
+        </div>
+      )}
       {selected && (
         <DetailModal
           appt={selected}
@@ -2618,7 +2608,7 @@ export default function AppointmentsPage() {
         <div className="desktop-only">
         <div className="table-scroll-inner">
         <div className="appt-table-inner">
-        <div style={{ display: "grid", gridTemplateColumns: "40px 1.2fr 130px 120px 1.5fr 120px 110px 90px 110px", padding: "12px 20px", borderBottom: "1px solid #f0f0f5", background: "#faf9fd" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "40px 1.2fr 130px 120px 1.5fr 120px 110px 90px 150px", padding: "12px 20px", borderBottom: "1px solid #f0f0f5", background: "#faf9fd" }}>
           <div style={{ display: "flex", alignItems: "center" }}>
             <input
               type="checkbox"
@@ -2646,7 +2636,7 @@ export default function AppointmentsPage() {
               <div
                 key={appt.id}
                 onClick={() => setSelected(appt)}
-                style={{ display: "grid", gridTemplateColumns: "40px 1.2fr 130px 120px 1.5fr 120px 110px 90px 110px", padding: "14px 20px", borderBottom: isLast ? "none" : "1px solid #f8f8fc", alignItems: "center", cursor: "pointer", background: isChecked ? "#F5F3FF" : "transparent", transition: "background 0.2s" }}
+                style={{ display: "grid", gridTemplateColumns: "40px 1.2fr 130px 120px 1.5fr 120px 110px 90px 150px", padding: "14px 20px", borderBottom: isLast ? "none" : "1px solid #f8f8fc", alignItems: "center", cursor: "pointer", background: isChecked ? "#F5F3FF" : "transparent", transition: "background 0.2s" }}
                 className="hover-bg-row"
               >
                 <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", alignItems: "center" }}>
@@ -2702,7 +2692,12 @@ export default function AppointmentsPage() {
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 800, color: "var(--accent)" }}>{fmt(appt.totalAmount)}</div>
                 {/* Checkout button — visible for arrived / in-progress / completed, until it's actually been invoiced */}
-                <div onClick={(e) => e.stopPropagation()}>
+                <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button type="button" title="Resend confirmation on WhatsApp" aria-label={`Resend confirmation to ${appt.clientName}`}
+                    onClick={() => void quickResendConfirmation(appt)}
+                    style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #ddd6fe", background: "#f5f3ff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                    <MessageSquare size={13} color="#7C3AED" />
+                  </button>
                   {CHECKOUT_STATUSES.includes(appt.status) && !invoicedApptIds.has(appt.id) ? (
                     <a
                       href={checkoutHref(appt.id, appt.status)}
@@ -2780,6 +2775,11 @@ export default function AppointmentsPage() {
                         <span style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", color: "#b45309", background: "#fffbeb", padding: "2px 6px", borderRadius: 20, letterSpacing: "0.04em", flexShrink: 0 }}>Day {appt.dayNumber}/{appt.totalDays}</span>
                       )}
                     </div>
+                    <button type="button" title="Resend confirmation on WhatsApp" aria-label={`Resend confirmation to ${appt.clientName}`}
+                      onClick={(e) => { e.stopPropagation(); void quickResendConfirmation(appt); }}
+                      style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #ddd6fe", background: "#f5f3ff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, marginLeft: "auto" }}>
+                      <MessageSquare size={14} color="#7C3AED" />
+                    </button>
                     {canCheckout && (
                       <a
                         href={checkoutHref(appt.id, appt.status)}

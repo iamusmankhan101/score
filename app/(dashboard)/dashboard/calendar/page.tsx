@@ -4,7 +4,8 @@ import { appointmentHasStaff } from "@/lib/appointment-staff";
 import { useState, useEffect, useRef } from "react";
 import { getStoredAppointments, getStoredStaff, getStoredServices } from "@/lib/storage";
 import type { AppointmentStatus, Appointment, Staff, Service } from "@/lib/types";
-import { ChevronLeft, ChevronRight, X, Clock, User, Scissors, Tag, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Clock, User, Scissors, Tag, CalendarDays, MessageSquare } from "lucide-react";
+import { resendConfirmationWithNote } from "@/lib/whatsapp-scheduler";
 import { fmtCurrency as fmt } from "@/lib/format";
 import PageTitle from "@/components/page-title";
 import MobilePageHeader from "@/components/mobile-page-header";
@@ -143,6 +144,7 @@ function DetailModal({ appt, onClose, staffList, allServices }: {
   const teamStaff    = teamStaffIds.map((sid) => staffList.find((s) => s.id === sid)).filter((s): s is Staff => Boolean(s));
   const durationMin = toMin(appt.endTime) - toMin(appt.startTime);
   const accent      = staff?.color ?? cfg.color;
+  const [confirmNote, setConfirmNote] = useState<{ tone: "sending" | "sent" | "info" | "error"; note: string } | null>(null);
 
   return (
     <div
@@ -170,6 +172,22 @@ function DetailModal({ appt, onClose, staffList, allServices }: {
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Resend the booking confirmation on WhatsApp */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "12px 24px 0" }}>
+          <button type="button" disabled={confirmNote?.tone === "sending"}
+            onClick={async () => {
+              setConfirmNote({ tone: "sending", note: "" });
+              const { tone, note } = await resendConfirmationWithNote(appt);
+              setConfirmNote({ tone, note });
+            }}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 9, border: "1px solid #ddd6fe", background: "#f5f3ff", color: "#7C3AED", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: confirmNote?.tone === "sending" ? 0.6 : 1 }}>
+            <MessageSquare size={13} /> {confirmNote?.tone === "sending" ? "Sending…" : "Send Confirmation"}
+          </button>
+          {confirmNote && confirmNote.tone !== "sending" && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: confirmNote.tone === "error" ? "#dc2626" : confirmNote.tone === "info" ? "#9898b0" : "#059669" }}>{confirmNote.note}</span>
+          )}
         </div>
 
         {/* Body */}

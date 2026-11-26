@@ -2,9 +2,9 @@
  * /api/cron/booking-queue
  *
  * Drains wa_booking_send_queue — automated appointment/customer WhatsApp sends
- * queued by the app with a 5-10 min scheduled_at
+ * queued by the app with a 2-5 min scheduled_at
  * instead of being sent immediately (a serverless function can't just sleep
- * for 5-10 minutes to apply the same jitter every other automated WhatsApp
+ * for 2-5 minutes to apply the same jitter every other automated WhatsApp
  * send in this app uses).
  *
  * Also drains wa_pos_receipt_queue, whose rows are scheduled only 1-2 min out —
@@ -74,7 +74,7 @@ function spacingDelayMs(kind: QueueKind): number {
 // the same second, and short enough that the fifth client still has theirs
 // before they reach the door (2nd lands 1-2 min out, 3rd 2-4 min, ...).
 function posSpacingDelayMs(): number {
-  return randBetween(5 * MINUTE_MS, 7 * MINUTE_MS);
+  return randBetween(2 * MINUTE_MS, 5 * MINUTE_MS);
 }
 
 // A failed send is almost never worth retrying immediately — the usual causes
@@ -250,8 +250,8 @@ async function updateItem(item: QueueRow, status: "sent" | "pending" | "expired"
 // queue drained. Push each one at least 5-10 min (random) past any other pending message
 // of this salon, so a deferred batch never goes out in a burst. Confirmations and the
 // salon's own alert stay fast.
-const DEFER_MIN_GAP_MS = 5 * MINUTE_MS;
-const DEFER_MAX_GAP_MS = 10 * MINUTE_MS;
+const DEFER_MIN_GAP_MS = 2 * MINUTE_MS;
+const DEFER_MAX_GAP_MS = 5 * MINUTE_MS;
 // Looks across BOTH queues (booking messages and POS invoices) — checking only
 // its own table let an invoice and a confirmation land on the same minute.
 async function spacedFromPending(item: { userId: string; id: string; kind?: string; table: "b" | "p" }, wantedMs: number): Promise<number> {
@@ -551,7 +551,7 @@ function minGapMsForKind(kind: QueueKind): number {
 // at that width a second checkout inside the same 10 minutes had its receipt
 // pushed past the client's visit, which is the delay this is meant to remove.
 // A 1 min floor still keeps two receipts off the same second.
-const POS_MIN_GAP_MS = 5 * MINUTE_MS; // never closer than 5 min between any two messages
+const POS_MIN_GAP_MS = 2 * MINUTE_MS; // never closer than 2 min between any two messages
 
 // SEND_LIMIT_PER_RUN only caps how many messages go out within one cron
 // invocation — it does nothing to stop a *later* invocation from sending
@@ -603,7 +603,7 @@ function globalTargetGapMs(): number {
 // so it is the least likely of the automated types to be reported, which is
 // what the cross-type gap is ultimately protecting against.
 function posGlobalTargetGapMs(): number {
-  return randBetween(5 * MINUTE_MS, 7 * MINUTE_MS);
+  return randBetween(2 * MINUTE_MS, 5 * MINUTE_MS);
 }
 async function getLastAnySentAtMs(
   userId: string,
