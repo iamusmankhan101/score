@@ -976,7 +976,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     window.addEventListener("werzio_new_booking_alert", onNewBooking);
     window.addEventListener("storage", onStorage);
 
-    // Poll for new online bookings every 5 s — catches bookings from external devices
+    // Poll for new online bookings every 15 s — catches bookings from external devices
     const user = getCurrentUser();
     let lastSeenId: string | null = null;
     // When the appointments last changed on the server — the poll sends it back so an
@@ -1035,13 +1035,17 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     }
 
     pollNewBookings(); // run immediately to set baseline
-    const pollInterval = window.setInterval(pollNewBookings, 5_000);
+    // Skip while the tab is hidden (saves server CPU); catch up the moment it's visible again.
+    const pollInterval = window.setInterval(() => { if (!document.hidden) void pollNewBookings(); }, 15_000);
+    const onVisible = () => { if (!document.hidden) void pollNewBookings(); };
+    document.addEventListener("visibilitychange", onVisible);
 
     return () => {
       window.removeEventListener("werzio_new_booking_alert", onNewBooking);
       window.removeEventListener("storage", onStorage);
       channel.close();
       window.clearInterval(pollInterval);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [isReady, isAdmin]);
 

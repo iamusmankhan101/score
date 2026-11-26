@@ -707,10 +707,13 @@ function MessagesPageContent() {
       });
     }
     void refreshQueueCounts();
-    const interval = window.setInterval(refreshQueueCounts, 5000);
+    const interval = window.setInterval(() => { if (!document.hidden) void refreshQueueCounts(); }, 15000);
+    const onVisible = () => { if (!document.hidden) void refreshQueueCounts(); };
+    document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("werzio_wa_message_logged", refreshQueueCounts);
     return () => {
       window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("werzio_wa_message_logged", refreshQueueCounts);
     };
   }, []);

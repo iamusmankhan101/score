@@ -7,6 +7,7 @@ import { computeInventoryUsage, consumptionHistory, itemsWithServiceRates, usage
 import { checkLowStockAlerts } from "@/lib/whatsapp-scheduler";
 import { settingsStore } from "@/lib/settings-store";
 import type { InventoryBatch, InventoryItem, InventoryCategory, InventoryUnit, Service } from "@/lib/types";
+import { usePharmacy } from "@/lib/pharmacy";
 import { batchUsage, getTreatmentCharts, newId, todayKey } from "@/lib/clinic";
 import { getSectionOptions, getActiveSection, inSection, defaultSectionForNewRecord } from "@/lib/sections";
 import { barcodeSvg, generateBarcode, isValidLabelSize, LABEL_LIMITS, LABEL_PRESETS, printBarcodeLabels, type LabelSize } from "@/lib/barcode-label";
@@ -89,7 +90,7 @@ type ItemForm = {
   barcode: string;
   variablePrice: boolean; priceRangeMin: string; priceRangeMax: string;
   servicesPerUnit: string;
-  expiryDate: string; isActive: boolean;
+  expiryDate: string; strength: string; isActive: boolean;
   /** Why a typed-in stock figure changed — only asked when editing. */
   stockReason: "" | "restock" | "wastage" | "correction";
 };
@@ -100,7 +101,7 @@ const EMPTY_FORM: ItemForm = {
   retailPrice: "", barcode: "", supplier: "", notes: "",
   variablePrice: false, priceRangeMin: "", priceRangeMax: "",
   servicesPerUnit: "",
-  expiryDate: "", isActive: true, stockReason: "",
+  expiryDate: "", strength: "", isActive: true, stockReason: "",
 };
 
 function itemToForm(item: InventoryItem): ItemForm {
@@ -115,7 +116,7 @@ function itemToForm(item: InventoryItem): ItemForm {
     priceRangeMin: item.priceRangeMin ? String(item.priceRangeMin) : "",
     priceRangeMax: item.priceRangeMax ? String(item.priceRangeMax) : "",
     servicesPerUnit: item.servicesPerUnit ? String(item.servicesPerUnit) : "",
-    expiryDate: item.expiryDate ?? "", isActive: item.isActive !== false, stockReason: "",
+    expiryDate: item.expiryDate ?? "", strength: item.strength ?? "", isActive: item.isActive !== false, stockReason: "",
   };
 }
 
@@ -162,6 +163,7 @@ function formToItem(form: ItemForm, existing?: InventoryItem): InventoryItem {
       ? new Date().toLocaleDateString("en-CA")
       : existing?.lastRestocked ?? new Date().toLocaleDateString("en-CA"),
     expiryDate: form.expiryDate || undefined,
+    strength: form.strength.trim() || undefined,
     isActive: form.isActive ? undefined : false,
     ...consumptionFields(form, existing),
   };
@@ -243,6 +245,7 @@ function BarcodeLabelPrinter({ item }: { item: InventoryItem }) {
 }
 
 function ItemFormFields({ form, set, items, original }: { form: ItemForm; set: (k: keyof ItemForm, v: string | boolean) => void; items: InventoryItem[]; original?: InventoryItem }) {
+  const pharmacy = usePharmacy();
   const stockMoved = !!original && form.currentStock !== "" && Number(form.currentStock) !== original.currentStock;
   const [scanning, setScanning] = useState(false);
   const barcodeKey = form.barcode.trim().toLowerCase();
@@ -336,6 +339,7 @@ function ItemFormFields({ form, set, items, original }: { form: ItemForm; set: (
         )}
       </Field>
       <Field label="Supplier"><input value={form.supplier} onChange={(e) => set("supplier", e.target.value)} placeholder="e.g. Wella Pakistan" style={INP} /></Field>
+      {pharmacy && <Field label="Strength / Dose"><input value={form.strength} onChange={(e) => set("strength", e.target.value)} placeholder="e.g. 500 mg" style={INP} /></Field>}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
         <Field label="Expiry Date"><input type="date" value={form.expiryDate} onChange={(e) => set("expiryDate", e.target.value)} style={INP} /></Field>
         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", paddingBottom: 10 }}>
@@ -1099,11 +1103,11 @@ function ItemRow({ item, isLast, usage, onEdit, onDelete, onShowUsage }: {
           {status !== "ok" && <AlertTriangle size={12} color={badge.color} />}
         </div>
         <div style={{ fontSize: 11, color: "#9898b0", marginTop: 1 }}>
-          {item.brand}{item.supplier ? ` · ${item.supplier}` : ""}
+          {item.brand}{item.strength ? ` · ${item.strength}` : ""}{item.supplier ? ` · ${item.supplier}` : ""}
           {item.servicesPerUnit ? <span style={{ color: "#7C3AED", fontWeight: 600 }}> · 1 {item.unit} ≈ {item.servicesPerUnit} services</span> : null}
           {item.isActive === false && <span style={{ color: "#9898b0", fontWeight: 700 }}> · Inactive</span>}
           {item.batches?.some((b) => b.expiry && b.expiry < new Date().toLocaleDateString("en-CA")) && <span style={{ color: "#dc2626", fontWeight: 700 }}> · Expired batch</span>}
-          {item.expiryDate && <span style={{ color: item.expiryDate < new Date().toLocaleDateString("en-CA") ? "#dc2626" : "#9898b0", fontWeight: 600 }}> · Exp {item.expiryDate}</span>}
+          {item.expiryDate && <span style={{ color: item.expiryDate < new Date().toLocaleDateString("en-CA") ? "#dc2626" : item.expiryDate <= new Date(Date.now() + 60 * 864e5).toLocaleDateString("en-CA") ? "#d97706" : "#9898b0", fontWeight: 600 }}> · Exp {item.expiryDate}{item.expiryDate >= new Date().toLocaleDateString("en-CA") && item.expiryDate <= new Date(Date.now() + 60 * 864e5).toLocaleDateString("en-CA") ? " (soon)" : ""}</span>}
         </div>
       </div>
 
@@ -1169,6 +1173,7 @@ function ItemRow({ item, isLast, usage, onEdit, onDelete, onShowUsage }: {
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function InventoryPage() {
+  const pharmacy = usePharmacy();
   const [tab, setTab]                   = useState<"stock" | "retail">("stock");
   const [items, setItems]               = useState<InventoryItem[]>([]);
   const [search, setSearch]             = useState("");
@@ -1292,7 +1297,7 @@ export default function InventoryPage() {
 
       {/* Mobile app bar */}
       <MobilePageHeader
-        title="Inventory"
+        title={pharmacy ? "Pharmacy" : "Inventory"}
         subtitle={tab === "stock"
           ? `${items.length} items · ${fmtV(totalValue)}`
           : `${retailItems.length} in POS`}
@@ -1573,7 +1578,7 @@ export default function InventoryPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <PageTitle
             icon={<Package size={24} />}
-            title="Inventory"
+            title={pharmacy ? "Pharmacy" : "Inventory"}
             subtitle={
               <>
                 {tab === "stock"
@@ -1632,7 +1637,7 @@ export default function InventoryPage() {
               style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", borderRadius: 12, border: "none", background: "var(--accent-gradient)", fontSize: 13, fontWeight: 750, color: "#fff", cursor: "pointer", boxShadow: "0 4px 14px var(--accent-glow)", transition: "all 0.18s ease" }}
               className="page-header-btn hover-scale"
             >
-              <Plus size={16} /> {tab === "retail" ? "Add Product" : "Add Item"}
+              <Plus size={16} /> {pharmacy ? "Add Medicine" : tab === "retail" ? "Add Product" : "Add Item"}
             </button>
           </div>
         </div>
@@ -1641,7 +1646,7 @@ export default function InventoryPage() {
         <div style={{ display: "flex", gap: 4, background: "#fff", border: "1px solid #e3e0eb", borderRadius: 14, padding: 5, width: "fit-content", boxShadow: "0 2px 8px rgba(0,0,0,0.01)" }}>
           {([
             { id: "stock",  label: "Stock Management", icon: Package },
-            { id: "retail", label: "Retail Products",  icon: Tag },
+            { id: "retail", label: pharmacy ? "Medicines" : "Retail Products",  icon: Tag },
           ] as { id: "stock" | "retail"; label: string; icon: React.ElementType }[]).map(t => {
             const active = tab === t.id;
             const Icon = t.icon;

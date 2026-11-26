@@ -375,6 +375,8 @@ export interface InventoryItem {
   stockCountedAt?: string;
   /** YYYY-MM-DD. */
   expiryDate?: string;
+  /** Pharmacy accounts: dose / strength, e.g. "500 mg". */
+  strength?: string;
   /** false hides the item from POS and from service recipes; unset means active. */
   isActive?: boolean;
   /**

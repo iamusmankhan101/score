@@ -11,6 +11,7 @@ import {
   ClipboardCheck, Store, Landmark, Archive, Smartphone, FileText, FileSignature, Megaphone, DoorOpen, HeartPulse, FlaskConical, Truck, ArrowLeftRight,
 } from "lucide-react";
 import { businessTypeOf, term, useIsClinic } from "@/lib/clinic";
+import { usePharmacy } from "@/lib/pharmacy";
 import { AuthUser, getCurrentUser, signOut } from "@/lib/auth";
 import { getLang, setLang } from "@/lib/urdu";
 
@@ -107,12 +108,13 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
   const [locations, setLocations] = useState<SalonLocation[]>([]);
   const [activeLocationId, setActiveLocationId] = useState("main");
   const clinic = useIsClinic();
+  const pharmacy = usePharmacy();
   // Clinic mode renames a few screens and adds the consent forms page.
   const navGroups: typeof NAV_GROUPS = NAV_GROUPS.map((group) => ({
     ...group,
     items: [
       // Salon-only screens (hair/makeup Virtual Try-On) don't belong in a clinic.
-      ...group.items.filter((item) => !(clinic && item.href === "/dashboard/try-on")).map((item) => ({ ...item, label: term(item.label, clinic) })),
+      ...group.items.filter((item) => !(clinic && item.href === "/dashboard/try-on")).map((item) => ({ ...item, label: pharmacy && item.href === "/dashboard/inventory" ? "Pharmacy" : term(item.label, clinic) })),
       ...(clinic && group.label === "Clients & Sales" ? [{ href: "/dashboard/consent-forms", icon: FileSignature, label: "Consent Forms" }, { href: "/dashboard/lab-orders", icon: FlaskConical, label: "Lab & Scan Orders" }, { href: "/dashboard/quotations", icon: ReceiptText, label: "Quotations" }, { href: "/dashboard/medical-documents", icon: FileText, label: "Medical Documents" }] : []),
       ...(clinic && group.label === "Business" ? [{ href: "/dashboard/clinic-reports", icon: BarChart3, label: "Clinic Reports" }, { href: "/dashboard/cash-closing", icon: Banknote, label: "Cash Closing" }, { href: "/dashboard/rooms", icon: DoorOpen, label: "Rooms & Machines" }] : []),
       ...(group.label === "Business" ? [{ href: "/dashboard/purchase-orders", icon: Truck, label: "Purchase Orders" }, { href: "/dashboard/stock-transfers", icon: ArrowLeftRight, label: "Stock Transfers" }] : []),
