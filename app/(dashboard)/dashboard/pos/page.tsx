@@ -28,7 +28,7 @@ import {
 import { settingsStore } from "@/lib/settings-store";
 import { normalizePhone, fillTemplate } from "@/lib/whatsapp-scheduler";
 import { newGuestClient } from "@/lib/appointment-credit";
-import { usePharmacy } from "@/lib/pharmacy";
+import { usePharmacy, PHARMACY_LABELS } from "@/lib/pharmacy";
 import { queueInvoiceReceipt } from "@/lib/whatsapp-receipt";
 import { getCurrentPlan } from "@/lib/plan-limits";
 import { getDefaultLocationId } from "@/lib/locations";
@@ -313,6 +313,7 @@ export default function POSPage() {
 
   // ── Catalog ───────────────────────────────────────────────────────────────
   const [catalogTab,    setCatalogTab]    = useState<CatalogTab>("all");
+  const [catalogCategory, setCatalogCategory] = useState("all");
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogSectionFilter, setCatalogSectionFilter] = useState(() => getActiveSection());
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -372,7 +373,7 @@ export default function POSPage() {
   const [retryingSync,     setRetryingSync]     = useState(false);
 
   // ── Derived catalog ───────────────────────────────────────────────────────
-  const catalogItems = useMemo<CatalogItem[]>(() => {
+  const allCatalogItems = useMemo<CatalogItem[]>(() => {
     const q = catalogSearch.toLowerCase();
     const svc: CatalogItem[] = (catalogTab !== "products" ? services : [])
       .filter(s => !q || s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q))
@@ -392,6 +393,16 @@ export default function POSPage() {
       }));
     return [...svc, ...prod];
   }, [services, inventory, catalogTab, catalogSearch, catalogSectionFilter]);
+
+  // Category chips: one per category in what's currently listed (most items first); a stale pick falls back to All.
+  const categoryOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const i of allCatalogItems) if (i.category) counts.set(i.category, (counts.get(i.category) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
+  }, [allCatalogItems]);
+  const activeCategory = categoryOptions.includes(catalogCategory) ? catalogCategory : "all";
+  const catalogItems = activeCategory === "all" ? allCatalogItems : allCatalogItems.filter(i => i.category === activeCategory);
+  const categoryLabel = (c: string) => (pharmacy && PHARMACY_LABELS[c]) || c.replace(/-/g, " ");
 
   const dropClients = useMemo(() => {
     const q = clientQ.toLowerCase();
@@ -1673,6 +1684,21 @@ export default function POSPage() {
                 );
               })}
             </div>
+
+            {/* Category chips — built from the items shown */}
+            {categoryOptions.length > 1 && (
+              <div style={{ display: "flex", gap: 6, overflowX: "auto", WebkitOverflowScrolling: "touch", marginTop: 8 }}>
+                {["all", ...categoryOptions].map(c => {
+                  const active = activeCategory === c;
+                  return (
+                    <button key={c} type="button" onClick={() => setCatalogCategory(c)}
+                      style={{ padding: "5px 12px", borderRadius: 20, border: `1.5px solid ${active ? "#7C3AED" : "#e8e8f4"}`, background: active ? "#7C3AED" : "#fff", color: active ? "#fff" : "#6b6b8a", fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.12s", flexShrink: 0, whiteSpace: "nowrap", textTransform: "capitalize" }}>
+                      {c === "all" ? "All Categories" : categoryLabel(c)}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Section filter — locked to the active dashboard section when one is
                 set (no picker needed, only that section is valid here); shown as

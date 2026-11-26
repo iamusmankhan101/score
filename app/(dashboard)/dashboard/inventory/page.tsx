@@ -7,7 +7,7 @@ import { computeInventoryUsage, consumptionHistory, itemsWithServiceRates, usage
 import { checkLowStockAlerts } from "@/lib/whatsapp-scheduler";
 import { settingsStore } from "@/lib/settings-store";
 import type { InventoryBatch, InventoryItem, InventoryCategory, InventoryUnit, Service } from "@/lib/types";
-import { usePharmacy } from "@/lib/pharmacy";
+import { usePharmacy, PHARMACY_LABELS } from "@/lib/pharmacy";
 import { batchUsage, getTreatmentCharts, newId, todayKey } from "@/lib/clinic";
 import { getSectionOptions, getActiveSection, inSection, defaultSectionForNewRecord } from "@/lib/sections";
 import { barcodeSvg, generateBarcode, isValidLabelSize, LABEL_LIMITS, LABEL_PRESETS, printBarcodeLabels, type LabelSize } from "@/lib/barcode-label";
@@ -34,10 +34,6 @@ const CATEGORY_CONFIG: Record<InventoryCategory, { label: string; color: string;
 // Pharmacy accounts see medicine groups instead of salon ones. The stored category values stay the same.
 // ponytail: relabels the shared CATEGORY_CONFIG in render (see InventoryPage) — give pharmacies real categories if they outgrow six groups.
 const SALON_LABELS = Object.fromEntries(Object.entries(CATEGORY_CONFIG).map(([k, v]) => [k, v.label])) as Record<InventoryCategory, string>;
-const PHARMACY_LABELS: Record<InventoryCategory, string> = {
-  "hair-color": "Tablets & Capsules", "skin-care": "Creams & Ointments", "nail": "Syrups & Liquids",
-  "tools": "Injections & Devices", "consumables": "Supplies", "retail": "OTC / General",
-};
 const EXPIRY_SOON_DAYS = 60;
 /** Earliest expiry on the item or its batches: "expired", "soon" (within 60 days) or "ok". */
 function expiryState(i: InventoryItem): "expired" | "soon" | "ok" {

@@ -15,3 +15,9 @@ export function usePharmacy(): boolean {
   }, []);
   return on;
 }
+
+// Medicine groups shown in place of the salon categories (the stored category values stay the same).
+export const PHARMACY_LABELS: Record<string, string> = {
+  "hair-color": "Tablets & Capsules", "skin-care": "Creams & Ointments", "nail": "Syrups & Liquids",
+  "tools": "Injections & Devices", "consumables": "Supplies", "retail": "OTC / General",
+};
