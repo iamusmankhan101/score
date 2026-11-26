@@ -121,7 +121,11 @@ function authorized(req: NextRequest): boolean {
   return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
+// Schema setup (a dozen CREATE/ALTER statements) only needs to run once per warm
+// server instance, not on every poll — the external cron hits this about once a minute.
+let tablesReady = false;
 async function ensureTables() {
+  if (tablesReady) return;
   await db.execute(`
     CREATE TABLE IF NOT EXISTS wa_booking_send_queue (
       id           TEXT NOT NULL,
@@ -184,6 +188,7 @@ async function ensureTables() {
   // The cron's "pending and due, oldest first" queries (getDueItems / getDuePosReceipts).
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_wa_booking_queue_due ON wa_booking_send_queue(status, scheduled_at)`).catch(() => {});
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_wa_pos_receipt_queue_due ON wa_pos_receipt_queue(status, scheduled_at)`).catch(() => {});
+  tablesReady = true;
 }
 
 type QueueKind = "confirmation" | "groupalert" | "followup" | "cancellation" | "reminder" | "birthday" | "winback" | "lowstock" | "manual" | "aftercare";
@@ -942,6 +947,7 @@ async function runBookingQueueCron(): Promise<{ sent: number; failed: number; sk
   return { sent, failed, skipped, expired, posSent, posFailed, posExpired };
 }
 
+let birthdayTablesReady = false;
 export async function GET(req: NextRequest) {
   if (!authorized(req)) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -955,7 +961,7 @@ export async function GET(req: NextRequest) {
     let birthday: Awaited<ReturnType<typeof runBirthdayCron>> | null = null;
     if (result.sent + result.failed + result.posSent + result.posFailed === 0) {
       try {
-        await ensureBirthdayTables();
+        if (!birthdayTablesReady) { await ensureBirthdayTables(); birthdayTablesReady = true; }
         birthday = await runBirthdayCron();
       } catch (err) {
         console.error("[booking-queue] birthday drain error:", err);
