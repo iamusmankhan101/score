@@ -28,6 +28,7 @@ import {
 import { settingsStore } from "@/lib/settings-store";
 import { normalizePhone, fillTemplate } from "@/lib/whatsapp-scheduler";
 import { newGuestClient } from "@/lib/appointment-credit";
+import { usePharmacy } from "@/lib/pharmacy";
 import { queueInvoiceReceipt } from "@/lib/whatsapp-receipt";
 import { getCurrentPlan } from "@/lib/plan-limits";
 import { getDefaultLocationId } from "@/lib/locations";
@@ -137,6 +138,7 @@ function initials(name: string) {
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 export default function POSPage() {
+  const pharmacy = usePharmacy();
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const [services,  setServices]  = useState<Service[]>([]);
@@ -381,10 +383,10 @@ export default function POSPage() {
       }));
     const prod: CatalogItem[] = (catalogTab !== "services" ? inventory : [])
       .filter(i => i.isActive !== false && ((i.retailPrice ?? 0) > 0 || i.variablePrice))
-      .filter(i => !q || i.name.toLowerCase().includes(q) || i.brand.toLowerCase().includes(q))
+      .filter(i => !q || i.name.toLowerCase().includes(q) || i.brand.toLowerCase().includes(q) || (i.strength ?? "").toLowerCase().includes(q))
       .filter(i => inSection(i, catalogSectionFilter))
       .map(i => ({
-        id: i.id, type: "product", name: `${i.brand ? i.brand + " " : ""}${i.name}`, price: i.retailPrice ?? 0,
+        id: i.id, type: "product", name: `${i.brand ? i.brand + " " : ""}${i.name}${i.strength ? " " + i.strength : ""}`, price: i.retailPrice ?? 0,
         category: i.category, section: i.section, stock: i.currentStock, unit: i.unit, barcode: i.barcode,
         variablePrice: i.variablePrice, priceRangeMin: i.priceRangeMin, priceRangeMax: i.priceRangeMax,
       }));
@@ -610,7 +612,7 @@ export default function POSPage() {
     addToCart({
       id: product.id,
       type: "product",
-      name: `${product.brand ? product.brand + " " : ""}${product.name}`,
+      name: `${product.brand ? product.brand + " " : ""}${product.name}${product.strength ? " " + product.strength : ""}`,
       price: product.retailPrice,
       category: product.category,
       stock: product.currentStock,
@@ -1603,7 +1605,7 @@ export default function POSPage() {
               <div style={{ position: "relative", flex: 1 }}>
                 <Search size={14} style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#b0b0c8", pointerEvents: "none" }} />
                 <input value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)}
-                  placeholder="Search services & products…"
+                  placeholder={pharmacy ? "Search medicines…" : "Search services & products…"}
                   style={{ width: "100%", height: 38, padding: "0 34px", borderRadius: 10, border: "1.5px solid #e8e8f4", fontSize: 13, color: "#1d1d2f", outline: "none", background: "#fafafe", boxSizing: "border-box" }} />
                 {catalogSearch && (
                   <button type="button" onClick={() => setCatalogSearch("")}
@@ -1638,7 +1640,7 @@ export default function POSPage() {
                 disabled={!barcodeInput.trim()}
                 style={{ height: 36, padding: "0 13px", borderRadius: 10, border: "none", background: barcodeInput.trim() ? "linear-gradient(135deg,#5B21B6,#9333EA)" : "#eceaf2", color: barcodeInput.trim() ? "#fff" : "#aaa8b7", fontSize: 11, fontWeight: 800, cursor: barcodeInput.trim() ? "pointer" : "not-allowed", whiteSpace: "nowrap" }}
               >
-                Add Product
+                {pharmacy ? "Add Medicine" : "Add Product"}
               </button>
               <button type="button" onClick={() => setCameraScanning(true)} aria-label="Scan barcode with camera" title="Scan with camera"
                 style={{ width: 36, height: 36, flexShrink: 0, borderRadius: 10, border: "1.5px solid #ddd6fe", background: "#faf8ff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
@@ -1659,7 +1661,7 @@ export default function POSPage() {
               {([
                 { id: "all",      label: "All Items", icon: Sparkles },
                 { id: "services", label: "Services",  icon: Scissors },
-                { id: "products", label: "Products",  icon: Package  },
+                { id: "products", label: pharmacy ? "Medicines" : "Products",  icon: Package  },
               ] as { id: CatalogTab; label: string; icon: React.ElementType }[]).map(t => {
                 const active = catalogTab === t.id;
                 const Icon = t.icon;
@@ -1705,7 +1707,7 @@ export default function POSPage() {
                 <div style={{ fontSize: 15, fontWeight: 700, color: "#b0b0c8" }}>No items found</div>
                 <div style={{ fontSize: 12, color: "#c8c8d8", marginTop: 6, lineHeight: 1.6 }}>
                   {catalogTab === "products"
-                    ? "Set retail prices on inventory items to sell them here"
+                    ? (pharmacy ? "Set retail prices on medicines in Pharmacy to sell them here" : "Set retail prices on inventory items to sell them here")
                     : "Add active services to display them in the catalog"}
                 </div>
               </div>
@@ -1760,7 +1762,7 @@ export default function POSPage() {
                         {/* Badges */}
                         <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
                           <span style={{ padding: "2px 7px", borderRadius: 20, background: fg + "15", fontSize: 9, fontWeight: 800, color: fg, textTransform: "capitalize", letterSpacing: "0.03em" }}>
-                            {item.type === "service" ? item.category : "product"}
+                            {item.type === "service" ? item.category : pharmacy ? "medicine" : "product"}
                           </span>
                           {item.type === "product" && item.stock !== undefined && (
                             <span style={{ fontSize: 9, fontWeight: 600, color: item.stock === 0 ? "#dc2626" : item.stock <= 3 ? "#d97706" : "#9999b0" }}>
