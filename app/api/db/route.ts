@@ -54,7 +54,10 @@ function withoutPay(list: unknown[]): unknown[] {
   });
 }
 
+// Once per warm server instance — every request used to pay a database round trip for this.
+let tableReady = false;
 async function ensureTable() {
+  if (tableReady) return;
   await db.execute(`
     CREATE TABLE IF NOT EXISTS salon_data (
       entity     TEXT PRIMARY KEY,
@@ -62,6 +65,7 @@ async function ensureTable() {
       updated_at TEXT NOT NULL
     )
   `);
+  tableReady = true;
 }
 
 function itemId(item: unknown): string | null {
@@ -236,15 +240,15 @@ export async function GET(req: NextRequest) {
     if (!mayRead(actor, entity)) return Response.json({ error: "Forbidden" }, { status: 403 });
     await ensureTable();
     const key = storageKey(userId, locationId, entity);
-    const result = await db.execute({
-      sql: "SELECT data FROM salon_data WHERE entity = ?",
-      args: [key],
-    });
+    // The data row and the tombstone list are independent reads — fetch them together (one round trip, not two).
+    const [result, deletedIds] = await Promise.all([
+      db.execute({ sql: "SELECT data FROM salon_data WHERE entity = ?", args: [key] }),
+      entity === DELETED_RECORDS_ENTITY ? Promise.resolve(new Set<string>()) : loadDeletedIds(userId, locationId, entity),
+    ]);
     const raw = result.rows.length === 0 ? [] : JSON.parse(result.rows[0].data as string) as unknown[];
     const list = Array.isArray(raw) ? raw : [];
     if (entity === DELETED_RECORDS_ENTITY) return Response.json(list);
 
-    const deletedIds = await loadDeletedIds(userId, locationId, entity);
     const stored = deletedIds.size === 0
       ? list
       : list.filter((item) => { const id = itemId(item); return !id || !deletedIds.has(id); });
