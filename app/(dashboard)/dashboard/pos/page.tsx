@@ -1806,9 +1806,9 @@ export default function POSPage() {
                 </span>
               )}
             </span>
-            {cart.length > 0 && !completed && (
-              <button type="button" onClick={holdSale} title="Save this sale and finish it later"
-                style={{ display: "flex", alignItems: "center", gap: 4, border: "1px solid #fde68a", borderRadius: 8, background: "#fffbeb", cursor: "pointer", padding: "5px 10px", fontSize: 11, fontWeight: 700, color: "#b45309" }}>
+            {!completed && (
+              <button type="button" onClick={holdSale} disabled={cart.length === 0} title={cart.length === 0 ? "Add items to the cart to hold a sale" : "Save this sale and finish it later"}
+                style={{ display: "flex", alignItems: "center", gap: 4, border: "1px solid #fde68a", borderRadius: 8, background: "#fffbeb", cursor: cart.length === 0 ? "not-allowed" : "pointer", opacity: cart.length === 0 ? 0.45 : 1, padding: "5px 10px", fontSize: 11, fontWeight: 700, color: "#b45309" }}>
                 <PauseCircle size={11} /> Hold
               </button>
             )}
