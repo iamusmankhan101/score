@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch cancels the older run still in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      # ponytail: non-blocking — the codebase has ~130 existing lint errors. Remove
+      # continue-on-error once they're cleaned up so lint failures block merges.
+      - name: Lint
+        run: npx eslint app lib components middleware.ts
+        continue-on-error: true
+
+      # Catches build-only failures (bad imports, server/client boundary mistakes).
+      # Placeholder env so module-level clients don't need real secrets.
+      - name: Build
+        run: npm run build
+        env:
+          TURSO_DATABASE_URL: http://localhost:8080
+          NEXT_TELEMETRY_DISABLED: "1"
