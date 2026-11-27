@@ -1175,7 +1175,7 @@ export default function RevenuePage() {
                       {fmt(revenueAmount(inv))}
                       {inv.status === "partial" && (
                         <div style={{ fontSize: 10, fontWeight: 700, color: "#b45309", background: "#fef3c7", padding: "1px 6px", borderRadius: 20, marginTop: 2, display: "inline-block" }}>
-                          Advance · of {fmt(inv.total)}
+                          {inv.creditSale ? "Credit sale · of" : "Advance · of"} {fmt(inv.total)}
                         </div>
                       )}
                     </div>

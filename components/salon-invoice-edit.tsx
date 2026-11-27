@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { X, Plus, Trash2, Save } from "lucide-react";
 import {
-  updateSalonInvoice, newBlankItem, reviseInvoiceOnFbr, fbrRelevantChange,
+  updateSalonInvoice, getSalonInvoices, newBlankItem, reviseInvoiceOnFbr, fbrRelevantChange,
   type SalonInvoice, type SalonInvoiceItem,
 } from "@/lib/salon-invoices";
 import type { PaymentMethod } from "@/lib/types";
@@ -120,6 +120,8 @@ export default function SalonInvoiceEdit({ invoice, onClose, onSaved }: Props) {
       total,
       paymentMethod,
       notes: notes.trim(),
+      // A Pay Later sale whose total changed: remember the old total so the customer is told what was added.
+      ...(invoice.creditSale ? { creditPreviousTotal: total !== invoice.total ? invoice.total : undefined } : {}),
     };
     // FBR already holds this bill — cancel it there and re-file the edited one.
     if (invoice.fbrInvoiceNumber && fbrRelevantChange(invoice, updated)) {
@@ -128,6 +130,8 @@ export default function SalonInvoiceEdit({ invoice, onClose, onSaved }: Props) {
       updated = revised.invoice;
     }
     updateSalonInvoice(updated);
+    // A Pay Later sale is re-settled on save (paid / part-paid / unpaid follows the new total) — hand on that saved version.
+    updated = getSalonInvoices().find((i) => i.id === updated.id) ?? updated;
 
     // Commission is computed from the appointment's totalAmount, not the bill,
     // so a service added here has to move that figure too. Without it an upsell

@@ -226,7 +226,9 @@ function buildReceipt(data: ReceiptData): Buffer {
   }
 
   const isPaid = data.invoice.status === "paid";
-  const isAdvance = data.invoice.status === "partial";
+  const isAdvance = data.invoice.status === "partial" && !data.invoice.creditSale;
+  const creditOpen = !!data.invoice.creditSale && data.invoice.status !== "paid";
+  const creditPaid = data.invoice.advanceAmount ?? 0;
 
   if (isAdvance) {
     const advance = data.invoice.advanceAmount ?? 0;
@@ -238,15 +240,15 @@ function buildReceipt(data: ReceiptData): Buffer {
     push(CMD.heavyOff);
   }
 
-  if (data.invoice.creditSale && data.invoice.status === "unpaid") {
-    push(padLine("Paid so far", `${data.currency} 0`, W));
+  if (creditOpen) {
+    push(padLine("Paid so far", `${data.currency} ${creditPaid.toFixed(0)}`, W));
     push(CMD.heavyOn);
-    push(padLine("REMAINING", `${data.currency} ${data.invoice.total.toFixed(0)}`, W));
+    push(padLine("REMAINING", `${data.currency} ${(data.invoice.total - creditPaid).toFixed(0)}`, W));
     push(CMD.heavyOff);
   }
 
   push(CMD.alignCenter, CMD.heavyOn);
-  push(text(isPaid ? "** PAID **" : isAdvance ? "** ADVANCE PAID **" : "** UNPAID **"));
+  push(text(isPaid ? "** PAID **" : isAdvance ? "** ADVANCE PAID **" : creditOpen && creditPaid > 0 ? "** PART PAID **" : "** UNPAID **"));
   push(CMD.heavyOff);
 
   // The refund terms have to be on the customer's copy, not just the PDF.

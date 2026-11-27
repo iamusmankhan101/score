@@ -729,7 +729,7 @@ export function patientTimeline(input: {
   for (const inv of input.invoices) {
     if (inv.clientId !== clientId) continue;
     const time = (inv.createdAt ?? "").slice(11, 16);
-    events.push({ date: inv.date, time, kind: "payment", title: `Invoice ${inv.number} · PKR ${Math.round(inv.total).toLocaleString("en-PK")}`, detail: inv.status === "paid" ? "Paid" : inv.status === "partial" ? "Advance paid" : "Unpaid" });
+    events.push({ date: inv.date, time, kind: "payment", title: `Invoice ${inv.number} · PKR ${Math.round(inv.total).toLocaleString("en-PK")}`, detail: inv.status === "paid" ? "Paid" : inv.status === "partial" ? (inv.creditSale ? "Part paid" : "Advance paid") : "Unpaid" });
     for (const line of inv.items) {
       if (line.packagePurchase) events.push({ date: inv.date, time, kind: "package", title: `Package bought: ${line.description}`, detail: `${line.packagePurchase.sessions * Math.max(1, line.qty)} sessions` });
       if (line.packageId) events.push({ date: inv.date, time, kind: "package", title: `Package session used: ${line.description}` });

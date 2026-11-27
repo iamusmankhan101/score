@@ -10,7 +10,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { useCanDelete } from "@/lib/use-can-delete";
 import { reverseInvoicePoints } from "@/lib/loyalty";
 import {
-  getSalonInvoices, deleteSalonInvoice, cancelInvoiceOnFbr, markSalonInvoicePaid, markSalonInvoiceUnpaid, updateSalonInvoice, createBalancePaymentInvoice, localDateKey, balanceDue, advancePercent,
+  getSalonInvoices, deleteSalonInvoice, cancelInvoiceOnFbr, markSalonInvoicePaid, markSalonInvoiceUnpaid, updateSalonInvoice, createBalancePaymentInvoice, payCreditInvoice, balanceOwed, localDateKey, balanceDue, advancePercent,
   paymentMethodLabel, refundedTotal, revenueAmount, type SalonInvoice,
 } from "@/lib/salon-invoices";
 import type { PaymentMethod } from "@/lib/types";
@@ -51,6 +51,9 @@ const STATUS_META = {
   // settled nor untouched at a glance.
   partial: { label: "Advance", color: "#0284c7", bg: "#e0f2fe", icon: Clock },
 };
+
+// A Pay Later sale that has been part-paid: "partial" in the data, but not an advance.
+const CREDIT_PART_META = { label: "Part-paid", color: "#0284c7", bg: "#e0f2fe", icon: Clock };
 
 const METHOD_LABELS: Record<string, string> = {
   cash: "Cash", jazzcash: "JazzCash", easypaisa: "EasyPaisa",
@@ -98,6 +101,7 @@ export default function InvoicesPage() {
   const [markUnpaidConfirmId, setMarkUnpaidConfirmId] = useState<string | null>(null);
   const [creatingBalanceReceipt, setCreatingBalanceReceipt] = useState(false);
   const [markPaidDate, setMarkPaidDate] = useState(() => localDateKey());
+  const [creditPayAmount, setCreditPayAmount] = useState(""); // Pay Later sales: how much is being paid now
   const [editDateInvoice, setEditDateInvoice] = useState<SalonInvoice | null>(null);
   const [editDateValue, setEditDateValue] = useState("");
   const [editingInvoice, setEditingInvoice] = useState<SalonInvoice | null>(null);
@@ -128,7 +132,12 @@ export default function InvoicesPage() {
   // previously-picked backdate doesn't silently carry over to the next one.
   useEffect(() => {
     if (!markPaidPromptId) return;
-    queueMicrotask(() => setMarkPaidDate(localDateKey()));
+    queueMicrotask(() => {
+      setMarkPaidDate(localDateKey());
+      const inv = invoices.find((i) => i.id === markPaidPromptId);
+      setCreditPayAmount(inv?.creditSale ? String(balanceOwed(inv)) : "");
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [markPaidPromptId]);
 
   // Deep-link support: opening /dashboard/invoices?id=<invoiceId> (e.g. from a
@@ -190,8 +199,35 @@ export default function InvoicesPage() {
     if (!markPaidPromptId) return;
     const id = markPaidPromptId;
     const invoiceBeingPaid = invoices.find((inv) => inv.id === id);
-    // An advance's balance, or a Pay Later sale's payment, goes on its own dated receipt so the money counts on the day it came in.
-    const wasPartial = invoiceBeingPaid?.status === "partial" || (!!invoiceBeingPaid?.creditSale && invoiceBeingPaid.status === "unpaid");
+    // A Pay Later sale is paid in one or more parts; each part is its own dated receipt so the money counts on the day it came in.
+    if (invoiceBeingPaid?.creditSale && invoiceBeingPaid.status !== "paid") {
+      const owed = balanceOwed(invoiceBeingPaid);
+      const amount = Math.min(owed, Math.round(Number(creditPayAmount) || 0));
+      if (amount <= 0) return;
+      setCreatingBalanceReceipt(true);
+      const { invoice: receipt, remaining } = await payCreditInvoice(invoiceBeingPaid, method, markPaidDate, amount);
+      setViewingInvoice(receipt);
+      const client = receipt.clientId ? getStoredClients().find((c) => c.id === receipt.clientId) : undefined;
+      const phone = receipt.clientPhone || client?.phone || "";
+      const name = receipt.clientName || client?.name || "";
+      const summary = remaining > 0 ? `${fmt(amount)} received, ${fmt(remaining)} still remaining.` : `${fmt(amount)} received — fully paid.`;
+      if (!phone) {
+        setResendNotice({ ok: false, text: `${summary} Receipt ${receipt.number} has no customer phone number for WhatsApp.` });
+      } else {
+        const result = await queueInvoiceReceipt(receipt, { name, phone });
+        setResendNotice(
+          result === "queued" ? { ok: true, text: `${summary} Receipt ${receipt.number} queued for ${name || phone} on WhatsApp.` }
+          : result === "skipped" ? { ok: false, text: `${summary} WhatsApp automation is off, so no message was sent.` }
+          : { ok: false, text: `${summary} WhatsApp delivery could not be queued.` }
+        );
+      }
+      setTimeout(() => setResendNotice(null), 8000);
+      setCreatingBalanceReceipt(false);
+      reload();
+      setMarkPaidPromptId(null);
+      return;
+    }
+    const wasPartial = invoiceBeingPaid?.status === "partial";
     if (wasPartial && invoiceBeingPaid) {
       setCreatingBalanceReceipt(true);
       const created = await createBalancePaymentInvoice(invoiceBeingPaid, method, markPaidDate);
@@ -233,8 +269,9 @@ export default function InvoicesPage() {
     // Reopening a Pay Later sale takes back the payment receipt that counted its money.
     if (invoices.find((inv) => inv.id === id)?.creditSale) {
       for (const receipt of invoices.filter((inv) => inv.balanceInvoiceOf === id)) void deleteSalonInvoice(receipt.id);
+    } else {
+      markSalonInvoiceUnpaid(id);
     }
-    markSalonInvoiceUnpaid(id);
     reload();
     if (viewingInvoice?.id === id) {
       setViewingInvoice((prev) => prev ? { ...prev, status: "unpaid", paymentMethod: "", paidDate: undefined } : prev);
@@ -425,7 +462,7 @@ export default function InvoicesPage() {
             <InvoiceDiagnostics month={month} section={activeSection} />
           </div>
         ) : filtered.map((inv) => {
-          const sm = STATUS_META[inv.status];
+          const sm = inv.creditSale && inv.status === "partial" ? CREDIT_PART_META : STATUS_META[inv.status];
           const Icon = sm.icon;
           return (
             <div key={inv.id} className="mobile-list-card" onClick={() => setViewingInvoice(inv)}>
@@ -528,19 +565,32 @@ export default function InvoicesPage() {
             {(() => {
               const promptInvoice = invoices.find((inv) => inv.id === markPaidPromptId);
               const balance = promptInvoice ? balanceDue(promptInvoice) : 0;
-              return promptInvoice?.creditSale && promptInvoice.status === "unpaid" ? (
+              return promptInvoice?.creditSale && promptInvoice.status !== "paid" ? (
                 <>
-                  <div style={{ fontWeight: 800, fontSize: 16, color: "#1a1a2e", marginBottom: 6 }}>Collect the payment</div>
+                  <div style={{ fontWeight: 800, fontSize: 16, color: "#1a1a2e", marginBottom: 6 }}>Collect a payment</div>
                   <div style={{ fontSize: 13, color: "#6b6b8a", marginBottom: 12 }}>
-                    Credit invoice {promptInvoice.number} — total {fmt(promptInvoice.total)}, paid so far {fmt(0)}.
+                    Credit invoice {promptInvoice.number} — total {fmt(promptInvoice.total)}, paid so far {fmt(promptInvoice.advanceAmount ?? 0)}.
                   </div>
-                  <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 14, fontWeight: 800, color: "#b45309" }}>
-                    Remaining {fmt(promptInvoice.total)}
+                  <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 14, fontWeight: 800, color: "#b45309" }}>
+                    Remaining {fmt(balanceOwed(promptInvoice))}
                   </div>
-                  <div style={{ fontSize: 13, color: "#6b6b8a", marginBottom: 16 }}>How was it paid?</div>
+                  <div style={{ textAlign: "left", marginBottom: 14 }}>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+                      Amount paid now (PKR)
+                    </label>
+                    <input
+                      type="number" min={1} max={balanceOwed(promptInvoice)} value={creditPayAmount}
+                      onChange={(e) => setCreditPayAmount(e.target.value)}
+                      style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: "1px solid #e8e8f0", fontSize: 14, fontWeight: 700, color: "#1a1a2e", background: "#faf9fd" }}
+                    />
+                    <div style={{ fontSize: 11, color: "#9898b0", marginTop: 5 }}>
+                      {(() => { const left = balanceOwed(promptInvoice) - Math.min(balanceOwed(promptInvoice), Number(creditPayAmount) || 0); return left > 0 ? `${fmt(left)} will still be remaining after this payment.` : "This clears the whole balance."; })()}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 13, color: "#6b6b8a", marginBottom: 12 }}>How was it paid?</div>
                   <div style={{ textAlign: "left", marginBottom: 14, padding: "10px 12px", borderRadius: 10, background: "#f0f9ff", border: "1px solid #bae6fd", fontSize: 11, color: "#0369a1", lineHeight: 1.4 }}>
                     <b style={{ display: "block", fontSize: 12, color: "#075985" }}>Payment receipt</b>
-                    A paid receipt for {fmt(promptInvoice.total)} is created on the date you pick below, and that is the day it counts in revenue.
+                    A paid receipt for this amount is created on the date you pick below, and that is the day it counts in revenue.
                   </div>
                 </>
               ) : promptInvoice?.status === "partial" ? (
@@ -727,7 +777,7 @@ export default function InvoicesPage() {
                   <InvoiceDiagnostics month={month} section={activeSection} />
                 </div>
               ) : filtered.map((inv, i) => {
-                const sm = STATUS_META[inv.status];
+                const sm = inv.creditSale && inv.status === "partial" ? CREDIT_PART_META : STATUS_META[inv.status];
                 const StatusIcon = sm.icon;
                 return (
                   <div

@@ -35,10 +35,14 @@ export async function sendSalonInvoiceWhatsApp({
 
   const pdf = await generateSalonInvoicePdf(invoice, salon);
   const pkr = (n: number) => `PKR ${n.toLocaleString("en-PK")}`;
-  const invoiceLine = invoice.creditSale && invoice.status === "unpaid"
-    ? `Credit invoice ${invoice.number} from ${salon.name} — total ${pkr(invoice.total)}. Paid so far: ${pkr(0)}. Remaining balance: ${pkr(invoice.total)}`
+  const creditPaidNow = invoice.status === "paid" ? invoice.total : invoice.advanceAmount ?? 0;
+  const creditChange = invoice.creditSale && invoice.creditPreviousTotal != null ? invoice.total - invoice.creditPreviousTotal : 0;
+  const invoiceLine = invoice.creditSale && creditChange !== 0
+    ? `Updated credit invoice ${invoice.number} from ${salon.name} — total is now ${pkr(invoice.total)} (was ${pkr(invoice.creditPreviousTotal ?? 0)}; ${creditChange > 0 ? `${pkr(creditChange)} added` : `${pkr(-creditChange)} less`}). Paid so far: ${pkr(creditPaidNow)}. Remaining balance: ${pkr(Math.max(0, invoice.total - creditPaidNow))}`
+    : invoice.creditSale && invoice.status !== "paid"
+    ? `Credit invoice ${invoice.number} from ${salon.name} — total ${pkr(invoice.total)}. Paid so far: ${pkr(invoice.advanceAmount ?? 0)}. Remaining balance: ${pkr(invoice.total - (invoice.advanceAmount ?? 0))}`
     : invoice.balanceInvoiceOf && invoice.creditParentNumber
-    ? `Payment receipt ${invoice.number} from ${salon.name} — received ${pkr(invoice.total)} for credit invoice ${invoice.creditParentNumber}. Remaining balance: ${pkr(0)}`
+    ? `Payment receipt ${invoice.number} from ${salon.name} — received ${pkr(invoice.total)} for credit invoice ${invoice.creditParentNumber}. Remaining balance: ${pkr(invoice.creditRemaining ?? 0)}`
     : isAdvanceInvoice(invoice)
     ? `Advance receipt ${invoice.number} from ${salon.name} — advance received ${pkr(invoice.advanceAmount ?? 0)} of ${pkr(invoice.total)}. Balance due: ${pkr(balanceDue(invoice))}`
     : `Invoice ${invoice.number} from ${salon.name} — ${pkr(invoice.total)}`;

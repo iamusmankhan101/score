@@ -139,8 +139,12 @@ export interface SalonInvoice {
    * Older unpaid invoices don't have this and keep counting as before.
    */
   creditSale?: boolean;
-  /** On the receipt that settled a credit sale: the credit invoice's number, for the wording. */
+  /** On a receipt that paid toward a credit sale: the credit invoice's number, for the wording. */
   creditParentNumber?: string;
+  /** On that receipt: what was still owed on the credit invoice right after this payment. */
+  creditRemaining?: number;
+  /** On a credit invoice whose total was edited: the total before the latest edit (so the customer is told what was added). */
+  creditPreviousTotal?: number;
   /** Set on a separate receipt created for the balance of an advance invoice. */
   balanceInvoiceOf?: string;
   /** Derived on read: the separate receipt that collected this advance invoice's balance (see getSalonInvoices). */
@@ -272,7 +276,8 @@ export function invoiceTimeLabel(inv: Pick<SalonInvoice, "date" | "createdAt">):
 }
 
 /** True for an advance receipt: money taken up front, balance still owed. */
-export const isAdvanceInvoice = (inv: Pick<SalonInvoice, "status" | "advanceAmount">) => inv.status === "partial" && (inv.advanceAmount ?? 0) > 0;
+// A credit sale that has been part-paid is "partial" too (so balances and outstanding totals work), but it isn't an advance.
+export const isAdvanceInvoice = (inv: Pick<SalonInvoice, "status" | "advanceAmount" | "creditSale">) => inv.status === "partial" && (inv.advanceAmount ?? 0) > 0 && !inv.creditSale;
 
 /** WhatsApp wording for an advance receipt — what was received and what is left, not "thanks for visiting". */
 export function advanceThanks(name: string, salonName: string): string {
@@ -394,18 +399,19 @@ export async function createBalancePaymentInvoice(
   paymentMethod: PaymentMethod,
   paidDate = localDateKey(),
 ): Promise<{ invoice: SalonInvoice; dbSaved: boolean; alreadyExists: boolean }> {
-  // A credit sale is settled in one payment for its whole total; an advance invoice for what's left.
-  const credit = !!parent.creditSale && parent.status === "unpaid";
-  const balance = credit ? parent.total : balanceDue(parent);
+  // A credit sale can be paid in several parts — each part is its own dated receipt.
+  if (parent.creditSale) {
+    const { invoice, dbSaved } = await payCreditInvoice(parent, paymentMethod, paidDate, balanceOwed(parent));
+    return { invoice, dbSaved, alreadyExists: false };
+  }
+  const balance = balanceDue(parent);
   const existing = getSalonInvoices().find((inv) => inv.balanceInvoiceOf === parent.id);
   if (existing) return { invoice: existing, dbSaved: true, alreadyExists: true };
 
   const item: SalonInvoiceItem = {
     id: crypto.randomUUID(),
     type: "service",
-    description: credit
-      ? `Payment for credit invoice ${parent.number} — ${parent.items.map((i) => i.description).join(", ")}`
-      : balanceDescription(parent),
+    description: balanceDescription(parent),
     qty: 1,
     unitPrice: balance,
     total: balance,
@@ -430,16 +436,87 @@ export async function createBalancePaymentInvoice(
     paidDate,
     status: "paid",
     balanceInvoiceOf: parent.id,
-    ...(credit ? { creditParentNumber: parent.number } : {}),
-    notes: credit
-      ? `Payment receipt for credit invoice ${parent.number}. Total ${parent.total.toLocaleString("en-PK")}, paid in full on this date.`
-      : `Balance payment receipt for advance invoice ${parent.number}. Advance received: PKR ${(parent.advanceAmount ?? 0).toLocaleString("en-PK")}.`,
+    notes: `Balance payment receipt for advance invoice ${parent.number}. Advance received: PKR ${(parent.advanceAmount ?? 0).toLocaleString("en-PK")}.`,
     source: "pos",
   }).then(({ invoice, dbSaved }) => ({ invoice, dbSaved, alreadyExists: false }));
 }
 
+/** What's still owed on a Pay Later sale: unpaid in full, or part-paid (advanceAmount holds what has come in so far). */
+export function balanceOwed(inv: Pick<SalonInvoice, "status" | "total" | "advanceAmount">): number {
+  return inv.status === "paid" ? 0 : Math.max(0, inv.total - (inv.advanceAmount ?? 0));
+}
+
+/**
+ * Recomputes a Pay Later sale from the payment receipts in `list`: unpaid until something
+ * is paid, part-paid in between, paid once the receipts cover the total. The receipts are
+ * the single source of truth, so adding or deleting one always leaves the sale consistent.
+ */
+function settleCreditParent(list: SalonInvoice[], parentId: string): SalonInvoice[] {
+  const parent = list.find((i) => i.id === parentId);
+  if (!parent?.creditSale) return list;
+  const receipts = list.filter((i) => i.balanceInvoiceOf === parentId);
+  const paid = receipts.reduce((sum, r) => sum + r.total, 0);
+  const latest = [...receipts].sort((a, b) => (a.date + a.createdAt).localeCompare(b.date + b.createdAt)).pop();
+  const settled = paid >= parent.total;
+  const next: SalonInvoice = {
+    ...parent,
+    status: settled ? "paid" : paid > 0 ? "partial" : "unpaid",
+    advanceAmount: !settled && paid > 0 ? paid : undefined,
+    paymentMethod: settled ? latest?.paymentMethod ?? "" : "",
+    paidDate: settled ? latest?.paidDate ?? latest?.date : undefined,
+  };
+  return list.map((i) => (i.id === parentId ? next : i));
+}
+
+/**
+ * Records a payment (all or part) toward a Pay Later sale: a paid receipt dated `paidDate`,
+ * so the money counts in revenue on the day it came in, and the sale's balance goes down.
+ */
+export async function payCreditInvoice(
+  parent: SalonInvoice,
+  paymentMethod: PaymentMethod,
+  paidDate: string,
+  amount: number,
+): Promise<{ invoice: SalonInvoice; dbSaved: boolean; remaining: number }> {
+  const owed = balanceOwed(parent);
+  const pay = Math.min(Math.max(0, amount), owed);
+  const remaining = owed - pay;
+  const receipt: SalonInvoice = {
+    id: crypto.randomUUID(),
+    number: nextInvoiceNumber(),
+    createdAt: new Date().toISOString(),
+    appointmentId: parent.appointmentId,
+    clientId: parent.clientId,
+    clientName: parent.clientName,
+    clientPhone: parent.clientPhone,
+    clientEmail: parent.clientEmail,
+    staffName: parent.staffName,
+    staffId: parent.staffId,
+    staffIds: parent.staffIds,
+    section: parent.section,
+    items: [{
+      id: crypto.randomUUID(), type: "service",
+      description: `Payment for credit invoice ${parent.number} — ${parent.items.map((i) => i.description).join(", ")}`,
+      qty: 1, unitPrice: pay, total: pay,
+    }],
+    subtotal: pay, discountAmount: 0, taxAmount: 0, total: pay,
+    paymentMethod, date: paidDate, paidDate, status: "paid",
+    balanceInvoiceOf: parent.id,
+    creditParentNumber: parent.number,
+    creditRemaining: remaining,
+    notes: `Payment of PKR ${pay.toLocaleString("en-PK")} for credit invoice ${parent.number} (total PKR ${parent.total.toLocaleString("en-PK")}). Remaining: PKR ${remaining.toLocaleString("en-PK")}.`,
+    source: "pos",
+  };
+  const list = settleCreditParent([receipt, ...getSalonInvoices()], parent.id);
+  const dbSaved = await saveSalonInvoices(list);
+  return { invoice: receipt, dbSaved, remaining };
+}
+
 export function updateSalonInvoice(updated: SalonInvoice): void {
-  const list = getSalonInvoices().map((inv) => (inv.id === updated.id ? updated : inv));
+  let list = getSalonInvoices().map((inv) => (inv.id === updated.id ? updated : inv));
+  // Editing a Pay Later sale's total, or one of its payment receipts, changes what is paid / still owed.
+  const creditParentId = updated.creditSale ? updated.id : updated.creditParentNumber ? updated.balanceInvoiceOf : undefined;
+  if (creditParentId) list = settleCreditParent(list, creditParentId);
   saveSalonInvoices(list);
 }
 
@@ -452,7 +529,12 @@ export function updateSalonInvoice(updated: SalonInvoice): void {
  */
 export async function deleteSalonInvoice(id: string): Promise<void> {
   const tombstoned = recordDeletions("salon_invoices", [id]);
-  saveSalonInvoices(getSalonInvoices().filter((inv) => inv.id !== id));
+  const before = getSalonInvoices();
+  const creditParentId = before.find((inv) => inv.id === id && inv.creditParentNumber)?.balanceInvoiceOf;
+  let remainingList = before.filter((inv) => inv.id !== id);
+  // Deleting a payment receipt puts that amount back on its Pay Later sale.
+  if (creditParentId) remainingList = settleCreditParent(remainingList, creditParentId);
+  saveSalonInvoices(remainingList);
 
   // A deleted invoice may still have a WhatsApp receipt queued from checkout —
   // cancel it so the client isn't sent an "Invoice" message for a sale that no

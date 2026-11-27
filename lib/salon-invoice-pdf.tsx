@@ -73,7 +73,9 @@ function InvoiceDocument({ invoice, salon, fbrQr, fbrLogo }: {
   fbrLogo?: Buffer;
 }) {
   const isPaid   = invoice.status === "paid";
-  const isAdvance = invoice.status === "partial";
+  const isAdvance = invoice.status === "partial" && !invoice.creditSale;
+  const creditOpen = !!invoice.creditSale && invoice.status !== "paid";
+  const creditPaid = invoice.advanceAmount ?? 0;
   const advancePaid = invoice.advanceAmount ?? 0;
   const balanceRemaining = balanceDue(invoice);
   const salonName = salon.name || "Salon Central";
@@ -129,7 +131,7 @@ function InvoiceDocument({ invoice, salon, fbrQr, fbrLogo }: {
             </View>
             <View style={styles.metaRow}>
               <Text style={styles.metaRowLabel}>Status:</Text>
-              <Text style={styles.metaRowValue}>{isPaid ? "PAID" : isAdvance ? "ADVANCE PAID" : "UNPAID"}</Text>
+              <Text style={styles.metaRowValue}>{isPaid ? "PAID" : isAdvance ? "ADVANCE PAID" : creditOpen && creditPaid > 0 ? "PART PAID" : "UNPAID"}</Text>
             </View>
           </View>
         </View>
@@ -197,15 +199,21 @@ function InvoiceDocument({ invoice, salon, fbrQr, fbrLogo }: {
             <Text style={styles.totalLabel}>Total</Text>
             <Text style={styles.totalValue}>{money(invoice.total)}</Text>
           </View>
-          {invoice.creditSale && invoice.status === "unpaid" && (
+          {!!invoice.creditSale && invoice.creditPreviousTotal != null && invoice.total !== invoice.creditPreviousTotal && (
+            <View style={styles.row}>
+              <Text style={styles.cellMuted}>{invoice.total > invoice.creditPreviousTotal ? "Amount added (was " : "Amount reduced (was "}{money(invoice.creditPreviousTotal)})</Text>
+              <Text style={styles.cellStrong}>{invoice.total > invoice.creditPreviousTotal ? "+" : "−"}{money(Math.abs(invoice.total - invoice.creditPreviousTotal))}</Text>
+            </View>
+          )}
+          {creditOpen && (
             <>
               <View style={styles.row}>
                 <Text style={styles.cellMuted}>Paid so far</Text>
-                <Text style={styles.cellStrong}>{money(0)}</Text>
+                <Text style={styles.cellStrong}>{money(creditPaid)}</Text>
               </View>
               <View style={styles.row}>
                 <Text style={styles.cellMuted}>Remaining balance</Text>
-                <Text style={styles.cellStrong}>{money(invoice.total)}</Text>
+                <Text style={styles.cellStrong}>{money(invoice.total - creditPaid)}</Text>
               </View>
             </>
           )}

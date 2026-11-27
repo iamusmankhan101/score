@@ -313,7 +313,9 @@ export default function SalonInvoicePrint({
 
   const itemGroups = invoiceItemsByPerson(invoice);
   const isPaid   = invoice.status === "paid";
-  const isAdvance = invoice.status === "partial";
+  const isAdvance = invoice.status === "partial" && !invoice.creditSale;
+  const creditOpen = !!invoice.creditSale && invoice.status !== "paid";
+  const creditPaid = invoice.advanceAmount ?? 0;
   const logo     = (settingsStore.salon as { logo?: string }).logo || "";
   const initials = salonName.split(" ").filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
   const printer  = settingsStore.printer as { enabled: boolean; ip: string; port: number; paperWidthMm?: number };
@@ -539,7 +541,7 @@ export default function SalonInvoicePrint({
                         ["Issue Date:", [fmtDate(invoice.date), invoiceTimeLabel(invoice)].filter(Boolean).join(", ")],
                         ...(invoice.staffName ? [["Stylist:", invoice.staffName]] : []),
                         ["Payment:", METHOD_LABELS[invoice.paymentMethod ?? ""] ?? "—"],
-                        ["Status:", isPaid ? "PAID" : isAdvance ? "ADVANCE PAID" : "UNPAID"],
+                        ["Status:", isPaid ? "PAID" : isAdvance ? "ADVANCE PAID" : creditOpen && creditPaid > 0 ? "PART PAID" : "UNPAID"],
                       ].map(([label, value]) => (
                         <tr key={label} className={label === "Invoice No:" ? "sip-invno-row" : undefined}>
                           <td style={{ padding: "3px 0", color: "#555", width: "45%" }}>{label}</td>
@@ -624,14 +626,14 @@ export default function SalonInvoicePrint({
                     <span style={{ fontWeight: 800, color: "#111" }}>Total</span>
                     <span style={{ fontWeight: 900, color: "#111" }}>{fmt(invoice.total)}</span>
                   </div>
-                  {invoice.creditSale && invoice.status === "unpaid" && (
+                  {creditOpen && (
                     <>
                       <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13, color: "#555" }}>
-                        <span>Paid so far</span><span style={{ fontWeight: 700 }}>{fmt(0)}</span>
+                        <span>Paid so far</span><span style={{ fontWeight: 700 }}>{fmt(creditPaid)}</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13, color: "#b45309" }}>
                         <span style={{ fontWeight: 800 }}>Remaining balance</span>
-                        <span style={{ fontWeight: 900 }}>{fmt(invoice.total)}</span>
+                        <span style={{ fontWeight: 900 }}>{fmt(invoice.total - creditPaid)}</span>
                       </div>
                     </>
                   )}
