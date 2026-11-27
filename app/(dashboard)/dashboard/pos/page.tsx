@@ -20,7 +20,7 @@ import {
 } from "@/lib/storage";
 import { getHeldSales, saveHeldSale, removeHeldSale, type HeldSale } from "@/lib/held-sales";
 import {
-  createSalonInvoice, calcTotals, isAdvanceInvoice, advanceThanks, reportInvoiceToFbr, createBalancePaymentInvoice, markSalonInvoicePaid, balanceDue,
+  createSalonInvoice, calcTotals, isAdvanceInvoice, advanceThanks, reportInvoiceToFbr, createBalancePaymentInvoice, payCreditInvoice, markSalonInvoicePaid, balanceDue,
   localDateKey, getSalonInvoices, saveSalonInvoices,
   ADVANCE_NON_REFUNDABLE_NOTE, CARD_TERMINALS,
   type SalonInvoice, type SalonInvoiceItem,
@@ -350,6 +350,8 @@ export default function POSPage() {
 
   // ── Flow ──────────────────────────────────────────────────────────────────
   const [isCredit,         setIsCredit]         = useState(false);
+  // Pay Later sales can take part of the money now (e.g. 20,000 of 23,000); the rest stays owed.
+  const [creditPaidNow,    setCreditPaidNow]    = useState("");
   // Advance: client pays part now, balance on collection. Defaults to half the
   // ticket but the cashier can set any percentage or an exact rupee figure.
   const [isAdvance,        setIsAdvance]        = useState(false);
@@ -559,7 +561,8 @@ export default function POSPage() {
   const consentGaps = clinic && selectedClient?.id
     ? missingConsents(selectedClient.id, cart.filter(e => e.type === "service" && !e.guestName).map(e => ({ id: e.itemId, name: e.name })), getConsents())
     : [];
-  const noPaymentSelected = !isCredit && !payMethod;
+  const creditPaid = isCredit ? Math.min(Math.max(0, Math.round(Number(creditPaidNow) || 0)), Math.round(total)) : 0;
+  const noPaymentSelected = isCredit ? creditPaid > 0 && !payMethod : !payMethod;
   // An advance invoice is the client's receipt for the money just taken. With no
   // phone (walk-ins) it can't go on WhatsApp, so it's printed at the desk instead —
   // shown as a hint, not a block.
@@ -714,7 +717,7 @@ export default function POSPage() {
     setCardApproval(""); setCardLast4("");
     setIsAdvance(false); setAdvanceValue(50); setAdvanceType("pct");
     setSelectedClient(null); setClientQ(""); setSelectedStaffIds([]);
-    setCompleted(false); setLastInvoice(null); setWaStatus("idle"); setIsCredit(false);
+    setCompleted(false); setLastInvoice(null); setWaStatus("idle"); setIsCredit(false); setCreditPaidNow("");
     setSyncFailed(false);
     // Otherwise the next, unrelated sale would be linked to (and complete) the
     // appointment this page was opened for.
@@ -815,6 +818,7 @@ export default function POSPage() {
     // Mirrors the Complete Sale button's disabled condition — a payment method (or
     // explicit Pay Later/Credit) must be chosen, never silently defaulted.
     if (!isCredit && !payMethod) return;
+    if (isCredit && creditPaid > 0 && !payMethod) return;
     if (cardNoTerminal) return;
     if (packageWithoutClient || packageOverdrawn || membershipOverdrawn) return;
     setCompleting(true);
@@ -836,7 +840,7 @@ export default function POSPage() {
       const saleSection = staffMember?.section
         ?? (new Set(cartSections).size === 1 ? cartSections[0] : undefined)
         ?? (activeSection !== "all" ? activeSection : undefined);
-      const { invoice: createdInvoice, dbSaved } = await createSalonInvoice({
+      const { invoice: baseInvoice, dbSaved: baseSaved } = await createSalonInvoice({
         appointmentId: checkoutAppointmentId || undefined,
         clientId:      selectedClient?.id || undefined,
         clientName:    selectedClient?.name || "Walk-in Customer",
@@ -869,6 +873,15 @@ export default function POSPage() {
       // The sale is already final (payment collected, receipt about to send) so a
       // failed sync doesn't block checkout — but it must not go unnoticed the way
       // it did before, silently leaving the invoice missing on every other device.
+      // A Pay Later sale that takes part payment now: the money paid is its own receipt dated today
+      // (that's what counts in revenue); the invoice customers get shows paid so far and what remains.
+      let createdInvoice = baseInvoice;
+      let dbSaved = baseSaved;
+      if (isCredit && creditPaid > 0) {
+        const payment = await payCreditInvoice(baseInvoice, payMethod as PaymentMethod, today, creditPaid);
+        dbSaved = dbSaved && payment.dbSaved;
+        createdInvoice = getSalonInvoices().find((i) => i.id === baseInvoice.id) ?? baseInvoice;
+      }
       setSyncFailed(!dbSaved);
 
       // Reported before the receipt prints or goes out on WhatsApp, so both
@@ -1287,22 +1300,22 @@ export default function POSPage() {
       {/* ══ SUCCESS BANNER ══ */}
       {completed && lastInvoice && (
         <div style={{
-          background: lastInvoice.status === "unpaid" ? "linear-gradient(135deg,#fffbeb,#fef9c3)" : "linear-gradient(135deg,#ecfdf5,#f0fdf4)",
-          borderBottom: `2px solid ${lastInvoice.status === "unpaid" ? "#fcd34d" : "#6ee7b7"}`,
+          background: (lastInvoice.status === "unpaid" || (!!lastInvoice.creditSale && lastInvoice.status === "partial")) ? "linear-gradient(135deg,#fffbeb,#fef9c3)" : "linear-gradient(135deg,#ecfdf5,#f0fdf4)",
+          borderBottom: `2px solid ${(lastInvoice.status === "unpaid" || (!!lastInvoice.creditSale && lastInvoice.status === "partial")) ? "#fcd34d" : "#6ee7b7"}`,
           display: "flex", alignItems: "center", padding: "12px 24px", gap: 14, flexShrink: 0,
         }}>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", background: lastInvoice.status === "unpaid" ? "#d97706" : "#059669", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: `0 2px 8px rgba(${lastInvoice.status === "unpaid" ? "217,119,6" : "5,150,105"},0.35)` }}>
-            {lastInvoice.status === "unpaid" ? <Clock size={20} color="#fff" /> : <CheckCircle2 size={20} color="#fff" />}
+          <div style={{ width: 40, height: 40, borderRadius: "50%", background: (lastInvoice.status === "unpaid" || (!!lastInvoice.creditSale && lastInvoice.status === "partial")) ? "#d97706" : "#059669", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: `0 2px 8px rgba(${(lastInvoice.status === "unpaid" || (!!lastInvoice.creditSale && lastInvoice.status === "partial")) ? "217,119,6" : "5,150,105"},0.35)` }}>
+            {(lastInvoice.status === "unpaid" || (!!lastInvoice.creditSale && lastInvoice.status === "partial")) ? <Clock size={20} color="#fff" /> : <CheckCircle2 size={20} color="#fff" />}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: lastInvoice.status === "unpaid" ? "#92400e" : "#065f46" }}>
-              {lastInvoice.status === "unpaid" ? "Credit Invoice Created" : "Sale Complete"}
-              <span style={{ marginLeft: 8, fontSize: 13, fontWeight: 600, color: lastInvoice.status === "unpaid" ? "#fcd34d" : "#6ee7b7", background: lastInvoice.status === "unpaid" ? "#92400e" : "#065f46", borderRadius: 6, padding: "1px 8px" }}>{lastInvoice.number}</span>
+            <div style={{ fontSize: 15, fontWeight: 800, color: (lastInvoice.status === "unpaid" || (!!lastInvoice.creditSale && lastInvoice.status === "partial")) ? "#92400e" : "#065f46" }}>
+              {(lastInvoice.status === "unpaid" || (!!lastInvoice.creditSale && lastInvoice.status === "partial")) ? "Credit Invoice Created" : "Sale Complete"}
+              <span style={{ marginLeft: 8, fontSize: 13, fontWeight: 600, color: (lastInvoice.status === "unpaid" || (!!lastInvoice.creditSale && lastInvoice.status === "partial")) ? "#fcd34d" : "#6ee7b7", background: (lastInvoice.status === "unpaid" || (!!lastInvoice.creditSale && lastInvoice.status === "partial")) ? "#92400e" : "#065f46", borderRadius: 6, padding: "1px 8px" }}>{lastInvoice.number}</span>
             </div>
-            <div style={{ fontSize: 12, color: lastInvoice.status === "unpaid" ? "#b45309" : "#047857", marginTop: 3, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 12, color: (lastInvoice.status === "unpaid" || (!!lastInvoice.creditSale && lastInvoice.status === "partial")) ? "#b45309" : "#047857", marginTop: 3, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span style={{ fontWeight: 800 }}>{pkr(lastInvoice.total)}</span>
               <span>· {lastInvoice.clientName}</span>
-              {lastInvoice.status === "unpaid" && <span style={{ fontWeight: 700 }}>· Awaiting payment</span>}
+              {(lastInvoice.status === "unpaid" || (!!lastInvoice.creditSale && lastInvoice.status === "partial")) && <span style={{ fontWeight: 700 }}>· {lastInvoice.status === "partial" ? `Paid ${pkr(lastInvoice.advanceAmount ?? 0)}, ${pkr(lastInvoice.total - (lastInvoice.advanceAmount ?? 0))} remaining` : "Awaiting payment"}</span>}
               {waStatus === "sent" && <span style={{ display: "flex", alignItems: "center", gap: 3, color: "#059669", fontWeight: 700 }}><CheckCircle2 size={11} /> WhatsApp sent</span>}
               {waStatus === "queued" && <span style={{ display: "flex", alignItems: "center", gap: 3, color: "#7C3AED", fontWeight: 700 }}><Clock size={11} /> WhatsApp queued</span>}
               {waStatus === "sending" && <span style={{ display: "flex", alignItems: "center", gap: 3, color: "#7C3AED", fontWeight: 700 }}><RefreshCw size={11} /> Queueing PDF…</span>}
@@ -1318,7 +1331,7 @@ export default function POSPage() {
               </button>
             )}
             <button type="button" onClick={() => setPrintInvoice(lastInvoice)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 9, border: `1.5px solid ${lastInvoice.status === "unpaid" ? "#d97706" : "#059669"}`, background: "#fff", color: lastInvoice.status === "unpaid" ? "#d97706" : "#059669", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 9, border: `1.5px solid ${(lastInvoice.status === "unpaid" || (!!lastInvoice.creditSale && lastInvoice.status === "partial")) ? "#d97706" : "#059669"}`, background: "#fff", color: (lastInvoice.status === "unpaid" || (!!lastInvoice.creditSale && lastInvoice.status === "partial")) ? "#d97706" : "#059669", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
               <Printer size={14} /> Print
             </button>
             {selectedClient?.phone && lastInvoice.status !== "unpaid" && posPlan.whatsapp && (
@@ -2179,7 +2192,7 @@ export default function POSPage() {
                   <div style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", marginBottom: 3 }}>via</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.15)", borderRadius: 8, padding: "4px 10px" }}>
                     {isCredit ? (
-                      <span style={{ fontSize: 12, fontWeight: 800, color: "#fff" }}>Pay Later</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#fff" }}>Pay Later{creditPaid > 0 ? ` · ${pkr(creditPaid)} paid` : ""}</span>
                     ) : selectedPayMethod ? (
                       <>
                         {selectedPayMethod.logo
@@ -2247,7 +2260,7 @@ export default function POSPage() {
               {/* Pay Later toggle */}
               <button
                 type="button"
-                onClick={() => setIsCredit(c => !c)}
+                onClick={() => { setIsCredit(c => !c); setCreditPaidNow(""); }}
                 style={{
                   width: "100%", padding: "9px 0", borderRadius: 10, marginBottom: 8,
                   border: `2px solid ${isCredit ? "#d97706" : "#e8e8f4"}`,
@@ -2261,6 +2274,27 @@ export default function POSPage() {
                 <Clock size={13} />
                 {isCredit ? "Pay Later — Credit Sale" : "Pay Later / Credit"}
               </button>
+
+              {isCredit && (
+                <div style={{ marginBottom: 10, padding: "10px 12px", borderRadius: 11, background: "#fffbeb", border: "1px solid #fde68a" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#92400e", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Paid now (optional)</div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                    <input type="number" min={0} max={Math.round(total)} value={creditPaidNow} placeholder="0"
+                      onChange={e => setCreditPaidNow(e.target.value)}
+                      style={{ flex: 1, minWidth: 0, height: 34, padding: "0 10px", borderRadius: 9, border: "1.5px solid #fcd34d", fontSize: 14, fontWeight: 800, outline: "none", background: "#fff", color: "#1d1d2f" }} />
+                    {[25, 50].map(pct => (
+                      <button key={pct} type="button" onClick={() => setCreditPaidNow(String(Math.round(total * pct / 100)))}
+                        style={{ height: 34, padding: "0 10px", borderRadius: 9, border: "1.5px solid #fcd34d", background: "#fff", color: "#b45309", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>{pct}%</button>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 800, color: "#92400e" }}>
+                    <span>Paid {pkr(creditPaid)}</span><span>Remaining {pkr(Math.round(total) - creditPaid)}</span>
+                  </div>
+                  {creditPaid > 0 && !payMethod && (
+                    <div style={{ fontSize: 11, color: "#b91c1c", marginTop: 5, fontWeight: 700 }}>Pick how the {pkr(creditPaid)} was paid (Payment Method above).</div>
+                  )}
+                </div>
+              )}
 
               {advanceDue.length > 0 && (
                 <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 11, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
@@ -2381,7 +2415,7 @@ export default function POSPage() {
                 {completing
                   ? <><RefreshCw size={16} style={{ animation: "spin 1s linear infinite" }} /> Processing…</>
                   : isCredit
-                    ? <><Clock size={17} /> Create Credit Invoice</>
+                    ? <><Clock size={17} /> Create Credit Invoice{creditPaid > 0 ? ` · ${pkr(creditPaid)} paid` : ""}</>
                     : <><ReceiptText size={17} /> Complete Sale &amp; Print</>
                 }
               </button>
