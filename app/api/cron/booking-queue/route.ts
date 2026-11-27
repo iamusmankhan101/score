@@ -435,15 +435,19 @@ async function updatePosReceipt(
   error?: string,
   nextScheduledAt?: string,
 ) {
+  // Once a receipt is finished its salon snapshot (which carries the logo, ~65 KB) is never read again —
+  // keeping it made this table ~130 MB and the nightly full-database backup too big to store.
   await db.execute({
     sql: `UPDATE wa_pos_receipt_queue
           SET status = ?, attempts = ?, last_error = ?, sent_at = ?,
-              scheduled_at = COALESCE(?, scheduled_at)
+              scheduled_at = COALESCE(?, scheduled_at),
+              salon_json = CASE WHEN ? = 'pending' THEN salon_json ELSE '{}' END
           WHERE user_id = ? AND invoice_id = ?`,
     args: [
       status, item.attempts + 1, error ?? null,
       status === "sent" ? new Date().toISOString() : null,
       nextScheduledAt ?? null,
+      status,
       item.userId, item.invoiceId,
     ],
   });

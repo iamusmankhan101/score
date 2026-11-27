@@ -15,6 +15,7 @@
 import { NextRequest } from "next/server";
 import { encryptPlaintextRows, pruneOldBackups, snapshotAllSalonBundles, snapshotFullDatabase } from "@/lib/data-backup";
 import { pruneRateLimits } from "@/lib/rate-limit";
+import { db } from "@/lib/db";
 
 // The first prune after a long gap can have thousands of expired rows to clear.
 export const maxDuration = 300;
@@ -35,6 +36,10 @@ export async function GET(req: NextRequest) {
     // snapshot also stopped expired backups from ever being cleared, so the
     // backup tables kept growing — which is what made the snapshot fail.
     const pruned = await pruneOldBackups();
+    // Finished invoice-receipt queue rows still carry a full copy of the salon (logo included) that is never
+    // read again. They had grown to ~130 MB, which is what stopped the full-database backup from being stored.
+    // Idempotent: only rows that still hold a snapshot are touched.
+    await db.execute("UPDATE wa_pos_receipt_queue SET salon_json = '{}' WHERE status != 'pending' AND length(salon_json) > 2").catch(() => {});
     await pruneRateLimits();
     // Rows from before encryption was switched on, a batch a night.
     const encrypted = await encryptPlaintextRows();
