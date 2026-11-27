@@ -18,7 +18,7 @@ const rs = (n: number) => `Rs ${Math.round(n).toLocaleString()}`;
 const INP: React.CSSProperties = { padding: "9px 11px", borderRadius: 9, border: "1px solid #e4e4ee", fontSize: 14, outline: "none", background: "#fff" };
 
 /** Money actually received on this invoice: the advance on a partial, the full total otherwise. */
-const received = (i: SalonInvoice) => i.status === "partial" ? (i.advanceAmount ?? 0) : i.status === "paid" ? i.total : 0;
+const received = (i: SalonInvoice) => i.creditSale ? 0 : i.status === "partial" ? (i.advanceAmount ?? 0) : i.status === "paid" ? i.total : 0;
 
 export default function CashClosingPage() {
   const [date, setDate] = useState(todayKey());

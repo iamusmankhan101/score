@@ -35,7 +35,11 @@ export async function sendSalonInvoiceWhatsApp({
 
   const pdf = await generateSalonInvoicePdf(invoice, salon);
   const pkr = (n: number) => `PKR ${n.toLocaleString("en-PK")}`;
-  const invoiceLine = isAdvanceInvoice(invoice)
+  const invoiceLine = invoice.creditSale && invoice.status === "unpaid"
+    ? `Credit invoice ${invoice.number} from ${salon.name} — total ${pkr(invoice.total)}. Paid so far: ${pkr(0)}. Remaining balance: ${pkr(invoice.total)}`
+    : invoice.balanceInvoiceOf && invoice.creditParentNumber
+    ? `Payment receipt ${invoice.number} from ${salon.name} — received ${pkr(invoice.total)} for credit invoice ${invoice.creditParentNumber}. Remaining balance: ${pkr(0)}`
+    : isAdvanceInvoice(invoice)
     ? `Advance receipt ${invoice.number} from ${salon.name} — advance received ${pkr(invoice.advanceAmount ?? 0)} of ${pkr(invoice.total)}. Balance due: ${pkr(balanceDue(invoice))}`
     : `Invoice ${invoice.number} from ${salon.name} — ${pkr(invoice.total)}`;
   const caption = thankYouText ? `${thankYouText}\n\n${invoiceLine}` : invoiceLine;

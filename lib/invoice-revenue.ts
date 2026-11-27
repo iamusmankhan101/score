@@ -9,7 +9,7 @@
 
 import type { SalonInvoice } from "./salon-invoices";
 
-type RevenueFields = Pick<SalonInvoice, "status" | "total" | "advanceAmount" | "balanceInvoiceOf" | "balanceInvoiceId">;
+type RevenueFields = Pick<SalonInvoice, "status" | "total" | "advanceAmount" | "balanceInvoiceOf" | "balanceInvoiceId" | "creditSale">;
 
 /**
  * Marks each advance invoice whose balance was collected on its own receipt
@@ -24,6 +24,7 @@ export function linkBalanceReceipts<T extends Pick<SalonInvoice, "id" | "balance
 /** What this invoice contributes to revenue totals. */
 export function revenueAmount(inv: RevenueFields): number {
   if (inv.balanceInvoiceOf) return inv.total; // the balance, paid on its own receipt
+  if (inv.creditSale) return 0; // Pay Later sale: nothing counts until it's paid — then on its own receipt, on the paid date
   if (inv.balanceInvoiceId && inv.status === "paid") return inv.advanceAmount ?? 0; // its balance is on that receipt
   return inv.status === "partial" ? (inv.advanceAmount ?? 0) : inv.total;
 }

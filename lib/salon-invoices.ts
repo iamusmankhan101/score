@@ -133,6 +133,14 @@ export interface SalonInvoice {
   source?: "pos" | "manual";
   /** Which salon section this sale belongs to (e.g. "Men's", "Women's"). Free text, cosmetic only. */
   section?: string;
+  /**
+   * A "Pay Later / Credit" sale made at the POS. It brings in no revenue itself; the money
+   * counts when it is paid, on its own receipt (balanceInvoiceOf) dated the day it was paid.
+   * Older unpaid invoices don't have this and keep counting as before.
+   */
+  creditSale?: boolean;
+  /** On the receipt that settled a credit sale: the credit invoice's number, for the wording. */
+  creditParentNumber?: string;
   /** Set on a separate receipt created for the balance of an advance invoice. */
   balanceInvoiceOf?: string;
   /** Derived on read: the separate receipt that collected this advance invoice's balance (see getSalonInvoices). */
@@ -386,14 +394,18 @@ export async function createBalancePaymentInvoice(
   paymentMethod: PaymentMethod,
   paidDate = localDateKey(),
 ): Promise<{ invoice: SalonInvoice; dbSaved: boolean; alreadyExists: boolean }> {
-  const balance = balanceDue(parent);
+  // A credit sale is settled in one payment for its whole total; an advance invoice for what's left.
+  const credit = !!parent.creditSale && parent.status === "unpaid";
+  const balance = credit ? parent.total : balanceDue(parent);
   const existing = getSalonInvoices().find((inv) => inv.balanceInvoiceOf === parent.id);
   if (existing) return { invoice: existing, dbSaved: true, alreadyExists: true };
 
   const item: SalonInvoiceItem = {
     id: crypto.randomUUID(),
     type: "service",
-    description: balanceDescription(parent),
+    description: credit
+      ? `Payment for credit invoice ${parent.number} — ${parent.items.map((i) => i.description).join(", ")}`
+      : balanceDescription(parent),
     qty: 1,
     unitPrice: balance,
     total: balance,
@@ -418,7 +430,10 @@ export async function createBalancePaymentInvoice(
     paidDate,
     status: "paid",
     balanceInvoiceOf: parent.id,
-    notes: `Balance payment receipt for advance invoice ${parent.number}. Advance received: PKR ${(parent.advanceAmount ?? 0).toLocaleString("en-PK")}.`,
+    ...(credit ? { creditParentNumber: parent.number } : {}),
+    notes: credit
+      ? `Payment receipt for credit invoice ${parent.number}. Total ${parent.total.toLocaleString("en-PK")}, paid in full on this date.`
+      : `Balance payment receipt for advance invoice ${parent.number}. Advance received: PKR ${(parent.advanceAmount ?? 0).toLocaleString("en-PK")}.`,
     source: "pos",
   }).then(({ invoice, dbSaved }) => ({ invoice, dbSaved, alreadyExists: false }));
 }

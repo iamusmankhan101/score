@@ -6,7 +6,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { linkBalanceReceipts, revenueAmount } from "@/lib/invoice-revenue";
 
 // Unchanged from before except advance/balance pairs: the advance counts its advance, the balance receipt its balance.
-const posAmount = (inv: Parameters<typeof revenueAmount>[0]) => (inv.balanceInvoiceId || inv.balanceInvoiceOf ? revenueAmount(inv) : inv.total);
+const posAmount = (inv: Parameters<typeof revenueAmount>[0]) => (inv.balanceInvoiceId || inv.balanceInvoiceOf || inv.creditSale ? revenueAmount(inv) : inv.total);
 import { appointmentStartMs, appointmentStartHasPassed, timezoneFromSettings, type SalonHoursDay } from "@/lib/appointment-time";
 import { createBooking } from "@/lib/booking";
 import type { Client, Appointment, Staff, Service, InventoryItem } from "@/lib/types";

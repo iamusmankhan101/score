@@ -190,7 +190,8 @@ export default function InvoicesPage() {
     if (!markPaidPromptId) return;
     const id = markPaidPromptId;
     const invoiceBeingPaid = invoices.find((inv) => inv.id === id);
-    const wasPartial = invoiceBeingPaid?.status === "partial";
+    // An advance's balance, or a Pay Later sale's payment, goes on its own dated receipt so the money counts on the day it came in.
+    const wasPartial = invoiceBeingPaid?.status === "partial" || (!!invoiceBeingPaid?.creditSale && invoiceBeingPaid.status === "unpaid");
     if (wasPartial && invoiceBeingPaid) {
       setCreatingBalanceReceipt(true);
       const created = await createBalancePaymentInvoice(invoiceBeingPaid, method, markPaidDate);
@@ -229,6 +230,10 @@ export default function InvoicesPage() {
   function confirmMarkUnpaid() {
     if (!markUnpaidConfirmId) return;
     const id = markUnpaidConfirmId;
+    // Reopening a Pay Later sale takes back the payment receipt that counted its money.
+    if (invoices.find((inv) => inv.id === id)?.creditSale) {
+      for (const receipt of invoices.filter((inv) => inv.balanceInvoiceOf === id)) void deleteSalonInvoice(receipt.id);
+    }
     markSalonInvoiceUnpaid(id);
     reload();
     if (viewingInvoice?.id === id) {
@@ -523,7 +528,22 @@ export default function InvoicesPage() {
             {(() => {
               const promptInvoice = invoices.find((inv) => inv.id === markPaidPromptId);
               const balance = promptInvoice ? balanceDue(promptInvoice) : 0;
-              return promptInvoice?.status === "partial" ? (
+              return promptInvoice?.creditSale && promptInvoice.status === "unpaid" ? (
+                <>
+                  <div style={{ fontWeight: 800, fontSize: 16, color: "#1a1a2e", marginBottom: 6 }}>Collect the payment</div>
+                  <div style={{ fontSize: 13, color: "#6b6b8a", marginBottom: 12 }}>
+                    Credit invoice {promptInvoice.number} — total {fmt(promptInvoice.total)}, paid so far {fmt(0)}.
+                  </div>
+                  <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 14, fontWeight: 800, color: "#b45309" }}>
+                    Remaining {fmt(promptInvoice.total)}
+                  </div>
+                  <div style={{ fontSize: 13, color: "#6b6b8a", marginBottom: 16 }}>How was it paid?</div>
+                  <div style={{ textAlign: "left", marginBottom: 14, padding: "10px 12px", borderRadius: 10, background: "#f0f9ff", border: "1px solid #bae6fd", fontSize: 11, color: "#0369a1", lineHeight: 1.4 }}>
+                    <b style={{ display: "block", fontSize: 12, color: "#075985" }}>Payment receipt</b>
+                    A paid receipt for {fmt(promptInvoice.total)} is created on the date you pick below, and that is the day it counts in revenue.
+                  </div>
+                </>
+              ) : promptInvoice?.status === "partial" ? (
                 <>
                   <div style={{ fontWeight: 800, fontSize: 16, color: "#1a1a2e", marginBottom: 6 }}>Collect the balance</div>
                   <div style={{ fontSize: 13, color: "#6b6b8a", marginBottom: 12 }}>

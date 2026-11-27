@@ -624,6 +624,17 @@ export default function SalonInvoicePrint({
                     <span style={{ fontWeight: 800, color: "#111" }}>Total</span>
                     <span style={{ fontWeight: 900, color: "#111" }}>{fmt(invoice.total)}</span>
                   </div>
+                  {invoice.creditSale && invoice.status === "unpaid" && (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13, color: "#555" }}>
+                        <span>Paid so far</span><span style={{ fontWeight: 700 }}>{fmt(0)}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13, color: "#b45309" }}>
+                        <span style={{ fontWeight: 800 }}>Remaining balance</span>
+                        <span style={{ fontWeight: 900 }}>{fmt(invoice.total)}</span>
+                      </div>
+                    </>
+                  )}
                   {isAdvance && (
                     <>
                       <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 13, color: "#555" }}>

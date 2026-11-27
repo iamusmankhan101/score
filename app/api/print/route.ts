@@ -238,6 +238,13 @@ function buildReceipt(data: ReceiptData): Buffer {
     push(CMD.heavyOff);
   }
 
+  if (data.invoice.creditSale && data.invoice.status === "unpaid") {
+    push(padLine("Paid so far", `${data.currency} 0`, W));
+    push(CMD.heavyOn);
+    push(padLine("REMAINING", `${data.currency} ${data.invoice.total.toFixed(0)}`, W));
+    push(CMD.heavyOff);
+  }
+
   push(CMD.alignCenter, CMD.heavyOn);
   push(text(isPaid ? "** PAID **" : isAdvance ? "** ADVANCE PAID **" : "** UNPAID **"));
   push(CMD.heavyOff);
@@ -350,6 +357,8 @@ interface ReceiptData {
     status: string;
     /** Set only on a "partial" sale — the amount taken up front. */
     advanceAmount?: number;
+    /** A Pay Later sale: prints Paid so far / Remaining while unpaid. */
+    creditSale?: boolean;
     notes?: string;
     fbrInvoiceNumber?: string;
     fbrFee?: number;

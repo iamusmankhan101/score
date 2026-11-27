@@ -857,6 +857,7 @@ export default function POSPage() {
         } : {}),
         date: today,
         status: isCredit ? "unpaid" : isAdvance ? "partial" : "paid",
+        creditSale: isCredit ? true : undefined,
         advanceAmount: !isCredit && isAdvance ? advanceAmount : undefined,
         notes: [
           saleNotes.trim(),
@@ -1066,7 +1067,8 @@ export default function POSPage() {
       `Total: ${pkr(invoice.total)}`,
       ...(pay && invoice.status === "paid" ? [`Paid by: ${pay}`] : []),
       ...(invoice.status === "partial" && invoice.advanceAmount ? [`Advance paid: ${pkr(invoice.advanceAmount)}`, `Balance due: ${pkr(invoice.total - invoice.advanceAmount)}`] : []),
-      ...(invoice.status === "unpaid" ? [`Balance due: ${pkr(invoice.total)}`] : []),
+      ...(invoice.status === "unpaid" ? [`Paid so far: ${pkr(0)}`, `Remaining balance: ${pkr(invoice.total)}`] : []),
+      ...(invoice.balanceInvoiceOf && invoice.creditParentNumber ? [`Payment received for credit invoice ${invoice.creditParentNumber}`, `Remaining balance: ${pkr(0)}`] : []),
     ].join("\n");
     // Emoji survive a JSON body fine (the automated WhatsApp Business API send
     // above), but a wa.me link passes the message through a URL query string

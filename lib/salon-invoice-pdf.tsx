@@ -197,6 +197,18 @@ function InvoiceDocument({ invoice, salon, fbrQr, fbrLogo }: {
             <Text style={styles.totalLabel}>Total</Text>
             <Text style={styles.totalValue}>{money(invoice.total)}</Text>
           </View>
+          {invoice.creditSale && invoice.status === "unpaid" && (
+            <>
+              <View style={styles.row}>
+                <Text style={styles.cellMuted}>Paid so far</Text>
+                <Text style={styles.cellStrong}>{money(0)}</Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.cellMuted}>Remaining balance</Text>
+                <Text style={styles.cellStrong}>{money(invoice.total)}</Text>
+              </View>
+            </>
+          )}
           {isAdvance && (
             <>
               <View style={styles.row}>
