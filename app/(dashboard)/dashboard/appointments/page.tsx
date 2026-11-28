@@ -974,9 +974,17 @@ function personServicePrice(prices: Record<string, string>, svc: Service): numbe
   return Number.isFinite(n) && n >= 0 ? n : svc.price;
 }
 
-function CreateModal({ onClose, onAdd, clients, staffList, allServices }: { onClose: () => void; onAdd: (appts: Appointment[], newClients: Client[]) => void; clients: Client[]; staffList: Staff[]; allServices: Service[] }) {
-  const [form, setForm] = useState({ clientId: "", notes: "" });
-  const [days, setDays] = useState<DayForm[]>(() => [emptyDay()]);
+/** Pre-fill for the booking form, read from the URL when POS sends staff here to book the next visit. */
+type CreatePrefill = { clientId: string; date: string; serviceIds: string[]; staffId: string };
+
+function CreateModal({ onClose, onAdd, clients, staffList, allServices, prefill }: { onClose: () => void; onAdd: (appts: Appointment[], newClients: Client[]) => void; clients: Client[]; staffList: Staff[]; allServices: Service[]; prefill?: CreatePrefill | null }) {
+  const [form, setForm] = useState({ clientId: prefill?.clientId ?? "", notes: "" });
+  const [days, setDays] = useState<DayForm[]>(() => [prefill ? {
+    ...emptyDay(),
+    date: prefill.date,
+    serviceIds: prefill.serviceIds.filter((id) => allServices.some((s) => s.id === id)),
+    staffId: staffList.some((s) => s.id === prefill.staffId) ? prefill.staffId : "",
+  } : emptyDay()]);
   const [activeDay, setActiveDay] = useState(0);
   const day = days[activeDay] ?? days[0];
   const updateDay = (fn: (d: DayForm) => DayForm) =>
@@ -2026,6 +2034,7 @@ export default function AppointmentsPage() {
   const paymentProofs = usePaymentProofs();
   const [showFilters, setShowFilters] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [createPrefill, setCreatePrefill] = useState<CreatePrefill | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [tab, setTab] = useState<"appointments" | "cancellations">("appointments");
@@ -2075,6 +2084,23 @@ export default function AppointmentsPage() {
     const appt = appointments.find((a) => a.id === id);
     if (appt) setSelected(appt);
   }, [appointments]);
+
+  // "Book next visit" from POS: /dashboard/appointments?book=1&clientId=…&date=…&services=a,b&staff=…
+  // opens the booking form already filled in. The query is dropped once read so a refresh doesn't reopen it.
+  useEffect(() => {
+    if (services.length === 0) return;
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("book") !== "1") return;
+    window.history.replaceState(null, "", window.location.pathname);
+    if (apptLimited) return;
+    setCreatePrefill({
+      clientId: p.get("clientId") ?? "",
+      date: p.get("date") ?? "",
+      serviceIds: (p.get("services") ?? "").split(",").filter(Boolean),
+      staffId: p.get("staff") ?? "",
+    });
+    setShowCreate(true);
+  }, [services, apptLimited]);
 
   const filtered = useMemo(() => {
     return [...appointments]
@@ -2278,7 +2304,8 @@ export default function AppointmentsPage() {
       {freedSlot && <WaitlistOffer appt={freedSlot.appt} matches={freedSlot.matches} onClose={() => setFreedSlot(null)} />}
       {showCreate && (
         <CreateModal
-          onClose={() => setShowCreate(false)}
+          prefill={createPrefill}
+          onClose={() => { setShowCreate(false); setCreatePrefill(null); }}
           clients={clients}
           staffList={staffList}
           allServices={services}

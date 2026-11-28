@@ -7,7 +7,7 @@ import {
   Smartphone, Zap, Tag, UserPlus, CheckCircle2, Printer,
   MessageSquare, RefreshCw, User, ChevronRight, Sparkles,
   Clock, AlertCircle, Gift, Percent,
-  ScanBarcode, Lock, PauseCircle, PlayCircle, Camera,
+  ScanBarcode, Lock, PauseCircle, PlayCircle, Camera, CalendarPlus,
 } from "lucide-react";
 import { EasypaisaLogo, JazzCashLogo } from "@/components/wallet-logos";
 import { adjustPoints, awardPoints, redeemPoints, type LoyaltySettings } from "@/lib/loyalty";
@@ -1323,7 +1323,25 @@ export default function POSPage() {
               {syncFailed && <span style={{ display: "flex", alignItems: "center", gap: 3, color: "#dc2626", fontWeight: 700 }}><AlertCircle size={11} /> Not synced to server — saved on this device only</span>}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            {lastInvoice.clientId && !isAdvanceInvoice(lastInvoice) && (() => {
+              // Book the next visit while the client is still at the counter: same services and stylist, N weeks out.
+              const services = lastInvoice.items.filter((i) => i.type === "service" && i.sourceId).map((i) => i.sourceId).join(",");
+              const href = (weeks: number) => {
+                const d = new Date(); d.setDate(d.getDate() + weeks * 7);
+                const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                return `/dashboard/appointments?${new URLSearchParams({ book: "1", clientId: lastInvoice.clientId!, date, services, staff: lastInvoice.staffId ?? "" })}`;
+              };
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 6px 4px 10px", borderRadius: 9, border: "1.5px solid #7C3AED", background: "#fff" }}>
+                  <CalendarPlus size={14} color="#7C3AED" />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#7C3AED", marginRight: 2 }}>Book next visit</span>
+                  {[1, 2, 3, 4].map((w) => (
+                    <a key={w} href={href(w)} style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: "#7C3AED", borderRadius: 6, padding: "3px 7px", textDecoration: "none" }}>+{w} wk</a>
+                  ))}
+                </div>
+              );
+            })()}
             {syncFailed && (
               <button type="button" onClick={retrySync} disabled={retryingSync}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 9, border: "1.5px solid #dc2626", background: "#fff", color: "#dc2626", fontSize: 12, fontWeight: 700, cursor: retryingSync ? "default" : "pointer", opacity: retryingSync ? 0.6 : 1 }}>
