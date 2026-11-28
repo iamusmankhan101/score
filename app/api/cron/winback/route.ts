@@ -12,7 +12,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { activeWhatsAppCredential, type WhatsAppProviderConfig, ycloudConfigOf } from "@/lib/whatsapp-provider";
-import { ensureWinbackTables, enqueueWinbackForUser } from "@/lib/winback-queue";
+import { ensureWinbackTables, enqueueWinbackForUser, enqueueRebookForUser } from "@/lib/winback-queue";
 
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
@@ -29,12 +29,12 @@ async function runWinbackCron() {
   let eligible = 0;
   let queued = 0;
   let skipped = 0;
+  let rebooks = 0;
 
   for (const row of settingsRows.rows) {
     const userId = (row.entity as string).replace(/_settings$/, "");
     try {
       const settings = JSON.parse(row.data as string);
-      if (settings?.winback?.autoWinback !== true) continue;
 
       const providerConfig: WhatsAppProviderConfig = {
         provider: settings?.wasender?.provider || "wasender",
@@ -47,6 +47,10 @@ async function runWinbackCron() {
       };
       if (!activeWhatsAppCredential(providerConfig)) continue;
 
+      // Rebooking reminders ride on this daily scan but have their own switch (wasender.autoRebook).
+      rebooks += (await enqueueRebookForUser(userId)).queued;
+      if (settings?.winback?.autoWinback !== true) continue;
+
       const result = await enqueueWinbackForUser(userId);
       if (!result.ok) continue;
       salons++;
@@ -58,7 +62,7 @@ async function runWinbackCron() {
     }
   }
 
-  return { salons, eligible, queued, skipped };
+  return { salons, eligible, queued, skipped, rebooks };
 }
 
 export async function GET(req: NextRequest) {

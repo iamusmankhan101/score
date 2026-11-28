@@ -344,6 +344,7 @@ function AddEditServiceModal({ onClose, onSave, staffList, servicesList, invento
     subcategory:      serviceToEdit?.subcategory ?? "",
     section:          serviceToEdit?.section ?? defaultSectionForNewRecord(),
     durationMin:      serviceToEdit ? String(serviceToEdit.durationMin) : "60",
+    rebookAfterDays:  serviceToEdit?.rebookAfterDays ? String(serviceToEdit.rebookAfterDays) : "",
     price:            serviceToEdit ? String(serviceToEdit.price) : "",
     variablePrice:    serviceToEdit?.variablePrice ?? false,
     priceRangeMin:    serviceToEdit?.priceRangeMin ? String(serviceToEdit.priceRangeMin) : "",
@@ -465,6 +466,7 @@ function AddEditServiceModal({ onClose, onSave, staffList, servicesList, invento
       subcategory:      !form.isPackage && form.subcategory.trim() ? form.subcategory.trim() : undefined,
       section:          form.section || undefined,
       durationMin,
+      rebookAfterDays:  !form.isPackage && Number(form.rebookAfterDays) > 0 ? Math.round(Number(form.rebookAfterDays)) : undefined,
       price:            form.variablePrice ? rangeMin : price,
       variablePrice:    form.variablePrice,
       priceRangeMin:    form.variablePrice ? rangeMin : undefined,
@@ -589,6 +591,14 @@ function AddEditServiceModal({ onClose, onSave, staffList, servicesList, invento
                 <input type="number" value={form.durationMin} onChange={(e) => set("durationMin", e.target.value)} placeholder="e.g. 60"
                   style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #e8e8f0", fontSize: 13, color: "#1a1a2e", outline: "none" }} />
               </div>
+            </div>
+          )}
+          {!form.isPackage && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "#9898b0", textTransform: "uppercase", letterSpacing: "0.06em" }}>Rebooking reminder (days after visit)</label>
+              <input type="number" min={0} value={form.rebookAfterDays} onChange={(e) => set("rebookAfterDays", e.target.value)} placeholder="e.g. 28 — leave empty for no reminder"
+                style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #e8e8f0", fontSize: 13, color: "#1a1a2e", outline: "none" }} />
+              <span style={{ fontSize: 11, color: "#9898b0" }}>Sends the client a WhatsApp to book again this many days after they had this service, unless they already have a booking.</span>
             </div>
           )}
           {!form.isPackage && form.category === "custom" && (

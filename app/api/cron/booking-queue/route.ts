@@ -191,7 +191,7 @@ async function ensureTables() {
   tablesReady = true;
 }
 
-type QueueKind = "confirmation" | "groupalert" | "followup" | "cancellation" | "reminder" | "birthday" | "winback" | "lowstock" | "manual" | "aftercare";
+type QueueKind = "confirmation" | "groupalert" | "followup" | "cancellation" | "reminder" | "birthday" | "winback" | "lowstock" | "manual" | "aftercare" | "rebook";
 type LogKind = QueueKind | "invoice";
 
 interface QueueRow {
@@ -325,6 +325,7 @@ async function hasSentForSameVisit(userId: string, logType: string, phone: strin
 
 function logTypeForKind(kind: LogKind): string {
   if (kind === "groupalert") return "newbooking";
+  if (kind === "rebook") return "followup";
   return kind;
 }
 
@@ -332,6 +333,7 @@ function messageTypeForKind(kind: QueueKind): "reminder" | "confirmation" | "fol
   if (kind === "groupalert") return "manual";
   if (kind === "lowstock") return "manual";
   if (kind === "aftercare") return "manual";
+  if (kind === "rebook") return "followup";
   return kind;
 }
 
@@ -345,7 +347,7 @@ function intentForKind(kind: QueueKind): WhatsAppMessageIntent {
 // that back defeats the point). Everything else in this set has no time
 // pressure, so it waits for the salon to actually be open rather than landing
 // in a client's chat, or the owner's low-stock alert, while the salon is closed.
-const SALON_HOURS_GATED_KINDS = new Set<QueueKind>(["reminder", "followup", "cancellation", "birthday", "winback", "lowstock", "aftercare"]);
+const SALON_HOURS_GATED_KINDS = new Set<QueueKind>(["reminder", "followup", "cancellation", "birthday", "winback", "lowstock", "aftercare", "rebook"]);
 
 function autoSettingEnabled(settings: Record<string, unknown> | null, kind: QueueKind): boolean {
   const wasender = settings?.wasender as {
@@ -355,6 +357,7 @@ function autoSettingEnabled(settings: Record<string, unknown> | null, kind: Queu
     autoCancellation?: boolean;
     autoReminder?: boolean;
     autoLowStock?: boolean;
+    autoRebook?: boolean;
   } | undefined;
   if (kind === "confirmation") return wasender?.autoConfirmation !== false;
   if (kind === "groupalert") return wasender?.autoGroupBooking !== false;
@@ -362,6 +365,7 @@ function autoSettingEnabled(settings: Record<string, unknown> | null, kind: Queu
   if (kind === "cancellation") return wasender?.autoCancellation !== false;
   if (kind === "reminder") return wasender?.autoReminder !== false;
   if (kind === "lowstock") return wasender?.autoLowStock !== false;
+  if (kind === "rebook") return wasender?.autoRebook !== false;
   // Win-back lives in its own settings block (not wasender) and is opt-in, so
   // unlike every other kind here an absent value means off, not on.
   if (kind === "winback") return (settings?.winback as { autoWinback?: boolean } | undefined)?.autoWinback === true;

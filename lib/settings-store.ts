@@ -4,6 +4,7 @@ import { activeCredential, isProviderField } from "./whatsapp-credentials";
 import { userKey, getCurrentUser } from "./auth";
 import { saveSettingsToDB } from "./turso-sync";
 import { cacheGet, cacheSet } from "./sync-records";
+import { REBOOK_DEFAULT_TEMPLATE } from "./rebook";
 
 const STORAGE_KEY = "werzio_settings";
 const SAVED_AT_KEY = "werzio_settings_saved_at";
@@ -70,6 +71,7 @@ const defaults = {
     reminderHours: 24,
     autoConfirmation: true,
     autoFollowup: true,
+    autoRebook: true,
     followupDelayMinutes: 1440,
     autoCancellation: true,
     cancellationDelayMinutes: 1440,
@@ -155,6 +157,7 @@ const defaults = {
     winbackNoDiscount: "Hi {{name}}, it's been a while since your last visit to {{salon_name}} — we've missed you! We'd love to see you again, just reply here whenever you'd like to book 💜",
     winbackNeverVisited: "Hi {{name}}, we'd love to welcome you to {{salon_name}} for the first time! Enjoy {{discount}} off your first appointment. Just reply here to book 💜",
     winbackNeverVisitedNoDiscount: "Hi {{name}}, we'd love to welcome you to {{salon_name}} for the first time! Just reply here whenever you'd like to book 💜",
+    rebook: REBOOK_DEFAULT_TEMPLATE,
     posThankYou: "Thank you so much for visiting {{salon_name}} today, {{name}}! We hope you loved your experience — see you again soon 💜",
   },
   birthday: {

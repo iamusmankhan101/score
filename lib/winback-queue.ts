@@ -12,6 +12,7 @@ import { db } from "./db";
 import { isFakePlaceholderPhone } from "./whatsapp-provider";
 import { summarizeWinbackAudience, resolveWinbackConfig, todaysWinbackCap, winbackTemplateVars, type WinbackAppointment, type WinbackClient, type WinbackInvoice } from "./winback";
 import { appointmentStartMs, isWithinSalonHours, nextSalonOpenMs, timezoneFromSettings, type SalonHoursDay } from "./appointment-time";
+import { findRebookDue, rebookTemplateVars, REBOOK_DEFAULT_TEMPLATE, type RebookAppointment, type RebookClient, type RebookInvoice, type RebookService } from "./rebook";
 
 const MINUTE_MS = 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -345,4 +346,57 @@ export async function enqueueWinbackForUser(
   }
 
   return { ok: true, eligible: targets.length, queued: batch.length, skipped, dailyCap, remainingToday };
+}
+
+/**
+ * Queue rebooking reminders for one salon (see lib/rebook.ts). Runs from the
+ * daily /api/cron/winback scan. The row id carries the visit date, so each visit
+ * gets at most one reminder however many days the catch-up window re-finds it.
+ */
+export async function enqueueRebookForUser(userId: string, nowMs = Date.now()): Promise<{ queued: number }> {
+  const settings = await loadSalonSettings(userId);
+  if (!settings) return { queued: 0 };
+  const wasender = settings.wasender as Record<string, unknown> | undefined;
+  if (wasender?.enabled === false || wasender?.autoRebook === false) return { queued: 0 };
+
+  const services = await loadEntity<RebookService>(userId, "services");
+  if (!services.some((s) => (s.rebookAfterDays ?? 0) > 0)) return { queued: 0 };
+
+  const timezone = timezoneFromSettings(settings);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(nowMs));
+  const due = findRebookDue(
+    await loadEntity<RebookClient>(userId, "clients"),
+    services,
+    await loadEntity<RebookAppointment>(userId, "appointments"),
+    await loadEntity<RebookInvoice>(userId, "salon_invoices"),
+    today,
+  );
+  if (due.length === 0) return { queued: 0 };
+
+  const template = (settings.whatsapp as Record<string, string> | undefined)?.rebook?.trim() || REBOOK_DEFAULT_TEMPLATE;
+  const salonName = (settings.salon as { name?: string } | undefined)?.name || "Your Salon";
+  const createdAt = new Date(nowMs).toISOString();
+  // ponytail: fixed 20/day cap, same spirit as win-back's; make it a setting if a salon outgrows it.
+  const batch = due.map((d) => ({ d, phone: normalizePhone(d.client.phone || "") }))
+    .filter(({ phone }) => phone && !isFakePlaceholderPhone(phone))
+    .slice(0, 20);
+  const gaps = winbackGapsMs(batch.length);
+  let cursor = nowMs + randBetween(WINBACK_FIRST_SEND_MIN_MS, WINBACK_FIRST_SEND_MAX_MS);
+  let queued = 0;
+  for (const [i, { d, phone }] of batch.entries()) {
+    if (i > 0) cursor += gaps[i - 1];
+    cursor = withinOpeningHours(cursor, settings);
+    const res = await db.execute({
+      sql: `INSERT OR IGNORE INTO wa_booking_send_queue
+              (id, user_id, kind, phone, text, client_name, appt_date, appt_time, service, scheduled_at, status, attempts, created_at)
+            VALUES (?, ?, 'rebook', ?, ?, ?, NULL, NULL, ?, ?, 'pending', 0, ?)`,
+      args: [
+        `rebook_${d.client.id}_${d.service.id}_${d.lastVisit}`, userId, phone,
+        fillTemplate(template, rebookTemplateVars(d, salonName)), d.client.name, d.service.name,
+        new Date(cursor).toISOString(), createdAt,
+      ],
+    });
+    queued += res.rowsAffected;
+  }
+  return { queued };
 }

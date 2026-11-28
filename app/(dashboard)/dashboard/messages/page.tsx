@@ -68,6 +68,7 @@ const TPL_CONFIG: TplCfg[] = [
   { key: "birthday", noDiscountKey: "birthdayNoDiscount", label: "Birthday Greeting", description: "Queued on each client's birthday. Supports separate discount and no-discount wording", vars: ["name","salon_name","discount"], noDiscountVars: ["name","salon_name"], color: "#db2777", icon: Cake },
   { key: "winback", noDiscountKey: "winbackNoDiscount", label: "Win-back (Lapsed Clients)", description: "Sent to clients who haven't visited in a long time. Supports separate discount and no-discount wording", vars: ["name","salon_name","discount","last_visit","days"], noDiscountVars: ["name","salon_name","last_visit","days"], color: "#0d9488", icon: UserMinus },
   { key: "winbackNeverVisited", noDiscountKey: "winbackNeverVisitedNoDiscount", label: "Win-back (Never Visited)", description: "Sent to clients on file who have never visited, when that option is on in Win-back Messages", vars: ["name","salon_name","discount"], noDiscountVars: ["name","salon_name"], color: "#0d9488", icon: UserMinus },
+  { key: "rebook",       label: "Rebooking Reminder",      description: "Sent when a client is due back for a service — set the days on each service (Services page)", vars: ["name","service","weeks","days","last_visit","salon_name"], color: "#7C3AED", icon: Bell },
   { key: "posThankYou",  label: "POS Thank You",           description: "Included in the invoice message caption after a POS sale", vars: ["name","salon_name"],                          color: "#c026d3", icon: Heart },
 ];
 
@@ -720,7 +721,7 @@ function MessagesPageContent() {
 
   const ws = settingsStore.wasender as {
     enabled?: boolean; provider?: "wasender" | "botsailor" | "zaptick" | "chakra" | "ycloud"; apiKey: string; botSailorApiToken?: string; botSailorPhoneNumberId?: string; zaptickApiKey?: string; chakraAccessToken?: string; chakraPluginId?: string; chakraWhatsappPhoneNumberId?: string; ownerPhone: string;
-    autoReminder: boolean; autoConfirmation: boolean; autoFollowup: boolean;
+    autoReminder: boolean; autoConfirmation: boolean; autoFollowup: boolean; autoRebook?: boolean;
     autoCancellation: boolean; autoLowStock: boolean;
   };
   // Keys are admin-managed and stay on the server; it reports `connected`.
@@ -797,6 +798,7 @@ function MessagesPageContent() {
           <AutoCard icon={Bell}         label="Appointment Reminder"  enabled={ws.autoReminder}     color="#7C3AED" />
           <AutoCard icon={CheckCircle2} label="Booking Confirmation"  enabled={ws.autoConfirmation} color="#059669" />
           <AutoCard icon={ThumbsUp}     label="Follow-up Message"     enabled={ws.autoFollowup}     color="#0284c7" />
+          <AutoCard icon={Bell}         label="Rebooking Reminder"    enabled={ws.autoRebook !== false} color="#7C3AED" />
           <AutoCard icon={CalendarX}    label="Cancellation Win-back"    enabled={ws.autoCancellation} color="#dc2626" />
           <AutoCard icon={Package}      label="Low Stock Alert"          enabled={ws.autoLowStock}     color="#ea580c" />
           <AutoCard icon={Cake}         label="Birthday Reminder"     enabled={bdEnabled}           color="#db2777" />

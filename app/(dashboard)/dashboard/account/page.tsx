@@ -857,6 +857,8 @@ interface WhatsAppSettings {
   reminderHours: number;
   autoConfirmation: boolean;
   autoFollowup: boolean;
+  /** Rebooking reminders (lib/rebook.ts). Absent = on. */
+  autoRebook?: boolean;
   followupDelayMinutes: number;
   autoCancellation: boolean;
   cancellationDelayMinutes: number;
@@ -1180,6 +1182,7 @@ function WhatsAppSection() {
     "autoReminder",
     "autoConfirmation",
     "autoFollowup",
+    "autoRebook",
     "autoCancellation",
     "autoLowStock",
     "autoGroupBooking",
@@ -1713,6 +1716,13 @@ function WhatsAppSection() {
               onChange={(v) => set("followupDelayMinutes", v)}
             />
           }
+        />
+        <AutoRow
+          label="Rebooking Reminder"
+          hint="Asks clients to book again a set number of days after a service — set the days on each service (Services page)"
+          enabled={isEnabled && form.autoRebook !== false}
+          disabled={!isEnabled}
+          onToggle={() => set("autoRebook", form.autoRebook === false)}
         />
         <AutoRow
           label="Cancellation Win-back"

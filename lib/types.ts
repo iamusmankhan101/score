@@ -103,6 +103,8 @@ export interface Service {
   section?: string;
   durationMin: number;
   price: number;
+  /** Days after a visit to send the client a "time to rebook" WhatsApp (lib/rebook.ts). Unset = no reminder. */
+  rebookAfterDays?: number;
   variablePrice?: boolean;
   priceRangeMin?: number;
   priceRangeMax?: number;
