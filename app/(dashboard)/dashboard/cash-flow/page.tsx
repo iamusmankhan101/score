@@ -37,6 +37,7 @@ export const EXPENSE_CATEGORIES: { key: ExpenseCategory; label: string; color: s
   { key: "utilities",     label: "Utilities",           color: "#eab308" },
   { key: "supplies",      label: "Products & Supplies", color: "#22c55e" },
   { key: "equipment",     label: "Equipment",           color: "#3b82f6" },
+  { key: "maintenance",   label: "Maintenance",         color: "#a16207" },
   { key: "marketing",     label: "Marketing",           color: "#8b5cf6" },
   { key: "food",          label: "Food & Tea",          color: "#ec4899" },
   { key: "refunds",       label: "Refunds",             color: "#be123c" },
@@ -131,6 +132,10 @@ export default function CashFlowPage() {
   const [showForm, setShowForm]       = useState(false);
   const [editId, setEditId]           = useState<string | null>(null);
   const [form, setForm]               = useState({ ...EMPTY_FORM });
+  const [typingCategory, setTypingCategory] = useState(false);
+  // Categories the salon typed in before, offered again in the picker.
+  const customCategories = useMemo(() => [...new Set(expenses.map(e => e.category))]
+    .filter(c => c && !EXPENSE_CATEGORIES.some(k => k.key === c)).sort(), [expenses]);
   const [inventory, setInventory]     = useState<InventoryItem[]>([]);
   const [formError, setFormError]     = useState("");
   const [hoveredBar, setHoveredBar]   = useState<number | null>(null);
@@ -317,7 +322,9 @@ export default function CashFlowPage() {
   const categoryBreakdown = useMemo(() => {
     const map: Record<string, number> = {};
     paidPeriodExpenses.forEach(e => { map[e.category] = (map[e.category] ?? 0) + e.amount; });
-    return EXPENSE_CATEGORIES
+    const custom = Object.keys(map).filter(k => !EXPENSE_CATEGORIES.some(c => c.key === k))
+      .map(k => ({ key: k as ExpenseCategory, label: k, color: "#6b7280" }));
+    return [...EXPENSE_CATEGORIES, ...custom]
       .map(c => ({ ...c, amount: map[c.key] ?? 0 }))
       .filter(c => c.amount > 0)
       .sort((a, b) => b.amount - a.amount);
@@ -382,6 +389,7 @@ export default function CashFlowPage() {
     setEditId(null);
     setFormError("");
     setForm({ ...EMPTY_FORM, date: today });
+    setTypingCategory(false);
     setShowForm(true);
   }
 
@@ -389,6 +397,7 @@ export default function CashFlowPage() {
     setInventory(getStoredInventory());
     setEditId(exp.id);
     setFormError("");
+    setTypingCategory(false);
     setForm({
       date: exp.date,
       category: exp.category,
@@ -487,6 +496,8 @@ export default function CashFlowPage() {
       setFormError("Please select an expense date.");
       return;
     }
+    const category = form.category.trim();
+    if (!category) { setFormError("Please type a name for the custom category."); return; }
     const filledRows = form.items.filter(row => row.name.trim() || row.qty || row.unitPrice);
     const items: ExpenseItem[] = [];
     for (const row of filledRows) {
@@ -506,8 +517,7 @@ export default function CashFlowPage() {
 
     const description = form.description.trim()
       || (items.length ? itemsSummary(items) : "")
-      || EXPENSE_CATEGORIES.find(category => category.key === form.category)?.label
-      || "Expense";
+      || (EXPENSE_CATEGORIES.find(c => c.key === category)?.label ?? category);
     const billImagePatch = { billImageDataUrl: form.billImageDataUrl, billImageName: form.billImageName };
 
     // Locked to the active dashboard section when one is restricted (e.g.
@@ -528,10 +538,10 @@ export default function CashFlowPage() {
       const itemsPatch = { items: linkedItems.length ? linkedItems : undefined };
       if (editId) {
         previousItems = before.find(e => e.id === editId)?.items;
-        dbSaved = await withinSeconds(20, updateExpense(editId, { date: form.date, category: form.category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch }), false);
+        dbSaved = await withinSeconds(20, updateExpense(editId, { date: form.date, category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch }), false);
         
       } else {
-        ({ dbSaved } = (await withinSeconds(20, addExpense({ date: form.date, category: form.category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch }), undefined)) ?? { dbSaved: false });
+        ({ dbSaved } = (await withinSeconds(20, addExpense({ date: form.date, category, description, amount: amt, paymentMethod: form.paymentMethod, paymentStatus: form.paymentStatus, ...billImagePatch, notes: form.notes.trim() || undefined, section: expenseSection, ...itemsPatch }), undefined)) ?? { dbSaved: false });
         
       }
       if (!dbSaved) {
@@ -672,7 +682,7 @@ export default function CashFlowPage() {
         
         const date = parseDate(field(row, "date"));
         const categoryRaw = String(field(row, "category")).trim().toLowerCase();
-        const category = categoryMap.get(categoryRaw);
+        const category: ExpenseCategory | undefined = categoryMap.get(categoryRaw) ?? (String(field(row, "category")).trim() || undefined);
         const categoryLabel = String(field(row, "category")).trim();
         const description = String(field(row, "service description", "description")).trim();
         const parseAmount = (value: unknown) => {
@@ -1379,9 +1389,19 @@ export default function CashFlowPage() {
               </div>
               <div>
                 <label style={labelSt}>Category</label>
-                <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value as ExpenseCategory }))} style={inputSt}>
+                <select value={typingCategory ? "__custom" : form.category} onChange={e => {
+                  const v = e.target.value;
+                  setTypingCategory(v === "__custom");
+                  setForm(f => ({ ...f, category: v === "__custom" ? "" : v }));
+                }} style={inputSt}>
                   {EXPENSE_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                  {customCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="__custom">+ Custom…</option>
                 </select>
+                {typingCategory && (
+                  <input autoFocus value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                    placeholder="Type category name" style={{ ...inputSt, marginTop: 6 }} />
+                )}
               </div>
               <div>
                 <label style={labelSt}>Payment</label>

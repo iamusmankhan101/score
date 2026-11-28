@@ -14,10 +14,13 @@ export type ExpenseCategory =
   | "utilities"
   | "supplies"
   | "equipment"
+  | "maintenance"
   | "marketing"
   | "food"
   | "refunds"
-  | "miscellaneous";
+  | "miscellaneous"
+  // A category the salon typed in themselves ("Custom…"), stored as its name.
+  | (string & {});
 
 /** One product bought in an expense, e.g. Shampoo × 5 @ PKR 800. */
 export interface ExpenseItem {

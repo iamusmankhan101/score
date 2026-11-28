@@ -66,6 +66,7 @@ const EXPENSE_CATEGORIES: { key: ExpenseCategory; label: string; color: string }
   { key: "utilities",     label: "Utilities",           color: "#eab308" },
   { key: "supplies",      label: "Products & Supplies", color: "#22c55e" },
   { key: "equipment",     label: "Equipment",           color: "#3b82f6" },
+  { key: "maintenance",   label: "Maintenance",         color: "#a16207" },
   { key: "marketing",     label: "Marketing",           color: "#8b5cf6" },
   { key: "food",          label: "Food & Tea",          color: "#ec4899" },
   { key: "miscellaneous", label: "Miscellaneous",       color: "#6b7280" },
